@@ -1,6 +1,11 @@
 # منصة إطلاق استراتيجية هيئة الحكومة الرقمية (GAC)
 ## Strategy House Rollout Platform
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/github)
+
+> **One-click deploy:** Click the button above → sign in to Railway → pick this repo (`Strategy-Rollout`) → Deploy. After deploy: **Settings → Networking → Generate Domain** to get your public URL.
+
+
 منصة رقمية تفاعلية لإطلاق استراتيجية الهيئة على ١٨٠ موظفاً موزّعين على ١٨ إدارة خلال أربعة أيام تشغيل (الأيام ٢ إلى ٥ فقط)، بجلسات مدتها ٩٠ دقيقة لكل إدارة كاملة.
 
 A configurable, Arabic-first platform that runs the Strategy House rollout for the General Authority for Competition (GAC): three movements per session (Define → Build → Commit), a collaborative per-department Strategy Map, voluntary digital signatures, and a daily operational dashboard for the strategy office.
