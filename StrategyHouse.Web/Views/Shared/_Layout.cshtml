@@ -1,0 +1,56 @@
+@{
+    var title = (ViewData["Title"] as string) ?? "منصة استراتيجية هيئة الحكومة الرقمية";
+}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@title</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=Cairo:wght@400;600;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar__inner">
+            <a href="/" class="brand">
+                <span class="brand__mark">GAC</span>
+                <span class="brand__name">منصة استراتيجية هيئة الحكومة الرقمية</span>
+            </a>
+            <nav class="nav">
+                <a href="/">الرئيسية</a>
+                <a href="/Wall">جدار الالتزامات</a>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <a href="/Dashboard">لوحة المؤشرات</a>
+                    <a href="/Admin">الإدارة</a>
+                    <form method="post" action="/Account/Logout" class="nav__form">
+                        <button type="submit" class="btn btn--ghost">خروج</button>
+                    </form>
+                    <span class="chip chip--user">@User.Identity?.Name</span>
+                }
+                else
+                {
+                    <a href="/Account/Login" class="btn btn--ghost">دخول</a>
+                }
+            </nav>
+        </div>
+    </header>
+
+    <main class="main">
+        @RenderBody()
+    </main>
+
+    <footer class="footer">
+        <div class="footer__inner">
+            <span>© @DateTime.Now.Year — هيئة الحكومة الرقمية</span>
+            <span class="footer__tag">منصة إطلاق الاستراتيجية</span>
+        </div>
+    </footer>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

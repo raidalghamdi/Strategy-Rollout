@@ -1,0 +1,34 @@
+@{
+    ViewData["Title"] = "تسجيل الدخول";
+}
+<div class="container--narrow">
+    <div class="card">
+        <h2>تسجيل دخول المنظم</h2>
+        <p class="muted">للحضور: لا حاجة لتسجيل الدخول، استخدم رمز الجلسة من المُيسّر.</p>
+
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert--error">
+                @foreach (var err in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <div>@err.ErrorMessage</div>
+                }
+            </div>
+        }
+
+        <form method="post" action="/Account/Login">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
+            <div class="form-row">
+                <label for="email">البريد الإلكتروني</label>
+                <input id="email" name="email" type="email" class="input" required value="admin@gac.gov.sa" />
+            </div>
+            <div class="form-row">
+                <label for="password">كلمة المرور</label>
+                <input id="password" name="password" type="password" class="input" required value="Demo@123" />
+            </div>
+            <button type="submit" class="btn btn--primary btn--block">دخول</button>
+            <p class="muted mt-2">حساب تجريبي: <code>admin@gac.gov.sa</code> / <code>Demo@123</code></p>
+        </form>
+    </div>
+</div>

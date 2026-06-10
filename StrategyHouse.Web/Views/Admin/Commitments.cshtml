@@ -1,0 +1,47 @@
+@using StrategyHouse.Domain.Entities
+@model List<CommitmentTemplate>
+@{ ViewData["Title"] = "قائمة الالتزامات"; }
+
+<h1>قائمة الالتزامات المقترحة (@Model.Count)</h1>
+<p class="muted">قائمة منسقة يختار منها المشاركون في الحركة الثالثة. أي إدارة يمكنها رؤية الالتزامات العامة + الخاصة بها فقط.</p>
+
+<table class="table">
+    <thead><tr><th>النص</th><th>الإدارة</th><th>الربط المقترح</th><th>الحالة</th></tr></thead>
+    <tbody>
+        @foreach (var c in Model)
+        {
+            <tr>
+                <td>@c.TextAr</td>
+                <td>@(c.Department?.NameAr ?? "عام")</td>
+                <td>@(c.SuggestedLinkType?.ToString() ?? "—")</td>
+                <td>@(c.IsActive ? "نشط" : "معطّل")</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<div class="card mt-3">
+    <h3>إضافة التزام جديد</h3>
+    <form method="post" action="/Admin/AddCommitment">
+        @Html.AntiForgeryToken()
+        <div class="form-row">
+            <label>نص الالتزام</label>
+            <input class="input" name="textAr" required />
+        </div>
+        <div class="form-row">
+            <label>الإدارة (فارغ = عام)</label>
+            <input class="input" name="departmentId" type="number" placeholder="رقم الإدارة (اختياري)" />
+        </div>
+        <div class="form-row">
+            <label>نوع الربط المقترح</label>
+            <select class="select" name="linkType">
+                <option value="">—</option>
+                <option value="0">قيمة</option>
+                <option value="1">ركيزة</option>
+                <option value="2">هدف</option>
+                <option value="3">مشروع</option>
+            </select>
+        </div>
+        <button class="btn btn--primary" type="submit">+ إضافة</button>
+    </form>
+</div>

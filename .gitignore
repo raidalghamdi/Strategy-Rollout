@@ -1,0 +1,23 @@
+# Build outputs
+bin/
+obj/
+publish/
+*.user
+
+# SQLite dev DB
+*.db
+*.db-shm
+*.db-wal
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

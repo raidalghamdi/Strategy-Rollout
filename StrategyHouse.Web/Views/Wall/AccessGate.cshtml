@@ -1,0 +1,15 @@
+@{ ViewData["Title"] = "جدار الالتزامات — وصول مقيد"; }
+<div class="container--narrow">
+    <div class="card">
+        <h1>جدار الالتزامات</h1>
+        <p class="muted">خلال أسبوع الإطلاق، يُتاح الجدار للحضور فقط. أدخل رمز جلستك للدخول.</p>
+        <form method="get" action="/Wall">
+            <div class="form-row">
+                <label>رمز الجلسة</label>
+                <input name="code" class="input" placeholder="DEMO-001" required />
+            </div>
+            <button type="submit" class="btn btn--primary btn--block">دخول الجدار</button>
+        </form>
+        <p class="muted mt-2">لمكتب الاستراتيجية: <a href="/Account/Login">تسجيل الدخول</a> للوصول الكامل.</p>
+    </div>
+</div>

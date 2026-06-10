@@ -1,0 +1,24 @@
+@using StrategyHouse.Domain.Entities
+@model Survey
+@{ ViewData["Title"] = "استبيان نهاية الجلسة"; }
+
+@if (Model == null)
+{
+    <div class="alert alert--warn">لا يوجد استبيان نشط حالياً.</div>
+}
+else
+{
+    <h1>@Model.NameAr <small class="muted">(v@Model.Version)</small></h1>
+    <p class="muted">@(Model.IntroAr ?? "")</p>
+
+    <table class="table">
+        <thead><tr><th>#</th><th>السؤال</th><th>النوع</th><th>إلزامي</th></tr></thead>
+        <tbody>
+            @foreach (var q in Model.Questions.OrderBy(q => q.Order))
+            {
+                <tr><td>@q.Order</td><td>@q.TextAr</td><td><span class="badge badge--gray">@q.Type</span></td><td>@(q.IsRequired ? "نعم" : "—")</td></tr>
+            }
+        </tbody>
+    </table>
+    <p class="muted mt-2">عدد الأسئلة: @Model.Questions.Count · الأسئلة قابلة للتعديل قاعدة البيانات مباشرة في النسخة الحالية.</p>
+}

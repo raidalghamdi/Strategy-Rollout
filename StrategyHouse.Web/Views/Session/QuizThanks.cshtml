@@ -1,0 +1,17 @@
+@{
+    ViewData["Title"] = "نتائج الاختبار";
+    var total = (int)(ViewBag.Total ?? 0);
+    var correct = (int)(ViewBag.Correct ?? 0);
+    var pct = total > 0 ? (int)Math.Round(correct * 100.0 / total) : 0;
+}
+<div class="container--narrow">
+    <div class="card center">
+        <h1>شكراً لك</h1>
+        <div class="stat__num" style="font-size:48px; margin-top:8px;">@correct / @total</div>
+        <p class="muted">نتيجتك (@pct%)</p>
+        <div class="alert alert--info mt-2">
+            النتائج الفردية لا تُحفظ بهوية. يُجمَّع المتوسط فقط لاستخدامه في تحسين الجلسات القادمة.
+        </div>
+        <a href="/" class="btn btn--secondary mt-2">العودة للرئيسية</a>
+    </div>
+</div>

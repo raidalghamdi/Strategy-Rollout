@@ -1,0 +1,68 @@
+@using StrategyHouse.Web.Controllers
+@{
+    ViewData["Title"] = "الرئيسية — منصة إطلاق الاستراتيجية";
+    var stats = (HomeStats)ViewBag.Stats;
+}
+
+<div class="hero">
+    <h1>منصة إطلاق استراتيجية هيئة الحكومة الرقمية</h1>
+    <p>منصة رقمية تفاعلية لإطلاق الاستراتيجية على مستوى الإدارات الثمانية عشر — تُعرّف الموظفين بالرؤية والرسالة والقيم، تبني الخريطة الاستراتيجية لكل إدارة معاً، وتُسجّل الالتزامات الجماعية بتوقيع تطوعي على الجدار الرقمي للالتزامات.</p>
+</div>
+
+<div class="stats">
+    <div class="stat">
+        <div class="stat__num">@stats.Departments</div>
+        <div class="stat__label">إدارة</div>
+    </div>
+    <div class="stat">
+        <div class="stat__num">@stats.Sessions</div>
+        <div class="stat__label">جلسة</div>
+    </div>
+    <div class="stat">
+        <div class="stat__num">@stats.Attendees</div>
+        <div class="stat__label">مشارك مسجل</div>
+    </div>
+    <div class="stat">
+        <div class="stat__num">@stats.Maps</div>
+        <div class="stat__label">خريطة استراتيجية</div>
+    </div>
+    <div class="stat">
+        <div class="stat__num">@stats.Commitments</div>
+        <div class="stat__label">التزام مسجل</div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card card--accent">
+        <h2>كيف تعمل الجلسة (٩٠ دقيقة)</h2>
+        <ol>
+            <li><strong>الحركة الأولى (٢٠ دقيقة) — التعريف:</strong> قياس مرجعي مجهول، ثم عرض بيت الاستراتيجية (الرؤية، الرسالة، القيم، الركائز، الأهداف).</li>
+            <li><strong>الحركة الثانية (٤٠ دقيقة) — البناء الجماعي:</strong> كل إدارة تبني خريطتها الاستراتيجية على لوحة تفاعلية بالربط بين عناصرها (مشاريع، مؤشرات، أدوار) وبين الأهداف والركائز.</li>
+            <li><strong>الحركة الثالثة (٣٠ دقيقة) — الالتزام:</strong> اختيار الالتزامات الجماعية، ربطها بعناصر الإطار، وتوقيع تطوعي على iPad.</li>
+            <li><strong>إغلاق:</strong> استبيان قصير ثم رسالة شكر بريدية في اليوم نفسه مع رابط الاختبار الاختياري.</li>
+        </ol>
+    </div>
+
+    <div class="card card--accent">
+        <h2>المبادئ التشغيلية</h2>
+        <ul>
+            <li>الإدارات مكتملة، بدون تجميع مختلط بين إدارات.</li>
+            <li>أيام التشغيل ٢ إلى ٥ فقط (لا أول ولا آخر يوم).</li>
+            <li>مكتب الاستراتيجية فقط هو المُيسّر؛ رئيس الإدارة راعٍ نشط بدور محدد سلفاً عبر <em>خريطة رحلة رئيس الإدارة</em>.</li>
+            <li>التوقيع تطوعي، يُضاف على خريطة الإدارة في منطقة A3.</li>
+            <li>جدار الالتزامات الرقمي يبقى مفتوحاً للحضور خلال الأسبوع، ثم يُعمَّم عند الإكمال.</li>
+            <li>التصميم عربي RTL، واضح ومؤسسي بهوية الحكومة الرقمية.</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card">
+    <h2>الدخول السريع</h2>
+    <p class="muted">للحضور: استخدم رمز الجلسة الذي عرضه المُيسّر. للمنظم: سجّل الدخول للوصول إلى لوحة المؤشرات والإدارة.</p>
+    <form method="get" action="/Session/Console" class="row mt-2">
+        <input type="text" name="code" placeholder="رمز الجلسة (مثال: DEMO-001)" class="input" style="max-width: 280px;" required />
+        <button type="submit" class="btn btn--primary">فتح طاولة الجلسة</button>
+        <a href="/Wall" class="btn btn--secondary">جدار الالتزامات</a>
+        <a href="/Account/Login" class="btn btn--secondary">دخول المنظم</a>
+    </form>
+</div>

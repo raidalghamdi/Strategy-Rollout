@@ -1,0 +1,12 @@
+**/bin
+**/obj
+**/publish
+**/.vs
+**/.vscode
+**/.idea
+**/*.db
+**/*.db-*
+**/*.user
+**/.DS_Store
+*.log
+.git

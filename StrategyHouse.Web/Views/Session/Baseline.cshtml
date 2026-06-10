@@ -1,0 +1,40 @@
+@using StrategyHouse.Domain.Entities
+@model Session
+@{ ViewData["Title"] = "قياس مرجعي مجهول"; }
+
+<div class="container--narrow">
+    <div class="card">
+        <h1>قياس مرجعي قصير</h1>
+        <p class="muted">قبل أن نبدأ — ثلاث إجابات قصيرة ومجهولة الهوية. لن تُحفظ هويتك. هدفنا قياس نقطة الانطلاق فقط.</p>
+
+        <form method="post" action="/Session/Baseline">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="code" value="@Model.AccessCode" />
+
+            <div class="form-row">
+                <label>١. ما هو أحد الركائز الاستراتيجية للهيئة التي تتذكرها؟</label>
+                <input name="pillar" class="input" placeholder="(اختياري)" />
+                <span class="hint">اكتب اسم الركيزة كما تتذكرها، أو اتركها فارغة.</span>
+            </div>
+
+            <div class="form-row">
+                <label>٢. ما إحدى القيم المؤسسية للهيئة؟</label>
+                <input name="value" class="input" placeholder="(اختياري)" />
+            </div>
+
+            <div class="form-row">
+                <label>٣. مدى وضوح ارتباط دوري اليومي بالاستراتيجية (١ = غير واضح، ٥ = واضح جداً)</label>
+                <select name="roleAware" class="select">
+                    <option value="">-- اختر --</option>
+                    <option value="1">١</option>
+                    <option value="2">٢</option>
+                    <option value="3">٣</option>
+                    <option value="4">٤</option>
+                    <option value="5">٥</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn--primary btn--lg btn--block">إرسال (مجهول)</button>
+        </form>
+    </div>
+</div>

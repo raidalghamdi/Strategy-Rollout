@@ -1,0 +1,166 @@
+@using StrategyHouse.Domain.Entities
+@using StrategyHouse.Domain.Enums
+@{
+    ViewData["Title"] = "الالتزامات + التوقيع";
+    var session = (Session)ViewBag.Session;
+    var dept = (Department)ViewBag.Department;
+    var map = (StrategyMap)ViewBag.Map;
+    var commitments = (List<CommitmentTemplate>)ViewBag.Commitments;
+    var framework = (Framework)ViewBag.Framework;
+    var allElements = framework.Layers.SelectMany(l => l.Elements).OrderBy(e => e.Layer!.Order).ThenBy(e => e.Order).ToList();
+}
+
+<h1>@dept.NameAr — الالتزامات الجماعية</h1>
+<p class="muted">الحركة الثالثة (٣٠ دقيقة): اختاروا الالتزامات معاً، اربطوها بعنصر من بيت الاستراتيجية، ثم وقّعوا عليها تطوعياً.</p>
+
+<div class="alert alert--info">
+    <strong>تذكير:</strong> الالتزام جماعي للإدارة وليس فردياً. التوقيع تطوعي ويُضاف على الخريطة كرمز إنساني للالتزام.
+</div>
+
+<div class="card">
+    <h2>الالتزامات المقترحة</h2>
+    <p class="muted">انقر على أي بطاقة لإضافتها — يمكنك تعديل ربطها بعنصر من بيت الاستراتيجية قبل التثبيت.</p>
+    <div class="commitments" id="suggestedCommitments">
+        @foreach (var c in commitments)
+        {
+            <div class="commitment-card" data-template-id="@c.Id" data-text="@c.TextAr" data-link-type="@((int)(c.SuggestedLinkType ?? CommitmentLinkType.Pillar))" data-element-id="@(c.SuggestedElementId ?? 0)">
+                <div class="commitment-card__text">@c.TextAr</div>
+                @if (!string.IsNullOrEmpty(c.HintAr))
+                {
+                    <div class="commitment-card__hint">@c.HintAr</div>
+                }
+                @if (c.SuggestedElement != null)
+                {
+                    <div class="commitment-card__link">يرتبط بـ: @c.SuggestedElement.NameAr</div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <h2>إضافة التزام مخصص</h2>
+    <div class="form-row">
+        <label>نص الالتزام</label>
+        <input type="text" id="customCommitText" class="input" placeholder="مثال: سنحضر اجتماعات استراتيجية شهرية..." />
+    </div>
+    <div class="grid-2">
+        <div class="form-row">
+            <label>اربط الالتزام بـ</label>
+            <select id="customLinkType" class="select">
+                <option value="0">قيمة (Value)</option>
+                <option value="1" selected>ركيزة (Pillar)</option>
+                <option value="2">هدف (Objective)</option>
+                <option value="3">مشروع (Project)</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <label>عنصر بيت الاستراتيجية</label>
+            <select id="customElementId" class="select">
+                @foreach (var e in allElements)
+                {
+                    <option value="@e.Id">@e.Layer!.NameAr — @e.NameAr</option>
+                }
+            </select>
+        </div>
+    </div>
+    <button type="button" class="btn btn--secondary" onclick="addCustomCommitment()">إضافة الالتزام المخصص</button>
+</div>
+
+<div class="card" id="addedSection">
+    <h2>الالتزامات المضافة</h2>
+    <ul id="addedList" style="list-style:none; padding:0;">
+        @foreach (var c in map.Commitments)
+        {
+            <li class="placed-item" style="display:block; background:var(--accent-green); margin-bottom:6px; padding:8px 12px;">
+                @c.TextAr <small style="opacity:.85;"> · @(c.LinkedElement?.NameAr ?? "")</small>
+            </li>
+        }
+    </ul>
+</div>
+
+<div class="signature-area">
+    <h3>التوقيع التطوعي على خريطة الإدارة</h3>
+    <p>التوقيع اختياري ويُضاف على منطقة A3 في الخريطة. وقّع باسمك ثم اضغط حفظ.</p>
+    <div class="form-row" style="max-width:480px; margin:0 auto;">
+        <label>الاسم بالعربية</label>
+        <input type="text" id="signerName" class="input" placeholder="اسمك الكامل" />
+    </div>
+    <canvas id="sigPad" class="signature-canvas"></canvas>
+    <div class="row" style="justify-content:center; margin-top:8px;">
+        <button type="button" class="btn btn--secondary btn--sm" onclick="clearSig()">مسح</button>
+        <button type="button" class="btn btn--success" onclick="saveSig()">حفظ التوقيع</button>
+    </div>
+
+    <div class="signatures-list" id="sigList">
+        @foreach (var s in map.Signatures)
+        {
+            <span class="signature-chip">✓ @s.SignerNameAr</span>
+        }
+    </div>
+</div>
+
+<div class="row mt-3" style="justify-content:space-between;">
+    <a href="/Session/Map?code=@session.AccessCode&departmentId=@dept.Id" class="btn btn--secondary">← الرجوع للخريطة</a>
+    <div class="row">
+        <button type="button" class="btn btn--warn" onclick="finalize()">إنهاء وتثبيت الخريطة النهائية</button>
+        <a href="/Session/Survey?code=@session.AccessCode" class="btn btn--primary">المتابعة إلى الاستبيان →</a>
+    </div>
+</div>
+
+<input type="hidden" id="mapId" value="@map.Id" />
+
+@section Scripts {
+    <script src="~/js/signature.js" asp-append-version="true"></script>
+    <script>
+        const MAP_ID = @map.Id;
+
+        document.querySelectorAll('#suggestedCommitments .commitment-card').forEach(card => {
+            card.addEventListener('click', async () => {
+                if (card.classList.contains('selected')) return;
+                const body = new URLSearchParams();
+                body.set('mapId', MAP_ID);
+                body.set('templateId', card.dataset.templateId);
+                body.set('text', card.dataset.text);
+                body.set('linkType', card.dataset.linkType);
+                body.set('linkedElementId', card.dataset.elementId);
+                const res = await fetch('/Session/AddCommitment', { method: 'POST', body });
+                if ((await res.json()).ok) {
+                    card.classList.add('selected');
+                    appendToList(card.dataset.text);
+                }
+            });
+        });
+
+        async function addCustomCommitment() {
+            const text = document.getElementById('customCommitText').value.trim();
+            if (!text) { alert('اكتب نص الالتزام أولاً'); return; }
+            const body = new URLSearchParams();
+            body.set('mapId', MAP_ID);
+            body.set('text', text);
+            body.set('linkType', document.getElementById('customLinkType').value);
+            body.set('linkedElementId', document.getElementById('customElementId').value);
+            const res = await fetch('/Session/AddCommitment', { method: 'POST', body });
+            if ((await res.json()).ok) {
+                appendToList(text);
+                document.getElementById('customCommitText').value = '';
+            }
+        }
+
+        function appendToList(text) {
+            const li = document.createElement('li');
+            li.className = 'placed-item';
+            li.style.cssText = 'display:block; background:var(--accent-green); margin-bottom:6px; padding:8px 12px;';
+            li.textContent = text;
+            document.getElementById('addedList').appendChild(li);
+        }
+
+        async function finalize() {
+            if (!confirm('تثبيت الخريطة كنسخة نهائية؟ لن تستطيع تعديلها بعد ذلك.')) return;
+            const body = new URLSearchParams();
+            body.set('mapId', MAP_ID);
+            const res = await fetch('/Session/Finalize', { method: 'POST', body });
+            if ((await res.json()).ok) alert('تم تثبيت الخريطة. شكراً لكم.');
+        }
+    </script>
+}

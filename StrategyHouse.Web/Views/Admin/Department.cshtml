@@ -1,0 +1,66 @@
+@using StrategyHouse.Domain.Entities
+@model Department
+@{ ViewData["Title"] = Model.NameAr; }
+
+<h1>@Model.NameAr <small class="muted">(@Model.Code)</small></h1>
+
+<div class="card">
+    <h3>تعديل الاسم</h3>
+    <form method="post" action="/Admin/UpdateDepartment" class="row">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" value="@Model.Id" />
+        <input class="input" name="nameAr" value="@Model.NameAr" style="max-width:300px;" />
+        <input class="input" name="nameEn" value="@Model.NameEn" placeholder="English name" style="max-width:300px;" />
+        <button class="btn btn--primary" type="submit">حفظ</button>
+    </form>
+</div>
+
+<div class="grid-3">
+    <div class="card">
+        <h3>المشاريع (@Model.Projects.Count)</h3>
+        <ul style="list-style:none; padding:0;">
+            @foreach (var p in Model.Projects) { <li>• @p.NameAr <span class="badge badge--gray">@p.Kind</span></li> }
+        </ul>
+        <form method="post" action="/Admin/AddProject" class="mt-2">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="departmentId" value="@Model.Id" />
+            <input class="input" name="nameAr" placeholder="اسم المشروع" required />
+            <select class="select mt-1" name="kind">
+                <option value="Strategic">استراتيجي</option>
+                <option value="Operational">تشغيلي</option>
+                <option value="Enabler">داعم</option>
+            </select>
+            <button class="btn btn--secondary btn--sm mt-1" type="submit">+ مشروع</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3>المؤشرات (@Model.Kpis.Count)</h3>
+        <ul style="list-style:none; padding:0;">
+            @foreach (var k in Model.Kpis) { <li>• @k.NameAr <span class="muted">@k.Unit @k.Target</span></li> }
+        </ul>
+        <form method="post" action="/Admin/AddKpi" class="mt-2">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="departmentId" value="@Model.Id" />
+            <input class="input" name="nameAr" placeholder="اسم المؤشر" required />
+            <input class="input mt-1" name="unit" placeholder="الوحدة" />
+            <input class="input mt-1" name="target" placeholder="المستهدف" />
+            <button class="btn btn--secondary btn--sm mt-1" type="submit">+ مؤشر</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3>الأدوار (@Model.Roles.Count)</h3>
+        <ul style="list-style:none; padding:0;">
+            @foreach (var r in Model.Roles) { <li>• @r.TitleAr</li> }
+        </ul>
+        <form method="post" action="/Admin/AddRole" class="mt-2">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="departmentId" value="@Model.Id" />
+            <input class="input" name="titleAr" placeholder="مسمى الدور" required />
+            <button class="btn btn--secondary btn--sm mt-1" type="submit">+ دور</button>
+        </form>
+    </div>
+</div>
+
+<a href="/Admin/Departments" class="btn btn--secondary mt-3">← قائمة الإدارات</a>

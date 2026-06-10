@@ -1,0 +1,43 @@
+@using StrategyHouse.Domain.Entities
+@model Framework
+@{ ViewData["Title"] = $"الإطار — {Model.NameAr}"; }
+
+<h1>@Model.NameAr</h1>
+<p class="muted">@(Model.DescriptionAr ?? "")</p>
+
+<div class="house">
+    @foreach (var layer in Model.Layers.OrderBy(l => l.Order))
+    {
+        <h3 style="margin-top:16px;">@layer.NameAr <small class="muted">(@layer.Type)</small></h3>
+        <div class="house__pillars">
+            @foreach (var el in layer.Elements.OrderBy(e => e.Order))
+            {
+                <div class="pillar" style="@(el.ColorHex != null ? $"background:{el.ColorHex}22; border-color:{el.ColorHex}; color:{el.ColorHex};" : "")">
+                    <span style="font-weight:700;">@el.NameAr</span>
+                    @if (!string.IsNullOrEmpty(el.DescriptionAr)) { <small>@el.DescriptionAr</small> }
+                    <details style="margin-top:6px;">
+                        <summary style="cursor:pointer; font-size:12px;">تعديل</summary>
+                        <form onsubmit="updateElement(event, @el.Id)">
+                            @Html.AntiForgeryToken()
+                            <input class="input" name="nameAr" value="@el.NameAr" style="margin-top:4px;" />
+                            <input class="input" name="descAr" value="@el.DescriptionAr" placeholder="وصف" style="margin-top:4px;" />
+                            <button class="btn btn--sm btn--primary mt-1" type="submit">حفظ</button>
+                        </form>
+                    </details>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        async function updateElement(e, id) {
+            e.preventDefault();
+            const fd = new FormData(e.target);
+            fd.set('id', id);
+            const res = await fetch('/Admin/UpdateElement', { method: 'POST', body: fd });
+            if ((await res.json()).ok) location.reload();
+        }
+    </script>
+}

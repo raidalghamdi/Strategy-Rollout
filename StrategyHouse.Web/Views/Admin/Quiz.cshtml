@@ -1,0 +1,32 @@
+@using StrategyHouse.Domain.Entities
+@model Quiz
+@{ ViewData["Title"] = "اختبار ما بعد الجلسة"; }
+
+@if (Model == null)
+{
+    <div class="alert alert--warn">لا يوجد اختبار نشط حالياً.</div>
+}
+else
+{
+    <h1>@Model.NameAr</h1>
+    <p class="muted">@(Model.IntroAr ?? "")</p>
+    <ul style="list-style:none; padding:0;">
+        @foreach (var q in Model.Questions.OrderBy(q => q.Order))
+        {
+            <li class="card">
+                <strong>@q.Order. @q.TextAr</strong> <span class="badge badge--gray">@q.Type</span>
+                <ul class="mt-1" style="font-size:13px;">
+                    @{
+                        var opts = System.Text.Json.JsonSerializer.Deserialize<List<string>>(q.OptionsJson) ?? new();
+                        var correct = System.Text.Json.JsonSerializer.Deserialize<List<int>>(q.CorrectOptionsJson) ?? new();
+                    }
+                    @for (int i = 0; i < opts.Count; i++)
+                    {
+                        var isC = correct.Contains(i);
+                        <li>@opts[i] @(isC ? "✓" : "")</li>
+                    }
+                </ul>
+            </li>
+        }
+    </ul>
+}

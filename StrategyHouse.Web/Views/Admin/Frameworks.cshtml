@@ -1,0 +1,21 @@
+@using StrategyHouse.Domain.Entities
+@model List<Framework>
+@{ ViewData["Title"] = "بيت الاستراتيجية"; }
+
+<h1>أطر الاستراتيجية</h1>
+<p class="muted">المنصة قابلة لاستيعاب أي شكل لبيت الاستراتيجية. الإطار الافتراضي هو بيت هيئة الحكومة الرقمية.</p>
+
+<div class="grid-2">
+    @foreach (var f in Model)
+    {
+        <div class="card">
+            <div class="row row--between">
+                <h3>@f.NameAr</h3>
+                @if (f.IsActive) { <span class="badge badge--green">نشط</span> }
+            </div>
+            <p class="muted">@(f.DescriptionAr ?? "")</p>
+            <p>الطبقات: @f.Layers.Count · العناصر: @f.Layers.Sum(l => l.Elements.Count)</p>
+            <a href="/Admin/Framework/@f.Id" class="btn btn--primary btn--sm">عرض وتعديل</a>
+        </div>
+    }
+</div>

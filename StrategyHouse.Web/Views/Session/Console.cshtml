@@ -1,0 +1,57 @@
+@using StrategyHouse.Domain.Entities
+@using StrategyHouse.Infrastructure.Persistence
+@inject ApplicationDbContext Db
+@model Session
+@{
+    ViewData["Title"] = $"طاولة الجلسة — {Model.TitleAr}";
+    var baselineQr = ViewBag.BaselineQr as string;
+    var surveyQr = ViewBag.SurveyQr as string;
+    var depts = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+        .ToListAsync(Db.SessionDepartments.Where(sd => sd.SessionId == Model.Id).Select(sd => sd.Department!));
+}
+
+<h1>@Model.TitleAr</h1>
+<p class="muted">رمز الجلسة: <strong>@Model.AccessCode</strong> · المكان: @(Model.VenueAr ?? "—") · الموعد: @Model.ScheduledAt.ToString("yyyy-MM-dd HH:mm")</p>
+
+<div class="grid-2">
+    <div class="qr-block">
+        <img src="@baselineQr" alt="رمز القياس المرجعي" />
+        <div class="qr-block__info">
+            <h3>قياس مرجعي مجهول</h3>
+            <p>الحركة الأولى — قبل العرض. يفتح المشاركون الرمز بهواتفهم.</p>
+            <a href="/Session/Baseline?code=@Model.AccessCode" class="btn btn--secondary btn--sm">فتح مباشرة</a>
+        </div>
+    </div>
+    <div class="qr-block">
+        <img src="@surveyQr" alt="رمز استبيان نهاية الجلسة" />
+        <div class="qr-block__info">
+            <h3>استبيان نهاية الجلسة</h3>
+            <p>الدقائق الأخيرة — يظهر للمشاركين عبر الهاتف.</p>
+            <a href="/Session/Survey?code=@Model.AccessCode" class="btn btn--secondary btn--sm">فتح مباشرة</a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>الإدارات المشاركة في هذه الجلسة</h2>
+    <p class="muted">على كل طاولة إدارة، افتح خريطتها لبدء الحركة الثانية.</p>
+    <div class="commitments">
+        @foreach (var d in depts)
+        {
+            <a class="commitment-card" href="/Session/Map?code=@Model.AccessCode&departmentId=@d.Id">
+                <div class="commitment-card__text">@d.NameAr</div>
+                <div class="commitment-card__hint">رمز: @d.Code</div>
+                <div class="commitment-card__link">افتح الخريطة الاستراتيجية</div>
+            </a>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <h2>روابط مكتب الاستراتيجية</h2>
+    <div class="row">
+        <a href="/Wall?code=@Model.AccessCode" class="btn btn--primary">جدار الالتزامات للجلسة</a>
+        <a href="/Dashboard" class="btn btn--secondary">لوحة المؤشرات اليومية</a>
+        <a href="/Admin/SessionDetail/@Model.Id" class="btn btn--secondary">تفاصيل الجلسة</a>
+    </div>
+</div>
