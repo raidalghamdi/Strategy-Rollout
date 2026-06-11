@@ -25,6 +25,10 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
     public DbSet<SessionDepartment> SessionDepartments => Set<SessionDepartment>();
     public DbSet<SessionAttendee> SessionAttendees => Set<SessionAttendee>();
 
+    // Booking slots
+    public DbSet<BookingSlot> BookingSlots => Set<BookingSlot>();
+    public DbSet<SlotBooking> SlotBookings => Set<SlotBooking>();
+
     // Maps
     public DbSet<StrategyMap> StrategyMaps => Set<StrategyMap>();
     public DbSet<MapPlacement> MapPlacements => Set<MapPlacement>();
@@ -85,5 +89,20 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
 
         b.Entity<Session>().HasIndex(s => s.AccessCode).IsUnique();
         b.Entity<Framework>().HasIndex(f => f.IsActive);
+
+        // Booking slots: a department can only book a given slot once.
+        b.Entity<SlotBooking>()
+            .HasIndex(x => new { x.BookingSlotId, x.DepartmentId })
+            .IsUnique();
+        b.Entity<SlotBooking>()
+            .HasOne(x => x.BookingSlot)
+            .WithMany(s => s.Bookings)
+            .HasForeignKey(x => x.BookingSlotId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<SlotBooking>()
+            .HasOne(x => x.Department)
+            .WithMany()
+            .HasForeignKey(x => x.DepartmentId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

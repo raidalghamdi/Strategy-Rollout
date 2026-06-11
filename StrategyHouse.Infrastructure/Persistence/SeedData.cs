@@ -19,6 +19,7 @@ public static class SeedData
         RoleManager<IdentityRole<int>> roleManager)
     {
         await db.Database.EnsureCreatedAsync();
+        await EnsureBookingTablesAsync(db);
         await SeedRolesAndAdminAsync(userManager, roleManager);
         await SeedFrameworkAsync(db);
         await SeedDepartmentsAsync(db);
@@ -26,6 +27,123 @@ public static class SeedData
         await SeedSurveyAsync(db);
         await SeedQuizAsync(db);
         await SeedSampleSessionAsync(db);
+        await SeedBookingSlotsAsync(db);
+    }
+
+    private static async Task SeedBookingSlotsAsync(ApplicationDbContext db)
+    {
+        if (await db.BookingSlots.AnyAsync()) return;
+        // Seed 8 slots over 4 consecutive working days, two per day at 09:00 and 13:00.
+        var firstDay = DateTime.UtcNow.Date.AddDays(7);
+        var titles = new[]
+        {
+            ("الجلسة الأولى — تعريف", "قاعة الاجتماعات الرئيسية"),
+            ("الجلسة الثانية — بناء", "قاعة الاجتماعات الرئيسية"),
+            ("الجلسة الثالثة — تعريف", "قاعة الورش"),
+            ("الجلسة الرابعة — بناء", "قاعة الورش"),
+            ("الجلسة الخامسة — تعريف", "قاعة الاجتماعات الرئيسية"),
+            ("الجلسة السادسة — بناء", "قاعة الاجتماعات الرئيسية"),
+            ("الجلسة السابعة — تعريف", "قاعة الورش"),
+            ("الجلسة الثامنة — التزام", "قاعة الورش"),
+        };
+        for (var i = 0; i < titles.Length; i++)
+        {
+            var day = firstDay.AddDays(i / 2);
+            var start = (i % 2 == 0) ? new TimeSpan(9, 0, 0) : new TimeSpan(13, 0, 0);
+            db.BookingSlots.Add(new BookingSlot
+            {
+                TitleAr = titles[i].Item1,
+                VenueAr = titles[i].Item2,
+                FacilitatorAr = "مكتب الاستراتيجية",
+                SlotDate = day,
+                StartTime = start,
+                DurationMinutes = 90,
+                Capacity = 2,
+                IsOpen = true,
+            });
+        }
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Creates the BookingSlots / SlotBookings tables if they do not yet exist.
+    /// EnsureCreated does not add new tables to an existing database, so this
+    /// idempotent CREATE TABLE IF NOT EXISTS step handles the upgrade for
+    /// already-deployed installations. Works for SQLite and MySQL.
+    /// </summary>
+    private static async Task EnsureBookingTablesAsync(ApplicationDbContext db)
+    {
+        var providerName = db.Database.ProviderName ?? "";
+        var isMySql = providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase)
+                   || providerName.Contains("Pomelo", StringComparison.OrdinalIgnoreCase);
+
+        string slotsSql;
+        string bookingsSql;
+        string bookingsIdxSql;
+
+        if (isMySql)
+        {
+            slotsSql = @"CREATE TABLE IF NOT EXISTS BookingSlots (
+                Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                TitleAr VARCHAR(255) NULL,
+                SlotDate DATETIME NOT NULL,
+                StartTime TIME(6) NOT NULL,
+                DurationMinutes INT NOT NULL,
+                VenueAr VARCHAR(255) NULL,
+                FacilitatorAr VARCHAR(255) NULL,
+                Capacity INT NOT NULL,
+                IsOpen TINYINT(1) NOT NULL,
+                NotesAr LONGTEXT NULL,
+                CreatedAt DATETIME NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+
+            bookingsSql = @"CREATE TABLE IF NOT EXISTS SlotBookings (
+                Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                BookingSlotId INT NOT NULL,
+                DepartmentId INT NOT NULL,
+                BookedByName VARCHAR(255) NULL,
+                BookedByContact VARCHAR(255) NULL,
+                BookedAt DATETIME NOT NULL,
+                CONSTRAINT FK_SlotBookings_BookingSlots FOREIGN KEY (BookingSlotId) REFERENCES BookingSlots(Id) ON DELETE CASCADE,
+                CONSTRAINT FK_SlotBookings_Departments FOREIGN KEY (DepartmentId) REFERENCES Departments(Id) ON DELETE RESTRICT
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+
+            bookingsIdxSql = @"CREATE UNIQUE INDEX IX_SlotBookings_Slot_Department ON SlotBookings (BookingSlotId, DepartmentId);";
+        }
+        else
+        {
+            slotsSql = @"CREATE TABLE IF NOT EXISTS BookingSlots (
+                Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                TitleAr TEXT NULL,
+                SlotDate TEXT NOT NULL,
+                StartTime TEXT NOT NULL,
+                DurationMinutes INTEGER NOT NULL,
+                VenueAr TEXT NULL,
+                FacilitatorAr TEXT NULL,
+                Capacity INTEGER NOT NULL,
+                IsOpen INTEGER NOT NULL,
+                NotesAr TEXT NULL,
+                CreatedAt TEXT NOT NULL
+            );";
+
+            bookingsSql = @"CREATE TABLE IF NOT EXISTS SlotBookings (
+                Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                BookingSlotId INTEGER NOT NULL,
+                DepartmentId INTEGER NOT NULL,
+                BookedByName TEXT NULL,
+                BookedByContact TEXT NULL,
+                BookedAt TEXT NOT NULL,
+                FOREIGN KEY (BookingSlotId) REFERENCES BookingSlots(Id) ON DELETE CASCADE,
+                FOREIGN KEY (DepartmentId) REFERENCES Departments(Id) ON DELETE RESTRICT
+            );";
+
+            bookingsIdxSql = @"CREATE UNIQUE INDEX IF NOT EXISTS IX_SlotBookings_Slot_Department ON SlotBookings (BookingSlotId, DepartmentId);";
+        }
+
+        await db.Database.ExecuteSqlRawAsync(slotsSql);
+        await db.Database.ExecuteSqlRawAsync(bookingsSql);
+        try { await db.Database.ExecuteSqlRawAsync(bookingsIdxSql); }
+        catch { /* index already exists on MySQL — ignore */ }
     }
 
     private static async Task SeedRolesAndAdminAsync(

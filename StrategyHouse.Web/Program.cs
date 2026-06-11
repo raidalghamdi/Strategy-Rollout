@@ -83,5 +83,6 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.MapHub<MapCanvasHub>("/hubs/canvas");
+app.MapHub<BookingHub>("/hubs/booking");
 
 app.Run();
