@@ -1,7 +1,7 @@
 @model List<BookingSlot>
 @{
     ViewData["Title"] = "حجز موعد للجلسة";
-    var departments = ViewBag.Departments as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+    var departments = ViewBag.Departments as IEnumerable<Department> ?? Enumerable.Empty<Department>();
 }
 
 <section class="hero">

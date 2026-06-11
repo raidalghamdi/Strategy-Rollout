@@ -36,7 +36,6 @@ public class BookingController : Controller
         var departments = await _db.Departments
             .Where(d => d.IsActive)
             .OrderBy(d => d.NameAr)
-            .Select(d => new { d.Id, d.NameAr })
             .ToListAsync();
 
         ViewBag.Departments = departments;
@@ -111,10 +110,11 @@ public class BookingController : Controller
     [Authorize(Roles = "Admin,Facilitator")]
     public async Task<IActionResult> Manage()
     {
-        var slots = await _db.BookingSlots
+        var slots = (await _db.BookingSlots
             .Include(s => s.Bookings).ThenInclude(b => b.Department)
+            .ToListAsync())
             .OrderBy(s => s.SlotDate).ThenBy(s => s.StartTime)
-            .ToListAsync();
+            .ToList();
         return View(slots);
     }
 
@@ -206,10 +206,11 @@ public class BookingController : Controller
 
     private async Task<List<BookingSlot>> LoadOpenSlotsAsync()
     {
-        return await _db.BookingSlots
+        // ORDER BY TimeSpan is not supported by SQLite, so sort in memory after fetching.
+        var rows = await _db.BookingSlots
             .Include(s => s.Bookings).ThenInclude(b => b.Department)
             .Where(s => s.IsOpen)
-            .OrderBy(s => s.SlotDate).ThenBy(s => s.StartTime)
             .ToListAsync();
+        return rows.OrderBy(s => s.SlotDate).ThenBy(s => s.StartTime).ToList();
     }
 }
