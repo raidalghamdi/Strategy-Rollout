@@ -1,0 +1,159 @@
+@model List<BookingSlot>
+@{
+    ViewData["Title"] = "إدارة المواعيد";
+    var defaultDate = DateTime.UtcNow.AddDays(7).ToString("yyyy-MM-dd");
+}
+
+<h1>إدارة المواعيد</h1>
+<p class="muted">إنشاء وتعديل مواعيد الجلسات المتاحة لإدارات الهيئة. الرابط العام للحجز: <a href="/Booking">/Booking</a></p>
+
+@if (TempData["ManageSuccess"] != null)
+{
+    <div class="card card--accent" style="border-right-color: var(--accent-green); background:#eafaf1;">
+        @TempData["ManageSuccess"]
+    </div>
+}
+@if (TempData["ManageError"] != null)
+{
+    <div class="card card--accent" style="border-right-color: #c0392b; background:#fdecea;">
+        @TempData["ManageError"]
+    </div>
+}
+
+<details class="card" style="margin:1rem 0;" open>
+    <summary style="font-weight:700; cursor:pointer; font-size:1.1rem;">+ إضافة موعد جديد</summary>
+    <form method="post" action="/Booking/CreateSlot" style="margin-top:1rem;">
+        @Html.AntiForgeryToken()
+        <div class="grid-2" style="gap:.8rem;">
+            <div>
+                <label>عنوان الجلسة (اختياري)</label>
+                <input type="text" name="titleAr" placeholder="جلسة إطلاق الاستراتيجية" style="width:100%; padding:.5rem; border:1px solid #d0d8de; border-radius:6px; font-family:inherit;" />
+            </div>
+            <div>
+                <label>المكان</label>
+                <input type="text" name="venueAr" placeholder="قاعة الاجتماعات الرئيسية" style="width:100%; padding:.5rem; border:1px solid #d0d8de; border-radius:6px; font-family:inherit;" />
+            </div>
+            <div>
+                <label>التاريخ <span style="color:#c0392b;">*</span></label>
+                <input type="date" name="slotDate" required value="@defaultDate" style="width:100%; padding:.5rem; border:1px solid #d0d8de; border-radius:6px; font-family:inherit;" />
+            </div>
+            <div>
+                <label>وقت البدء (HH:MM) <span style="color:#c0392b;">*</span></label>
+                <input type="time" name="startTime" required value="09:00" style="width:100%; padding:.5rem; border:1px solid #d0d8de; border-radius:6px; font-family:inherit;" />
+            </div>
+            <div>
+                <label>المدة (دقائق)</label>
+                <input type="number" name="durationMinutes" value="90" min="15" max="480" style="width:100%; padding:.5rem; border:1px solid #d0d8de; border-radius:6px; font-family:inherit;" />
+            </div>
+            <div>
+                <label>السعة (عدد الإدارات)</label>
+                <input type="number" name="capacity" value="2" min="1" max="10" style="width:100%; padding:.5rem; border:1px solid #d0d8de; border-radius:6px; font-family:inherit;" />
+            </div>
+            <div>
+                <label>الميسّر</label>
+                <input type="text" name="facilitatorAr" placeholder="اسم الميسّر" style="width:100%; padding:.5rem; border:1px solid #d0d8de; border-radius:6px; font-family:inherit;" />
+            </div>
+            <div>
+                <label>ملاحظات</label>
+                <input type="text" name="notesAr" placeholder="ملاحظات اختيارية" style="width:100%; padding:.5rem; border:1px solid #d0d8de; border-radius:6px; font-family:inherit;" />
+            </div>
+        </div>
+        <button type="submit" class="btn btn--primary" style="margin-top:1rem;">إنشاء الموعد</button>
+    </form>
+</details>
+
+<h2 style="margin-top:1.5rem;">المواعيد (@Model.Count)</h2>
+
+@if (!Model.Any())
+{
+    <div class="card"><p class="muted">لا توجد مواعيد بعد. أضف موعداً جديداً أعلاه.</p></div>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>التاريخ والوقت</th>
+                <th>العنوان</th>
+                <th>المكان / الميسّر</th>
+                <th>السعة</th>
+                <th>الحجوزات</th>
+                <th>الحالة</th>
+                <th>إجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in Model)
+            {
+                <tr>
+                    <td>
+                        <strong>@s.SlotDate.ToString("yyyy-MM-dd")</strong><br />
+                        <span class="muted">@s.StartTime.ToString(@"hh\:mm") · @s.DurationMinutes د</span>
+                    </td>
+                    <td>@(s.TitleAr ?? "—")</td>
+                    <td>
+                        @(s.VenueAr ?? "—")<br />
+                        <span class="muted">@(s.FacilitatorAr ?? "")</span>
+                    </td>
+                    <td>
+                        <span class="chip" style="@(s.Bookings.Count >= s.Capacity ? "background:#fdecea; color:#c0392b;" : "background:#eafaf1; color:#1e7e3e;")">
+                            @s.Bookings.Count / @s.Capacity
+                        </span>
+                    </td>
+                    <td>
+                        @if (!s.Bookings.Any())
+                        {
+                            <span class="muted">لا حجوزات</span>
+                        }
+                        else
+                        {
+                            <ul style="margin:0; padding-right:1rem;">
+                                @foreach (var b in s.Bookings)
+                                {
+                                    <li style="margin-bottom:.3rem;">
+                                        <strong>@(b.Department?.NameAr ?? "—")</strong>
+                                        @if (!string.IsNullOrWhiteSpace(b.BookedByName))
+                                        {
+                                            <span class="muted"> · @b.BookedByName</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(b.BookedByContact))
+                                        {
+                                            <span class="muted"> · @b.BookedByContact</span>
+                                        }
+                                        <form method="post" action="/Booking/CancelBooking" style="display:inline; margin-right:.4rem;" onsubmit="return confirm('إلغاء هذا الحجز؟');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="bookingId" value="@b.Id" />
+                                            <button type="submit" class="btn btn--sm btn--ghost" style="color:#c0392b;">إلغاء</button>
+                                        </form>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </td>
+                    <td>
+                        @if (s.IsOpen)
+                        {
+                            <span class="chip" style="background:#eafaf1; color:#1e7e3e;">مفتوح</span>
+                        }
+                        else
+                        {
+                            <span class="chip" style="background:#f0f0f0; color:#666;">مغلق</span>
+                        }
+                    </td>
+                    <td>
+                        <form method="post" action="/Booking/ToggleOpen" style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@s.Id" />
+                            <button type="submit" class="btn btn--sm btn--secondary">@(s.IsOpen ? "إغلاق" : "فتح")</button>
+                        </form>
+                        <form method="post" action="/Booking/DeleteSlot" style="display:inline;" onsubmit="return confirm('حذف الموعد وجميع حجوزاته؟');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@s.Id" />
+                            <button type="submit" class="btn btn--sm btn--ghost" style="color:#c0392b;">حذف</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
