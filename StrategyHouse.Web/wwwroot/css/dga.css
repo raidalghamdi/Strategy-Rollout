@@ -230,7 +230,7 @@ html, body {
     padding: 0;
     background: var(--bg-page);
     color: var(--color-gray-900);
-    font-family: var(--font-ar);
+    font-family: var(--font-ar) !important;
     font-size: 14px;
     line-height: 1.5;
 }
