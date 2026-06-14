@@ -17,6 +17,8 @@ public class QuizController : Controller
     public QuizController(ApplicationDbContext db) { _db = db; }
 
     // GET /Quiz/Start/{sessionId?}
+    // Phase 8 — render the quiz questions directly on this page (no intro gate).
+    // Anonymous learning tool; works standalone whether or not a session exists.
     [HttpGet("Quiz/Start/{sessionId:guid?}")]
     public async Task<IActionResult> Start(Guid? sessionId)
     {
@@ -26,40 +28,23 @@ public class QuizController : Controller
             var session = await _db.StrategySessions.FindAsync(sessionId.Value);
             if (session != null) deptCode = session.DeptCode;
         }
-        ViewBag.SessionId = sessionId;
-        ViewBag.DeptCode = deptCode;
-        ViewBag.HasDeptQuestions = deptCode != null &&
-            await _db.QuizQuestions.AnyAsync(q => q.IsApproved && q.IsActive && q.Scope == "Department" && q.DeptCodeFilter == deptCode);
-        return View();
-    }
 
-    // GET /Quiz/Play — returns a quiz with 10 random approved questions for the chosen scope.
-    [HttpGet("Quiz/Play")]
-    public async Task<IActionResult> Play(Guid? sessionId, string scope = "General")
-    {
-        string? deptCode = null;
-        if (sessionId != null)
-        {
-            var session = await _db.StrategySessions.FindAsync(sessionId.Value);
-            deptCode = session?.DeptCode;
-        }
-
-        IQueryable<QuizQuestion> pool = _db.QuizQuestions.Where(q => q.IsApproved && q.IsActive);
-        if (scope == "Department" && deptCode != null)
-            pool = pool.Where(q => q.Scope == "Department" && q.DeptCodeFilter == deptCode);
-        else
-            pool = pool.Where(q => q.Scope == "General");
-
-        var all = await pool.ToListAsync();
-        var seed = Random.Shared.Next();
-        var rnd = new Random(seed);
+        var all = await _db.QuizQuestions
+            .Where(q => q.IsApproved && q.IsActive && q.Scope == "General")
+            .ToListAsync();
+        var rnd = new Random(Random.Shared.Next());
         var picked = all.OrderBy(_ => rnd.Next()).Take(10).ToList();
 
         ViewBag.SessionId = sessionId;
-        ViewBag.Scope = scope;
+        ViewBag.Scope = "General";
         ViewBag.DeptCode = deptCode;
         return View(picked);
     }
+
+    // GET /Quiz/Play — legacy entry point; Phase 8 unified the quiz onto Start.
+    [HttpGet("Quiz/Play")]
+    public IActionResult Play(Guid? sessionId)
+        => RedirectToAction(nameof(Start), new { sessionId });
 
     // POST /Quiz/Submit — grade server-side, never trust client.
     [HttpPost("Quiz/Submit")]
