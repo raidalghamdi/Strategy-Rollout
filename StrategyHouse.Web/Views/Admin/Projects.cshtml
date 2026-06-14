@@ -1,0 +1,22 @@
+@model List<StrategyHouse.Domain.Entities.Project>
+@{ ViewData["Title"] = "المشاريع"; }
+<h1>المشاريع (@Model.Count)</h1>
+<table class="table">
+    <thead>
+        <tr><th>الرمز</th><th>الاسم</th><th>المبادرة</th><th>النوع</th><th>الحالة</th><th>الإدارة</th><th>الميزانية</th></tr>
+    </thead>
+    <tbody>
+    @foreach (var p in Model)
+    {
+        <tr>
+            <td>@p.ProjectCode</td>
+            <td>@p.ProjectName</td>
+            <td>@p.InitiativeCode</td>
+            <td>@p.ProjectType</td>
+            <td>@p.ProjectStatus</td>
+            <td>@p.Division</td>
+            <td>@p.Budget?.ToString("N0")</td>
+        </tr>
+    }
+    </tbody>
+</table>

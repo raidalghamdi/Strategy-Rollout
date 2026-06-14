@@ -12,11 +12,11 @@ public class HomeController : Controller
     public async Task<IActionResult> Index()
     {
         var stats = new HomeStats(
-            await _db.Departments.CountAsync(),
-            await _db.Sessions.CountAsync(),
-            await _db.SessionAttendees.CountAsync(),
-            await _db.StrategyMaps.CountAsync(),
-            await _db.MapCommitments.CountAsync());
+            await _db.Pillars.CountAsync(),
+            await _db.Objectives.CountAsync(),
+            await _db.Initiatives.CountAsync(),
+            await _db.Projects.CountAsync(),
+            await _db.Kpis.CountAsync());
         ViewBag.Stats = stats;
         return View();
     }
@@ -24,4 +24,4 @@ public class HomeController : Controller
     public IActionResult Error() => View();
 }
 
-public record HomeStats(int Departments, int Sessions, int Attendees, int Maps, int Commitments);
+public record HomeStats(int Pillars, int Objectives, int Initiatives, int Projects, int Kpis);

@@ -9,100 +9,42 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
-    // Framework engine
-    public DbSet<Framework> Frameworks => Set<Framework>();
-    public DbSet<FrameworkLayer> FrameworkLayers => Set<FrameworkLayer>();
-    public DbSet<FrameworkElement> FrameworkElements => Set<FrameworkElement>();
-
-    // Departments
+    // Strict strategy schema — Pillars → Objectives → Kpis / Initiatives → Projects (+ Departments lookup)
+    public DbSet<Pillar> Pillars => Set<Pillar>();
+    public DbSet<Objective> Objectives => Set<Objective>();
+    public DbSet<Kpi> Kpis => Set<Kpi>();
+    public DbSet<Initiative> Initiatives => Set<Initiative>();
+    public DbSet<Project> Projects => Set<Project>();
     public DbSet<Department> Departments => Set<Department>();
-    public DbSet<DepartmentProject> DepartmentProjects => Set<DepartmentProject>();
-    public DbSet<DepartmentKpi> DepartmentKpis => Set<DepartmentKpi>();
-    public DbSet<DepartmentRole> DepartmentRoles => Set<DepartmentRole>();
-
-    // Sessions
-    public DbSet<Session> Sessions => Set<Session>();
-    public DbSet<SessionDepartment> SessionDepartments => Set<SessionDepartment>();
-    public DbSet<SessionAttendee> SessionAttendees => Set<SessionAttendee>();
-
-    // Booking slots
-    public DbSet<BookingSlot> BookingSlots => Set<BookingSlot>();
-    public DbSet<SlotBooking> SlotBookings => Set<SlotBooking>();
-
-    // Maps
-    public DbSet<StrategyMap> StrategyMaps => Set<StrategyMap>();
-    public DbSet<MapPlacement> MapPlacements => Set<MapPlacement>();
-    public DbSet<MapCommitment> MapCommitments => Set<MapCommitment>();
-    public DbSet<MapSignature> MapSignatures => Set<MapSignature>();
-    public DbSet<CommitmentTemplate> CommitmentTemplates => Set<CommitmentTemplate>();
-
-    // Surveys + Quiz + Baseline
-    public DbSet<Survey> Surveys => Set<Survey>();
-    public DbSet<SurveyQuestion> SurveyQuestions => Set<SurveyQuestion>();
-    public DbSet<SurveyResponse> SurveyResponses => Set<SurveyResponse>();
-    public DbSet<SurveyAnswer> SurveyAnswers => Set<SurveyAnswer>();
-    public DbSet<BaselineResponse> BaselineResponses => Set<BaselineResponse>();
-    public DbSet<Quiz> Quizzes => Set<Quiz>();
-    public DbSet<QuizQuestion> QuizQuestions => Set<QuizQuestion>();
-    public DbSet<QuizResponse> QuizResponses => Set<QuizResponse>();
-    public DbSet<QuizAnswer> QuizAnswers => Set<QuizAnswer>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
 
-        b.Entity<FrameworkElement>()
-            .HasOne(e => e.ParentElement)
-            .WithMany()
-            .HasForeignKey(e => e.ParentElementId)
+        // Data annotations carry FK/column config. Relax delete behaviour on the
+        // denormalised PLR_Code shortcuts so they don't clash with the primary chain.
+        b.Entity<Kpi>()
+            .HasOne(k => k.Pillar)
+            .WithMany(p => p.Kpis)
+            .HasForeignKey(k => k.PlrCode)
             .OnDelete(DeleteBehavior.Restrict);
 
-        b.Entity<MapPlacement>()
-            .HasOne(p => p.FrameworkElement)
-            .WithMany()
-            .HasForeignKey(p => p.FrameworkElementId)
+        b.Entity<Kpi>()
+            .HasOne(k => k.Objective)
+            .WithMany(o => o.Kpis)
+            .HasForeignKey(k => k.ObjectiveCode)
             .OnDelete(DeleteBehavior.Restrict);
 
-        b.Entity<MapCommitment>()
-            .HasOne(c => c.LinkedElement)
-            .WithMany()
-            .HasForeignKey(c => c.LinkedElementId)
+        b.Entity<Project>()
+            .HasOne(p => p.Pillar)
+            .WithMany(pl => pl.Projects)
+            .HasForeignKey(p => p.PlrCode)
             .OnDelete(DeleteBehavior.Restrict);
 
-        b.Entity<DepartmentProject>()
-            .HasOne(p => p.DefaultElement)
-            .WithMany()
-            .HasForeignKey(p => p.DefaultElementId)
-            .OnDelete(DeleteBehavior.SetNull);
-
-        b.Entity<DepartmentKpi>()
-            .HasOne(k => k.DefaultElement)
-            .WithMany()
-            .HasForeignKey(k => k.DefaultElementId)
-            .OnDelete(DeleteBehavior.SetNull);
-
-        b.Entity<CommitmentTemplate>()
-            .HasOne(c => c.SuggestedElement)
-            .WithMany()
-            .HasForeignKey(c => c.SuggestedElementId)
-            .OnDelete(DeleteBehavior.SetNull);
-
-        b.Entity<Session>().HasIndex(s => s.AccessCode).IsUnique();
-        b.Entity<Framework>().HasIndex(f => f.IsActive);
-
-        // Booking slots: a department can only book a given slot once.
-        b.Entity<SlotBooking>()
-            .HasIndex(x => new { x.BookingSlotId, x.DepartmentId })
-            .IsUnique();
-        b.Entity<SlotBooking>()
-            .HasOne(x => x.BookingSlot)
-            .WithMany(s => s.Bookings)
-            .HasForeignKey(x => x.BookingSlotId)
-            .OnDelete(DeleteBehavior.Cascade);
-        b.Entity<SlotBooking>()
-            .HasOne(x => x.Department)
-            .WithMany()
-            .HasForeignKey(x => x.DepartmentId)
+        b.Entity<Project>()
+            .HasOne(p => p.Initiative)
+            .WithMany(i => i.Projects)
+            .HasForeignKey(p => p.InitiativeCode)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -1,42 +1,30 @@
 @{ ViewData["Title"] = "لوحة الإدارة"; }
 <h1>لوحة الإدارة</h1>
-<p class="muted">إدارة المحتوى القابل للتشكيل: بيت الاستراتيجية، الإدارات، الجلسات، الالتزامات، الاستبيان، والاختبار.</p>
+<p class="muted">استعراض بيانات الاستراتيجية: الركائز، الأهداف، الإدارات، المبادرات، المشاريع، ومؤشرات الأداء.</p>
 
 <div class="grid-3">
-    <a href="/Admin/Frameworks" class="card card--accent">
-        <h3>بيت الاستراتيجية</h3>
-        <p class="muted">رؤية، رسالة، قيم، ركائز، أهداف — قابلة للتعديل بالكامل.</p>
+    <a href="/Admin/Pillars" class="card card--accent">
+        <h3>الركائز</h3>
+        <p class="muted">٥ ركائز استراتيجية بميزانياتها وفتراتها.</p>
+    </a>
+    <a href="/Admin/Objectives" class="card card--accent">
+        <h3>الأهداف</h3>
+        <p class="muted">١٣ هدفاً استراتيجياً مرتبطة بالركائز.</p>
     </a>
     <a href="/Admin/Departments" class="card card--accent">
         <h3>الإدارات</h3>
-        <p class="muted">١٨ إدارة + مشاريعها، مؤشراتها، وأدوارها.</p>
+        <p class="muted">١٧ إدارة من المستوى الثاني للهيكل التنظيمي.</p>
     </a>
-    <a href="/Admin/Sessions" class="card card--accent">
-        <h3>الجلسات</h3>
-        <p class="muted">إنشاء جلسات جديدة، إضافة حضور، عرض الخرائط المكتملة.</p>
+    <a href="/Admin/Initiatives" class="card card--accent">
+        <h3>المبادرات</h3>
+        <p class="muted">٢٣ مبادرة موزعة على الأهداف.</p>
     </a>
-    <a href="/Admin/Commitments" class="card card--accent">
-        <h3>قائمة الالتزامات</h3>
-        <p class="muted">قائمة الالتزامات المقترحة للإدارات.</p>
+    <a href="/Admin/Projects" class="card card--accent">
+        <h3>المشاريع</h3>
+        <p class="muted">٢٢٠ مشروعاً (١١٠ استراتيجي / ١١٠ تشغيلي).</p>
     </a>
-    <a href="/Admin/Survey" class="card card--accent">
-        <h3>استبيان نهاية الجلسة</h3>
-        <p class="muted">٦ أسئلة (قابلة للتغيير).</p>
-    </a>
-    <a href="/Admin/Quiz" class="card card--accent">
-        <h3>اختبار ما بعد الجلسة</h3>
-        <p class="muted">٥ أسئلة، اختياري ومجهول الهوية.</p>
-    </a>
-    <a href="/Booking/Manage" class="card card--accent">
-        <h3>حجز المواعيد</h3>
-        <p class="muted">إدارة مواعيد الجلسات المتاحة لمدراء الإدارات وعرض الحجوزات.</p>
-    </a>
-    <a href="/Dashboard" class="card card--accent">
-        <h3>لوحة المؤشرات اليومية</h3>
-        <p class="muted">الأسئلة الخمسة التشغيلية لمكتب الاستراتيجية.</p>
-    </a>
-    <a href="/Wall" class="card card--accent">
-        <h3>جدار الالتزامات</h3>
-        <p class="muted">عرض كل الخرائط المثبتة وتوقيعاتها.</p>
+    <a href="/Admin/Kpis" class="card card--accent">
+        <h3>مؤشرات الأداء</h3>
+        <p class="muted">١٣٤ مؤشراً (١٤ استراتيجي / ١٢٠ تشغيلي).</p>
     </a>
 </div>

@@ -6,10 +6,10 @@ using StrategyHouse.Domain.Enums;
 namespace StrategyHouse.Infrastructure.Persistence;
 
 /// <summary>
-/// Seeds the GAC Strategy House (vision, mission, 5 values, 5 pillars, 13 objectives)
-/// as placeholder data, plus 18 placeholder departments and supporting catalog content.
-/// All seed data is editable through the admin UI and intended to be replaced with
-/// the strategy office's real content.
+/// Seeds the strict strategy schema for the General Authority for Competition (GAC):
+/// 5 pillars, 13 objectives, 17 departments, 23 initiatives, 220 projects
+/// (110 strategic / 110 operational) and 134 KPIs (14 strategic / 120 operational).
+/// Idempotent: guarded by Pillars.AnyAsync(). Identity admin is seeded separately.
 /// </summary>
 public static class SeedData
 {
@@ -18,132 +18,9 @@ public static class SeedData
         UserManager<AppUser> userManager,
         RoleManager<IdentityRole<int>> roleManager)
     {
-        await db.Database.EnsureCreatedAsync();
-        await EnsureBookingTablesAsync(db);
+        await db.Database.MigrateAsync();
         await SeedRolesAndAdminAsync(userManager, roleManager);
-        await SeedFrameworkAsync(db);
-        await SeedDepartmentsAsync(db);
-        await SeedCommitmentsAsync(db);
-        await SeedSurveyAsync(db);
-        await SeedQuizAsync(db);
-        await SeedSampleSessionAsync(db);
-        await SeedBookingSlotsAsync(db);
-    }
-
-    private static async Task SeedBookingSlotsAsync(ApplicationDbContext db)
-    {
-        if (await db.BookingSlots.AnyAsync()) return;
-        // Seed 8 slots over 4 consecutive working days, two per day at 09:00 and 13:00.
-        var firstDay = DateTime.UtcNow.Date.AddDays(7);
-        var titles = new[]
-        {
-            ("الجلسة الأولى — تعريف", "قاعة الاجتماعات الرئيسية"),
-            ("الجلسة الثانية — بناء", "قاعة الاجتماعات الرئيسية"),
-            ("الجلسة الثالثة — تعريف", "قاعة الورش"),
-            ("الجلسة الرابعة — بناء", "قاعة الورش"),
-            ("الجلسة الخامسة — تعريف", "قاعة الاجتماعات الرئيسية"),
-            ("الجلسة السادسة — بناء", "قاعة الاجتماعات الرئيسية"),
-            ("الجلسة السابعة — تعريف", "قاعة الورش"),
-            ("الجلسة الثامنة — التزام", "قاعة الورش"),
-        };
-        for (var i = 0; i < titles.Length; i++)
-        {
-            var day = firstDay.AddDays(i / 2);
-            var start = (i % 2 == 0) ? new TimeSpan(9, 0, 0) : new TimeSpan(13, 0, 0);
-            db.BookingSlots.Add(new BookingSlot
-            {
-                TitleAr = titles[i].Item1,
-                VenueAr = titles[i].Item2,
-                FacilitatorAr = "مكتب الاستراتيجية",
-                SlotDate = day,
-                StartTime = start,
-                DurationMinutes = 90,
-                Capacity = 2,
-                IsOpen = true,
-            });
-        }
-        await db.SaveChangesAsync();
-    }
-
-    /// <summary>
-    /// Creates the BookingSlots / SlotBookings tables if they do not yet exist.
-    /// EnsureCreated does not add new tables to an existing database, so this
-    /// idempotent CREATE TABLE IF NOT EXISTS step handles the upgrade for
-    /// already-deployed installations. Works for SQLite and MySQL.
-    /// </summary>
-    private static async Task EnsureBookingTablesAsync(ApplicationDbContext db)
-    {
-        var providerName = db.Database.ProviderName ?? "";
-        var isMySql = providerName.Contains("MySql", StringComparison.OrdinalIgnoreCase)
-                   || providerName.Contains("Pomelo", StringComparison.OrdinalIgnoreCase);
-
-        string slotsSql;
-        string bookingsSql;
-        string bookingsIdxSql;
-
-        if (isMySql)
-        {
-            slotsSql = @"CREATE TABLE IF NOT EXISTS BookingSlots (
-                Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                TitleAr VARCHAR(255) NULL,
-                SlotDate DATETIME NOT NULL,
-                StartTime TIME(6) NOT NULL,
-                DurationMinutes INT NOT NULL,
-                VenueAr VARCHAR(255) NULL,
-                FacilitatorAr VARCHAR(255) NULL,
-                Capacity INT NOT NULL,
-                IsOpen TINYINT(1) NOT NULL,
-                NotesAr LONGTEXT NULL,
-                CreatedAt DATETIME NOT NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
-
-            bookingsSql = @"CREATE TABLE IF NOT EXISTS SlotBookings (
-                Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                BookingSlotId INT NOT NULL,
-                DepartmentId INT NOT NULL,
-                BookedByName VARCHAR(255) NULL,
-                BookedByContact VARCHAR(255) NULL,
-                BookedAt DATETIME NOT NULL,
-                CONSTRAINT FK_SlotBookings_BookingSlots FOREIGN KEY (BookingSlotId) REFERENCES BookingSlots(Id) ON DELETE CASCADE,
-                CONSTRAINT FK_SlotBookings_Departments FOREIGN KEY (DepartmentId) REFERENCES Departments(Id) ON DELETE RESTRICT
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
-
-            bookingsIdxSql = @"CREATE UNIQUE INDEX IX_SlotBookings_Slot_Department ON SlotBookings (BookingSlotId, DepartmentId);";
-        }
-        else
-        {
-            slotsSql = @"CREATE TABLE IF NOT EXISTS BookingSlots (
-                Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                TitleAr TEXT NULL,
-                SlotDate TEXT NOT NULL,
-                StartTime TEXT NOT NULL,
-                DurationMinutes INTEGER NOT NULL,
-                VenueAr TEXT NULL,
-                FacilitatorAr TEXT NULL,
-                Capacity INTEGER NOT NULL,
-                IsOpen INTEGER NOT NULL,
-                NotesAr TEXT NULL,
-                CreatedAt TEXT NOT NULL
-            );";
-
-            bookingsSql = @"CREATE TABLE IF NOT EXISTS SlotBookings (
-                Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                BookingSlotId INTEGER NOT NULL,
-                DepartmentId INTEGER NOT NULL,
-                BookedByName TEXT NULL,
-                BookedByContact TEXT NULL,
-                BookedAt TEXT NOT NULL,
-                FOREIGN KEY (BookingSlotId) REFERENCES BookingSlots(Id) ON DELETE CASCADE,
-                FOREIGN KEY (DepartmentId) REFERENCES Departments(Id) ON DELETE RESTRICT
-            );";
-
-            bookingsIdxSql = @"CREATE UNIQUE INDEX IF NOT EXISTS IX_SlotBookings_Slot_Department ON SlotBookings (BookingSlotId, DepartmentId);";
-        }
-
-        await db.Database.ExecuteSqlRawAsync(slotsSql);
-        await db.Database.ExecuteSqlRawAsync(bookingsSql);
-        try { await db.Database.ExecuteSqlRawAsync(bookingsIdxSql); }
-        catch { /* index already exists on MySQL — ignore */ }
+        await SeedStrategyDataAsync(db);
     }
 
     private static async Task SeedRolesAndAdminAsync(
@@ -171,356 +48,336 @@ public static class SeedData
         }
     }
 
-    private static async Task SeedFrameworkAsync(ApplicationDbContext db)
+    public static async Task SeedStrategyDataAsync(ApplicationDbContext db)
     {
-        if (await db.Frameworks.AnyAsync()) return;
+        if (await db.Pillars.AnyAsync()) return;
 
-        var framework = new Framework
+        var rnd = new Random(20260614);
+        var start = new DateTime(2025, 1, 1);
+        var end = new DateTime(2030, 12, 31);
+
+        // ---- 5.1 Pillars ----
+        var pillarDefs = new (string Code, string Name, decimal Budget, decimal Liquidity)[]
         {
-            NameAr = "بيت الاستراتيجية - الهيئة العامة للمنافسة",
-            NameEn = "GAC Strategy House",
-            DescriptionAr = "بيئة منافسة رائدة عالميًا تسهم في الازدهار الاقتصادي",
-            Shape = "house",
-            IsActive = true,
+            ("PLR-01", "تمكين المنافسة", 50000000m, 45000000m),
+            ("PLR-02", "حماية المنافسة", 35000000m, 32000000m),
+            ("PLR-03", "الشراكة والتعاون", 20000000m, 18000000m),
+            ("PLR-04", "الكفاءة المؤسسية", 40000000m, 36000000m),
+            ("PLR-05", "الابتكار والتقنيات الرقمية", 55000000m, 50000000m),
         };
-        db.Frameworks.Add(framework);
+        var pillars = pillarDefs.Select(p => new Pillar
+        {
+            PlrCode = p.Code,
+            PillarName = p.Name,
+            Budget = p.Budget,
+            Liquidity = p.Liquidity,
+            StartDates = start,
+            EndDates = end,
+            PlrPeriods = "6Y",
+        }).ToList();
+        db.Pillars.AddRange(pillars);
         await db.SaveChangesAsync();
 
-        // Layer: Vision
-        var visionLayer = new FrameworkLayer { FrameworkId = framework.Id, Type = LayerType.Vision, NameAr = "الرؤية", NameEn = "Vision", Order = 1, VisualKey = "roof" };
-        db.FrameworkLayers.Add(visionLayer);
-        await db.SaveChangesAsync();
-        db.FrameworkElements.Add(new FrameworkElement
+        // ---- 5.2 Objectives ----
+        var objectiveDefs = new (string Code, string Name, string Plr)[]
         {
-            LayerId = visionLayer.Id, Order = 1, IconKey = "vision",
-            NameAr = "بيئة منافسة رائدة عالميًا تسهم في الازدهار الاقتصادي",
-            NameEn = "A world-leading competitive environment contributing to economic prosperity",
-        });
-
-        // Layer: Mission
-        var missionLayer = new FrameworkLayer { FrameworkId = framework.Id, Type = LayerType.Mission, NameAr = "الرسالة", NameEn = "Mission", Order = 2, VisualKey = "banner" };
-        db.FrameworkLayers.Add(missionLayer);
-        await db.SaveChangesAsync();
-        db.FrameworkElements.Add(new FrameworkElement
-        {
-            LayerId = missionLayer.Id, Order = 1, IconKey = "mission",
-            NameAr = "تمكين المنافسة العادلة من خلال تطبيق احكام النظام بفعالية ودعم السياسات ورفع مستويات الوعي والامتثال بما يسهم في تحسين كفاءة الأسواق وتعزيز مصلحة المستهلك",
-            NameEn = "Enable fair competition through effective enforcement, policy support, and raising awareness and compliance",
-        });
-
-        // Layer: Values (5)
-        var valuesLayer = new FrameworkLayer { FrameworkId = framework.Id, Type = LayerType.Values, NameAr = "قيم الهيئة", NameEn = "Values", Order = 3, VisualKey = "values-row" };
-        db.FrameworkLayers.Add(valuesLayer);
-        await db.SaveChangesAsync();
-        var values = new[]
-        {
-            ("الشفافية", "Transparency", "transparency", "#2D9CDB"),
-            ("التعاون", "Collaboration", "collaboration", "#27AE60"),
-            ("التميز", "Excellence", "excellence", "#F2994A"),
-            ("العدالة", "Fairness", "fairness", "#9B51E0"),
-            ("الابتكار", "Innovation", "innovation", "#EB5757"),
+            ("OBJ-01-01", "تطوير منظومة المنافسة التشريعية والتنظيمية", "PLR-01"),
+            ("OBJ-01-02", "رفع مستوى الوعي بثقافة المنافسة", "PLR-01"),
+            ("OBJ-01-03", "تحسين بيئة الأعمال للأسواق التنافسية", "PLR-01"),
+            ("OBJ-01-04", "دعم المنافسة العادلة في الأسواق الناشئة", "PLR-01"),
+            ("OBJ-02-01", "كشف ومعالجة الممارسات الاحتكارية", "PLR-02"),
+            ("OBJ-02-02", "تعزيز الامتثال لأحكام نظام المنافسة", "PLR-02"),
+            ("OBJ-03-01", "بناء شراكات استراتيجية محلية ودولية", "PLR-03"),
+            ("OBJ-03-02", "تعزيز التعاون مع الجهات الرقابية", "PLR-03"),
+            ("OBJ-04-01", "تطوير الكوادر البشرية وبناء القدرات", "PLR-04"),
+            ("OBJ-04-02", "تحسين كفاءة العمليات والخدمات المساندة", "PLR-04"),
+            ("OBJ-04-03", "ترسيخ الحوكمة وإدارة المخاطر", "PLR-04"),
+            ("OBJ-05-01", "تبني التقنيات الرقمية والذكاء الاصطناعي", "PLR-05"),
+            ("OBJ-05-02", "تطوير منصات البيانات والتحليلات", "PLR-05"),
         };
-        for (int i = 0; i < values.Length; i++)
+        var objCountPerPillar = objectiveDefs.GroupBy(o => o.Plr).ToDictionary(g => g.Key, g => g.Count());
+        var objectives = objectiveDefs.Select(o =>
         {
-            db.FrameworkElements.Add(new FrameworkElement
+            var pillar = pillars.First(p => p.PlrCode == o.Plr);
+            var n = objCountPerPillar[o.Plr];
+            return new Objective
             {
-                LayerId = valuesLayer.Id, Order = i + 1,
-                NameAr = values[i].Item1, NameEn = values[i].Item2,
-                IconKey = values[i].Item3, ColorHex = values[i].Item4,
-            });
-        }
-
-        // Layer: Pillars (5)
-        var pillarsLayer = new FrameworkLayer { FrameworkId = framework.Id, Type = LayerType.Pillars, NameAr = "الركائز", NameEn = "Pillars", Order = 4, VisualKey = "pillars-row" };
-        db.FrameworkLayers.Add(pillarsLayer);
-        await db.SaveChangesAsync();
-        var pillars = new[]
-        {
-            ("الركيزة الأولى: تمكين المنافسة", "Pillar 1: Enabling Competition"),
-            ("الركيزة الثانية: حماية المنافسة", "Pillar 2: Protecting Competition"),
-            ("الركيزة الثالثة: الشراكة والتعاون", "Pillar 3: Partnership and Cooperation"),
-            ("الركيزة الرابعة: الكفاءة المؤسسية", "Pillar 4: Institutional Efficiency"),
-            ("الركيزة الخامسة: الابتكار والتقنيات الرقمية", "Pillar 5: Innovation and Digital Technologies"),
-        };
-        var pillarIds = new List<int>();
-        for (int i = 0; i < pillars.Length; i++)
-        {
-            var el = new FrameworkElement
-            {
-                LayerId = pillarsLayer.Id, Order = i + 1,
-                NameAr = pillars[i].Item1, NameEn = pillars[i].Item2,
-                ColorHex = "#1B5E7F",
+                ObjectiveCode = o.Code,
+                ObjectiveName = o.Name,
+                PlrCode = o.Plr,
+                Budget = Math.Round((pillar.Budget ?? 0) / n, 2),
+                Liquidity = Math.Round((pillar.Liquidity ?? 0) / n, 2),
+                StartDates = start,
+                EndDates = end,
+                ObjPeriod = "6Y",
             };
-            db.FrameworkElements.Add(el);
-            await db.SaveChangesAsync();
-            pillarIds.Add(el.Id);
-        }
-
-        // Layer: Objectives (13) — grouped under their pillars
-        var objLayer = new FrameworkLayer { FrameworkId = framework.Id, Type = LayerType.Objectives, NameAr = "الأهداف", NameEn = "Objectives", Order = 5, VisualKey = "objectives-grid" };
-        db.FrameworkLayers.Add(objLayer);
+        }).ToList();
+        db.Objectives.AddRange(objectives);
         await db.SaveChangesAsync();
-        var objectives = new (string ar, string en, int pillarIdx)[]
+
+        // ---- 5.3 Departments (17, GAC Level-2) ----
+        var deptDefs = new (string Code, string Ar, string En, string Parent)[]
         {
-            // Pillar 1 (4)
-            ("تحسين بيئة تنظيمية داعمة للمنافسة العادلة", "Improve regulatory environment for fair competition", 0),
-            ("تعزيز السياسات والدراسات المحفزة للمنافسة لرفع كفاءة الأسواق", "Strengthen pro-competition policies and studies", 0),
-            ("رفع مستويات الامتثال للمنشآت", "Raise compliance levels among establishments", 0),
-            ("تعزيز الصورة الذهنية والوعي المعرفي بدور المنافسة", "Enhance brand and public awareness", 0),
-            // Pillar 2 (2)
-            ("تطوير منظومة الرقابة", "Develop the monitoring system", 1),
-            ("تعزيز مكافحة الممارسات المخلة بالمنافسة", "Strengthen action against anti-competitive practices", 1),
-            // Pillar 3 (2)
-            ("بناء تعاون فعال محليًا ودوليًا", "Build effective local and international cooperation", 2),
-            ("تعزيز الحضور الدولي للهيئة في المنظمات والمنتديات الدولية", "Strengthen international presence", 2),
-            // Pillar 4 (3)
-            ("تحسين العمليات التشغيلية والمالية وضمان استدامتها", "Improve operational and financial processes", 3),
-            ("الاستثمار بتطوير القدرات البشرية وتعزيز الثقافة المؤسسية", "Invest in human capital and culture", 3),
-            ("تعزيز ممارسات الحوكمة والمخاطر والالتزام", "Strengthen governance, risk, and compliance", 3),
-            // Pillar 5 (2)
-            ("تمكين الاستفادة من التقنيات الناشئة والبيانات", "Leverage emerging tech and data", 4),
-            ("تمكين الابتكار لتعزيز كفاءة الأسواق وتحقيق المنافسة العادلة", "Enable innovation for market efficiency", 4),
+            ("DEPT-01", "مكتب الرئيس التنفيذي", "CEO Office", "CEO"),
+            ("DEPT-02", "الاستراتيجية وتميز الأعمال", "Strategy & Business Excellence", "CEO"),
+            ("DEPT-03", "المراجعة الداخلية", "Internal Audit", "CEO"),
+            ("DEPT-04", "المخاطر والحوكمة والالتزام", "Risk Governance & Compliance", "CEO"),
+            ("DEPT-05", "الأمن السيبراني ومكتب البيانات", "Cybersecurity & Data Office", "CEO"),
+            ("DEPT-06", "الشؤون القانونية", "Legal Affairs", "CEO"),
+            ("DEPT-07", "الشؤون الاقتصادية", "Economic Affairs", "CEO"),
+            ("DEPT-08", "الدعم المؤسسي", "Corporate Support", "CEO"),
+            ("DEPT-09", "التحريات والتحقيق", "Investigation", "الشؤون القانونية"),
+            ("DEPT-10", "الامتثال والتسوية", "Compliance & Settlement", "الشؤون القانونية"),
+            ("DEPT-11", "رقابة الأسواق والتحليل الاقتصادي", "Market Monitoring", "الشؤون الاقتصادية"),
+            ("DEPT-12", "دعم السياسات", "Policy Support", "الشؤون الاقتصادية"),
+            ("DEPT-13", "الاندماجات والاستحواذات", "M&A", "الشؤون الاقتصادية"),
+            ("DEPT-14", "الخدمات المساندة", "Support Services", "الدعم المؤسسي"),
+            ("DEPT-15", "الموارد البشرية", "HR", "الدعم المؤسسي"),
+            ("DEPT-16", "الشؤون المالية", "Financial Affairs", "الدعم المؤسسي"),
+            ("DEPT-17", "التواصل المؤسسي", "Corporate Communications", "الدعم المؤسسي"),
         };
-        int order = 1;
-        foreach (var o in objectives)
+        var departments = deptDefs.Select(d => new Department
         {
-            db.FrameworkElements.Add(new FrameworkElement
-            {
-                LayerId = objLayer.Id, Order = order++,
-                NameAr = o.ar, NameEn = o.en,
-                ParentElementId = pillarIds[o.pillarIdx],
-                ColorHex = "#E8F4F8",
-            });
-        }
-
-        await db.SaveChangesAsync();
-    }
-
-    private static async Task SeedDepartmentsAsync(ApplicationDbContext db)
-    {
-        if (await db.Departments.AnyAsync()) return;
-
-        // 18 placeholder departments — strategy office will rename
-        var deptNames = new[]
-        {
-            ("الشؤون القانونية", "Legal Affairs"),
-            ("التحقيق والتفتيش", "Investigation & Inspection"),
-            ("الدراسات والسياسات", "Studies & Policies"),
-            ("التوعية والتثقيف", "Awareness & Education"),
-            ("العلاقات الدولية", "International Relations"),
-            ("الشراكات المحلية", "Local Partnerships"),
-            ("الحوكمة والالتزام", "Governance & Compliance"),
-            ("إدارة المخاطر", "Risk Management"),
-            ("الموارد البشرية", "Human Resources"),
-            ("التطوير المؤسسي", "Organizational Development"),
-            ("الشؤون المالية", "Finance"),
-            ("المشتريات والعقود", "Procurement & Contracts"),
-            ("تقنية المعلومات", "Information Technology"),
-            ("البيانات والتحليلات", "Data & Analytics"),
-            ("الابتكار الرقمي", "Digital Innovation"),
-            ("الاتصال المؤسسي", "Corporate Communication"),
-            ("مكتب الاستراتيجية", "Strategy Office"),
-            ("التدقيق الداخلي", "Internal Audit"),
-        };
-
-        foreach (var (ar, en) in deptNames)
-        {
-            var dept = new Department { NameAr = ar, NameEn = en, IsActive = true };
-            db.Departments.Add(dept);
-            await db.SaveChangesAsync();
-
-            // 2 placeholder projects per department
-            db.DepartmentProjects.AddRange(
-                new DepartmentProject { DepartmentId = dept.Id, NameAr = $"مشروع استراتيجي - {ar}", NameEn = "Strategic Project", Kind = "Strategic" },
-                new DepartmentProject { DepartmentId = dept.Id, NameAr = $"مشروع تشغيلي - {ar}", NameEn = "Operational Project", Kind = "Operational" }
-            );
-            // 2 placeholder KPIs per department
-            db.DepartmentKpis.AddRange(
-                new DepartmentKpi { DepartmentId = dept.Id, NameAr = $"مؤشر الأداء الأول - {ar}", Unit = "%", Target = "90" },
-                new DepartmentKpi { DepartmentId = dept.Id, NameAr = $"مؤشر الأداء الثاني - {ar}", Unit = "عدد", Target = "12" }
-            );
-            // 3 placeholder roles per department
-            db.DepartmentRoles.AddRange(
-                new DepartmentRole { DepartmentId = dept.Id, TitleAr = "مدير الإدارة", TitleEn = "Department Head" },
-                new DepartmentRole { DepartmentId = dept.Id, TitleAr = "أخصائي أول", TitleEn = "Senior Specialist" },
-                new DepartmentRole { DepartmentId = dept.Id, TitleAr = "أخصائي", TitleEn = "Specialist" }
-            );
-        }
-        await db.SaveChangesAsync();
-    }
-
-    private static async Task SeedCommitmentsAsync(ApplicationDbContext db)
-    {
-        if (await db.CommitmentTemplates.AnyAsync()) return;
-
-        // Universal commitments — visible to every department, linkable to any element.
-        // The strategy office can add department-specific commitments later.
-        var commitments = new[]
-        {
-            ("نلتزم بأن نطبق قيمة الشفافية في كل ما نقوم به من أعمال", CommitmentLinkType.Value),
-            ("نلتزم بتعزيز التعاون داخل فريقنا ومع الإدارات الأخرى", CommitmentLinkType.Value),
-            ("نلتزم بتحقيق التميز في مخرجاتنا", CommitmentLinkType.Value),
-            ("نلتزم بالعدالة في التعامل مع كل الأطراف", CommitmentLinkType.Value),
-            ("نلتزم بتبني الابتكار في حلولنا اليومية", CommitmentLinkType.Value),
-            ("نلتزم بإنجاز مشاريعنا الاستراتيجية ضمن الإطار الزمني المحدد", CommitmentLinkType.Project),
-            ("نلتزم بتحقيق مؤشرات الأداء المستهدفة لإدارتنا", CommitmentLinkType.Objective),
-            ("نلتزم بدعم الركيزة الاستراتيجية الأكثر ارتباطًا بعملنا", CommitmentLinkType.Pillar),
-        };
-        int order = 1;
-        foreach (var (text, link) in commitments)
-        {
-            db.CommitmentTemplates.Add(new CommitmentTemplate
-            {
-                TextAr = text,
-                SuggestedLinkType = link,
-                Order = order++,
-                IsActive = true,
-            });
-        }
-        await db.SaveChangesAsync();
-    }
-
-    private static async Task SeedSurveyAsync(ApplicationDbContext db)
-    {
-        if (await db.Surveys.AnyAsync()) return;
-
-        var survey = new Survey
-        {
-            NameAr = "استبيان نهاية الجلسة",
-            IntroAr = "نشكرك على مشاركتك. رأيك يساعدنا على تطوير الجلسات القادمة. الاستبيان يستغرق ٥ دقائق.",
+            DeptCode = d.Code,
+            NameAr = d.Ar,
+            NameEn = d.En,
+            ParentSector = d.Parent,
+            Level = 2,
             IsActive = true,
+        }).ToList();
+        db.Departments.AddRange(departments);
+        await db.SaveChangesAsync();
+
+        // Pillar → preferred department codes (for weighted assignment)
+        var pillarDepts = new Dictionary<string, string[]>
+        {
+            ["PLR-01"] = new[] { "DEPT-07", "DEPT-12", "DEPT-11", "DEPT-02" },
+            ["PLR-02"] = new[] { "DEPT-06", "DEPT-09", "DEPT-10", "DEPT-11" },
+            ["PLR-03"] = new[] { "DEPT-02", "DEPT-07", "DEPT-17", "DEPT-01" },
+            ["PLR-04"] = new[] { "DEPT-08", "DEPT-14", "DEPT-15", "DEPT-16", "DEPT-03", "DEPT-04" },
+            ["PLR-05"] = new[] { "DEPT-05", "DEPT-02", "DEPT-08" },
         };
-        db.Surveys.Add(survey);
-        await db.SaveChangesAsync();
+        string DeptName(string code) => departments.First(d => d.DeptCode == code).NameAr!;
+        string PickDept(string plr) { var arr = pillarDepts[plr]; return arr[rnd.Next(arr.Length)]; }
 
-        var questions = new (string text, SurveyQuestionType type, string? options)[]
+        var personNames = new[]
         {
-            ("كيف تقيّم وضوح الاستراتيجية بعد الجلسة؟", SurveyQuestionType.Rating, null),
-            ("كيف تقيّم تنظيم الجلسة وإيقاعها؟", SurveyQuestionType.Rating, null),
-            ("كيف تقيّم التفاعل مع المنصة (iPads)؟", SurveyQuestionType.Rating, null),
-            ("هل تشعر أن دور إدارتك في الاستراتيجية أصبح أوضح؟", SurveyQuestionType.SingleChoice, "[\"نعم تمامًا\",\"إلى حد ما\",\"لا أشعر بفرق\"]"),
-            ("ما الذي كان الأكثر فائدة لك في هذه الجلسة؟", SurveyQuestionType.OpenText, null),
-            ("ما الذي يمكن تحسينه في الجلسات القادمة؟", SurveyQuestionType.OpenText, null),
+            "أحمد العتيبي", "نورة القحطاني", "خالد الدوسري", "سارة المطيري", "فهد الشهري",
+            "ريم الغامدي", "عبدالله الحربي", "لمياء السبيعي", "ماجد العنزي", "هند الزهراني",
+            "سلطان البقمي", "منيرة العمري", "يوسف الرشيدي", "أمل الجهني", "بدر الشمري",
+            "وجدان المالكي", "تركي العسيري", "غادة الفيفي", "نايف القرني", "دانة الخالدي",
         };
-        int order = 1;
-        foreach (var (text, type, options) in questions)
-        {
-            db.SurveyQuestions.Add(new SurveyQuestion
-            {
-                SurveyId = survey.Id,
-                TextAr = text,
-                Type = type,
-                Order = order++,
-                IsRequired = type != SurveyQuestionType.OpenText,
-                MinValue = type == SurveyQuestionType.Rating ? 1 : null,
-                MaxValue = type == SurveyQuestionType.Rating ? 5 : null,
-                OptionsJson = options,
-            });
-        }
-        await db.SaveChangesAsync();
-    }
+        string PickPerson() => personNames[rnd.Next(personNames.Length)];
 
-    private static async Task SeedQuizAsync(ApplicationDbContext db)
-    {
-        if (await db.Quizzes.AnyAsync()) return;
-
-        var quiz = new Quiz
+        // ---- 5.4 Initiatives (23) ----
+        // 2 per objective = 26, drop 1 each from OBJ-04-02, OBJ-04-03, OBJ-05-02 → 23
+        var dropSecond = new HashSet<string> { "OBJ-04-02", "OBJ-04-03", "OBJ-05-02" };
+        var initiativeNameBank = new[]
         {
-            NameAr = "اختبار ما بعد الجلسة",
-            IntroAr = "اختبار قصير اختياري لتعزيز ما تعلمته في الجلسة. يأخذ ٣ دقائق.",
-            IsActive = true,
+            "تحديث لائحة الاندماجات والاستحواذات", "إطلاق منصة الشكاوى الإلكترونية",
+            "برنامج تدريب المحققين الاقتصاديين", "مرصد بيانات الأسواق", "حملة الوعي بثقافة المنافسة",
+            "تطوير دليل الامتثال للمنشآت", "برنامج الشراكات الدولية", "أتمتة إجراءات البت في البلاغات",
+            "مركز التميز في تحليل الأسواق", "منصة الإفصاح والشفافية", "برنامج بناء القدرات القيادية",
+            "إطار حوكمة المخاطر المؤسسية", "بوابة الخدمات الرقمية الموحدة", "نظام الإنذار المبكر للاحتكار",
+            "مؤشر تنافسية القطاعات", "برنامج التعاون مع الجهات الرقابية", "مختبر الابتكار التنظيمي",
+            "محرك التحليلات التنبؤية", "تطوير السياسات التنافسية", "حاضنة المواهب التحليلية",
+            "منصة إدارة القضايا", "برنامج تمكين الأسواق الناشئة", "نظام قياس أثر التدخلات التنظيمية",
         };
-        db.Quizzes.Add(quiz);
-        await db.SaveChangesAsync();
 
-        db.QuizQuestions.AddRange(
-            new QuizQuestion
-            {
-                QuizId = quiz.Id,
-                TextAr = "كم عدد ركائز الاستراتيجية؟",
-                Type = QuizQuestionType.SingleChoice,
-                Order = 1,
-                OptionsJson = "[\"٣\",\"٤\",\"٥\",\"٦\"]",
-                CorrectOptionsJson = "[2]",
-                FeedbackAr = "الاستراتيجية تتكون من ٥ ركائز رئيسية تشكل الهيكل الاستراتيجي للهيئة.",
-            },
-            new QuizQuestion
-            {
-                QuizId = quiz.Id,
-                TextAr = "أي من التالي يعتبر قيمة من قيم الهيئة؟",
-                Type = QuizQuestionType.SingleChoice,
-                Order = 2,
-                OptionsJson = "[\"الشفافية\",\"النمو\",\"السرعة\",\"التنافس\"]",
-                CorrectOptionsJson = "[0]",
-                FeedbackAr = "الشفافية إحدى قيم الهيئة الخمس: الشفافية، التعاون، التميز، العدالة، الابتكار.",
-            },
-            new QuizQuestion
-            {
-                QuizId = quiz.Id,
-                TextAr = "ما هو هدف الركيزة الخامسة؟",
-                Type = QuizQuestionType.SingleChoice,
-                Order = 3,
-                OptionsJson = "[\"الكفاءة المؤسسية\",\"الشراكة والتعاون\",\"الابتكار والتقنيات الرقمية\",\"حماية المنافسة\"]",
-                CorrectOptionsJson = "[2]",
-                FeedbackAr = "الركيزة الخامسة هي الابتكار والتقنيات الرقمية - تركز على الاستفادة من التقنيات الناشئة والبيانات.",
-            },
-            new QuizQuestion
-            {
-                QuizId = quiz.Id,
-                TextAr = "ما الركيزة المسؤولة عن مكافحة الممارسات المخلة بالمنافسة؟",
-                Type = QuizQuestionType.SingleChoice,
-                Order = 4,
-                OptionsJson = "[\"تمكين المنافسة\",\"حماية المنافسة\",\"الشراكة والتعاون\",\"الكفاءة المؤسسية\"]",
-                CorrectOptionsJson = "[1]",
-                FeedbackAr = "الركيزة الثانية - حماية المنافسة - مسؤولة عن تطوير منظومة الرقابة ومكافحة الممارسات المخلة.",
-            },
-            new QuizQuestion
-            {
-                QuizId = quiz.Id,
-                TextAr = "ما الهدف الرئيسي للرؤية الاستراتيجية؟",
-                Type = QuizQuestionType.SingleChoice,
-                Order = 5,
-                OptionsJson = "[\"زيادة الإيرادات\",\"الازدهار الاقتصادي\",\"التوسع الدولي\",\"تقليل التكاليف\"]",
-                CorrectOptionsJson = "[1]",
-                FeedbackAr = "رؤية الهيئة: بيئة منافسة رائدة عالميًا تسهم في الازدهار الاقتصادي.",
-            }
-        );
-        await db.SaveChangesAsync();
-    }
-
-    private static async Task SeedSampleSessionAsync(ApplicationDbContext db)
-    {
-        if (await db.Sessions.AnyAsync()) return;
-        var framework = await db.Frameworks.FirstAsync(f => f.IsActive);
-        var depts = await db.Departments.Take(3).ToListAsync();
-
-        var session = new Session
+        var initiatives = new List<Initiative>();
+        int initSeq = 1;
+        foreach (var obj in objectives)
         {
-            FrameworkId = framework.Id,
-            TitleAr = "الجلسة التجريبية - اليوم الأول",
-            ScheduledAt = DateTime.UtcNow.AddDays(1),
-            VenueAr = "قاعة الاجتماعات الرئيسية",
-            LeadFacilitator = "مكتب الاستراتيجية",
-            Status = SessionStatus.Scheduled,
-            AccessCode = "DEMO-001",
-        };
-        db.Sessions.Add(session);
-        await db.SaveChangesAsync();
-        foreach (var d in depts)
-        {
-            db.SessionDepartments.Add(new SessionDepartment { SessionId = session.Id, DepartmentId = d.Id });
-            for (int i = 1; i <= 3; i++)
+            int count = dropSecond.Contains(obj.ObjectiveCode) ? 1 : 2;
+            for (int j = 0; j < count; j++)
             {
-                db.SessionAttendees.Add(new SessionAttendee
+                var budget = Math.Round((decimal)(1_500_000 + rnd.Next(0, 3_500_001)), 2);
+                var sMonth = rnd.Next(0, 9); // 2025 Q1-Q3
+                var sDate = new DateTime(2025, 1, 1).AddMonths(sMonth);
+                var eDate = sDate.AddMonths(18 + rnd.Next(0, 19));
+                var name = initiativeNameBank[(initSeq - 1) % initiativeNameBank.Length];
+                initiatives.Add(new Initiative
                 {
-                    SessionId = session.Id,
-                    DepartmentId = d.Id,
-                    FullNameAr = $"عضو الفريق {i} - {d.NameAr}",
-                    Email = $"attendee{i}_{d.Id}@gac.gov.sa",
-                    IsDepartmentHead = i == 1,
+                    InitiativeCode = $"INIT-{initSeq:D3}",
+                    InitiativeName = name,
+                    ObjectiveCode = obj.ObjectiveCode,
+                    ObjectiveName = obj.ObjectiveName,
+                    Owners = DeptName(PickDept(obj.PlrCode!)),
+                    Budget = budget,
+                    Liquidity = Math.Round(budget * 0.9m, 2),
+                    StartDates = sDate,
+                    EndDates = eDate,
                 });
+                initSeq++;
             }
         }
+        db.Initiatives.AddRange(initiatives);
         await db.SaveChangesAsync();
+
+        // Initiative → its pillar (via objective)
+        var objToPlr = objectives.ToDictionary(o => o.ObjectiveCode, o => o.PlrCode!);
+
+        // ---- 5.5 Projects (220: 110 strategic / 110 operational) ----
+        var statuses = new[] { "مخطط", "قيد التنفيذ", "قيد التنفيذ", "قيد التنفيذ", "متأخر", "مكتمل", "متوقف" };
+        var phases = new[] { "تخطيط", "تصميم", "تنفيذ", "اختبار", "إغلاق" };
+        var projectFlavors = new[]
+        {
+            "نظام إدارة الشكاوى", "ترقية قاعدة بيانات الأسواق", "برنامج تدريب", "لوحة مؤشرات تنفيذية",
+            "أتمتة سير العمل", "بوابة المستفيدين", "دراسة قطاعية", "تطوير لائحة تنفيذية",
+            "حملة توعوية", "ورشة عمل تخصصية", "تكامل أنظمة", "مراجعة إجراءات", "نموذج تحليلي",
+            "منصة تعاون", "تقرير رصد سوق", "برنامج امتثال", "تحديث سياسة", "مبادرة تحول رقمي",
+        };
+
+        var projects = new List<Project>();
+        int prjSeq = 1;
+        int strategicLeft = 110, operationalLeft = 110;
+        // Round-robin across initiatives until 220 created
+        int total = 220;
+        for (int i = 0; i < total; i++)
+        {
+            var init = initiatives[i % initiatives.Count];
+            var plr = objToPlr[init.ObjectiveCode!];
+
+            // alternate type but respect remaining quotas
+            bool strategic;
+            if (strategicLeft == 0) strategic = false;
+            else if (operationalLeft == 0) strategic = true;
+            else strategic = (i % 2 == 0);
+            if (strategic) strategicLeft--; else operationalLeft--;
+
+            var budget = Math.Round((decimal)(200_000 + rnd.Next(0, 2_800_001)), 2);
+            var liquidity = Math.Round(budget * (decimal)(0.80 + rnd.NextDouble() * 0.15), 2);
+            var gac = Math.Round(budget * (decimal)(0.70 + rnd.NextDouble() * 0.30), 2);
+            var deptCode = PickDept(plr);
+
+            // 7-year liquidity spread over the project window (pick 3-5 consecutive years from 2025)
+            var spread = new decimal[7]; // 2025..2031
+            int firstYear = rnd.Next(0, 3);          // 2025-2027 start
+            int span = 3 + rnd.Next(0, 3);            // 3-5 years
+            int lastYear = Math.Min(6, firstYear + span - 1);
+            int activeYears = lastYear - firstYear + 1;
+            decimal per = Math.Round(liquidity / activeYears, 2);
+            decimal accumulated = 0;
+            for (int y = firstYear; y <= lastYear; y++)
+            {
+                if (y == lastYear) spread[y] = Math.Round(liquidity - accumulated, 2);
+                else { spread[y] = per; accumulated += per; }
+            }
+
+            projects.Add(new Project
+            {
+                ProjectCode = $"PRJ-{prjSeq:D3}",
+                ProjectName = $"مشروع {prjSeq} — {projectFlavors[rnd.Next(projectFlavors.Length)]}",
+                InitiativeCode = init.InitiativeCode,
+                PlrCode = plr,
+                ProjectType = strategic ? "استراتيجي" : "تشغيلي",
+                ProjectStatus = statuses[rnd.Next(statuses.Length)],
+                Budget = budget,
+                Liquidity = liquidity,
+                Liquidity2025 = spread[0],
+                Liquidity2026 = spread[1],
+                Liquidity2027 = spread[2],
+                Liquidity2028 = spread[3],
+                Liquidity2029 = spread[4],
+                Liquidity2030 = spread[5],
+                Liquidity2031 = spread[6],
+                GacBudget = gac,
+                ProjectSponsor = PickPerson(),
+                ProjectManager = PickPerson(),
+                DepartmentCode = deptCode,
+                Division = DeptName(deptCode),
+                ProjectPhase = phases[rnd.Next(phases.Length)],
+            });
+            prjSeq++;
+        }
+        db.Projects.AddRange(projects);
+        await db.SaveChangesAsync();
+
+        // ---- 5.6 KPIs (134: 14 strategic / 120 operational) ----
+        var kpiNameBank = new[]
+        {
+            "نسبة الشكاوى المغلقة خلال 30 يوم", "عدد القضايا المحالة للقضاء", "معدل رضا الجهات الشريكة",
+            "زمن البت في طلبات الاندماج", "نسبة أتمتة العمليات", "عدد المنشآت الملتزمة بالنظام",
+            "نسبة تغطية رصد الأسواق", "معدل الوعي بثقافة المنافسة", "عدد الدراسات الاقتصادية المنجزة",
+            "نسبة إنجاز المشاريع في وقتها", "معدل دوران الموظفين", "نسبة تنفيذ خطة المخاطر",
+            "عدد الاتفاقيات الدولية المبرمة", "زمن الاستجابة للبلاغات", "نسبة رضا المستفيدين",
+            "عدد البلاغات المعالجة", "نسبة الامتثال للحوكمة", "معدل توافر الأنظمة الرقمية",
+            "نسبة البيانات المؤتمتة", "عدد ورش التوعية المنفذة",
+        };
+        var freqs = new[] { "شهري", "ربع سنوي", "نصف سنوي", "سنوي" };
+        var units = new[] { "%", "عدد", "يوم", "ريال", "ساعة" };
+        var directions = new[] { "تصاعدي", "تنازلي" };
+        var automation = new[] { "مؤتمت بالكامل", "جزئي", "يدوي" };
+
+        var kpis = new List<Kpi>();
+        int kpiSeq = 1;
+
+        // Strategic: PLR-01:3, PLR-02:3, PLR-03:3, PLR-04:3, PLR-05:2
+        var strategicPerPillar = new (string Plr, int Count)[]
+        {
+            ("PLR-01", 3), ("PLR-02", 3), ("PLR-03", 3), ("PLR-04", 3), ("PLR-05", 2),
+        };
+        foreach (var (plr, cnt) in strategicPerPillar)
+        {
+            var pillarObjs = objectives.Where(o => o.PlrCode == plr).ToList();
+            for (int k = 0; k < cnt; k++)
+            {
+                var obj = pillarObjs[k % pillarObjs.Count];
+                var deptCode = PickDept(plr);
+                kpis.Add(BuildKpi(kpiSeq++, "استراتيجي", obj.ObjectiveCode, plr, deptCode,
+                    DeptName(deptCode), kpiNameBank, freqs, units, directions, automation, rnd));
+            }
+        }
+
+        // Operational: 120 scattered across 17 departments (~7 each)
+        for (int k = 0; k < 120; k++)
+        {
+            var dept = departments[k % departments.Count];
+            // pick an objective whose pillar tends to match the department's work; fallback random
+            var obj = objectives[rnd.Next(objectives.Count)];
+            kpis.Add(BuildKpi(kpiSeq++, "تشغيلي", obj.ObjectiveCode, obj.PlrCode, dept.DeptCode,
+                dept.NameAr!, kpiNameBank, freqs, units, directions, automation, rnd));
+        }
+
+        db.Kpis.AddRange(kpis);
+        await db.SaveChangesAsync();
+    }
+
+    private static Kpi BuildKpi(
+        int seq, string type, string? objCode, string? plr, string deptCode, string deptName,
+        string[] names, string[] freqs, string[] units, string[] dirs, string[] autos, Random rnd)
+    {
+        decimal min = rnd.Next(0, 51);
+        decimal max = rnd.Next(80, 101);
+        // 6 increasing targets between min and max
+        var targets = new string[6];
+        decimal step = (max - min) / 6m;
+        for (int t = 0; t < 6; t++)
+            targets[t] = Math.Round(min + step * (t + 1), 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        return new Kpi
+        {
+            KpiCode = $"KPI-{seq:D3}",
+            KpiName = names[rnd.Next(names.Length)],
+            ActivationStatus = rnd.Next(0, 10) == 0 ? "Inactive" : "Active",
+            KpiType = type,
+            ObjectiveCode = objCode,
+            PlrCode = plr,
+            DepartmentCode = deptCode,
+            Division = deptName,
+            Frequency = freqs[rnd.Next(freqs.Length)],
+            Unit = units[rnd.Next(units.Length)],
+            Direction = dirs[rnd.Next(dirs.Length)],
+            IndexWeight = (rnd.Next(1, 6)).ToString(),
+            Minimum = min,
+            Maximum = max,
+            Target2025 = targets[0],
+            Target2026 = targets[1],
+            Target2027 = targets[2],
+            Target2028 = targets[3],
+            Target2029 = targets[4],
+            Target2030 = targets[5],
+            AutomationStatus = autos[rnd.Next(autos.Length)],
+        };
     }
 }

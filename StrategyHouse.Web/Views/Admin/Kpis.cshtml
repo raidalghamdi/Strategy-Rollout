@@ -1,0 +1,22 @@
+@model List<StrategyHouse.Domain.Entities.Kpi>
+@{ ViewData["Title"] = "مؤشرات الأداء"; }
+<h1>مؤشرات الأداء (@Model.Count)</h1>
+<table class="table">
+    <thead>
+        <tr><th>الرمز</th><th>الاسم</th><th>النوع</th><th>الهدف</th><th>الإدارة</th><th>الوحدة</th><th>الحالة</th></tr>
+    </thead>
+    <tbody>
+    @foreach (var k in Model)
+    {
+        <tr>
+            <td>@k.KpiCode</td>
+            <td>@k.KpiName</td>
+            <td>@k.KpiType</td>
+            <td>@k.ObjectiveCode</td>
+            <td>@k.Division</td>
+            <td>@k.Unit</td>
+            <td>@k.ActivationStatus</td>
+        </tr>
+    }
+    </tbody>
+</table>

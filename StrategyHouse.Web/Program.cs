@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using StrategyHouse.Domain.Entities;
 using StrategyHouse.Infrastructure.Persistence;
-using StrategyHouse.Web.Hubs;
 using StrategyHouse.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -45,16 +44,12 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.AccessDeniedPath = "/Account/AccessDenied";
 });
 
-// MVC + Razor + SignalR
+// MVC + Razor
 builder.Services.AddControllersWithViews()
     .AddRazorRuntimeCompilation();
-builder.Services.AddSignalR();
 
 // App services
-builder.Services.AddScoped<EmailComposer>();
 builder.Services.AddScoped<QrService>();
-builder.Services.AddScoped<DashboardService>();
-builder.Services.AddScoped<JourneyMapService>();
 
 var app = builder.Build();
 
@@ -81,8 +76,5 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
-
-app.MapHub<MapCanvasHub>("/hubs/canvas");
-app.MapHub<BookingHub>("/hubs/booking");
 
 app.Run();
