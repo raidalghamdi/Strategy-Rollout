@@ -1,0 +1,90 @@
+@model List<StrategyHouse.Domain.Entities.DepartmentRoster>
+@{
+    ViewData["Title"] = "روستر الإدارات";
+    var depts = ViewBag.Departments as List<StrategyHouse.Domain.Entities.Department> ?? new();
+    var deptNames = depts.ToDictionary(d => d.DeptCode, d => d.NameAr ?? d.DeptCode);
+    var selected = ViewBag.SelectedDept as string;
+}
+
+<h1>روستر أعضاء الإدارات</h1>
+<p class="text-muted">الأعضاء المعتمدون الذين يظهرون كخيارات محددة مسبقاً في الخطوة الأولى من رحلة الإدارة.</p>
+
+@if (TempData["Saved"] != null) { <div class="alert alert-success">@TempData["Saved"]</div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger">@TempData["Error"]</div> }
+
+<form method="get" class="row g-2 align-items-end mb-3" style="max-width:520px;">
+    <div class="col-md-9">
+        <label class="form-label">تصفية حسب الإدارة</label>
+        <select name="dept" class="form-select" onchange="this.form.submit()">
+            <option value="">— كل الإدارات —</option>
+            @foreach (var d in depts)
+            {
+                <option value="@d.DeptCode" selected="@(d.DeptCode == selected)">@d.DeptCode — @d.NameAr</option>
+            }
+        </select>
+    </div>
+</form>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">إضافة عضو</h5>
+        <form method="post" asp-action="Add" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-md-3">
+                <label class="form-label">الإدارة</label>
+                <select name="deptCode" class="form-select" required>
+                    <option value="">— اختر —</option>
+                    @foreach (var d in depts)
+                    {
+                        <option value="@d.DeptCode" selected="@(d.DeptCode == selected)">@d.DeptCode — @d.NameAr</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3"><label class="form-label">الاسم</label><input name="nameAr" class="form-control" required /></div>
+            <div class="col-md-3"><label class="form-label">الدور</label><input name="role" class="form-control" /></div>
+            <div class="col-md-2 form-check mt-4">
+                <input class="form-check-input" type="checkbox" name="isDefaultAttending" value="true" id="addDef" checked />
+                <label class="form-check-label" for="addDef">محدد افتراضياً</label>
+            </div>
+            <div class="col-md-1"><button type="submit" class="btn btn-primary w-100">إضافة</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="table-responsive">
+<table class="table table-striped align-middle">
+    <thead>
+        <tr><th>الإدارة</th><th>الاسم</th><th>الدور</th><th>افتراضي</th><th>نشط</th><th></th></tr>
+    </thead>
+    <tbody>
+    @foreach (var r in Model)
+    {
+        <tr>
+            <td>@(deptNames.TryGetValue(r.DeptCode, out var n) ? n : r.DeptCode)</td>
+            <td colspan="4">
+                <form method="post" asp-action="Update" asp-route-id="@r.MemberId" class="row g-2 align-items-center">
+                    @Html.AntiForgeryToken()
+                    <div class="col-md-4"><input name="nameAr" class="form-control form-control-sm" value="@r.NameAr" /></div>
+                    <div class="col-md-3"><input name="role" class="form-control form-control-sm" value="@r.Role" placeholder="الدور" /></div>
+                    <div class="col-md-2 form-check">
+                        <input class="form-check-input" type="checkbox" name="isDefaultAttending" value="true" @(r.IsDefaultAttending ? "checked" : "") />
+                        <label class="form-check-label small">افتراضي</label>
+                    </div>
+                    <div class="col-md-2 form-check">
+                        <input class="form-check-input" type="checkbox" name="isActive" value="true" @(r.IsActive ? "checked" : "") />
+                        <label class="form-check-label small">نشط</label>
+                    </div>
+                    <div class="col-md-1"><button class="btn btn-sm btn-outline-primary w-100">حفظ</button></div>
+                </form>
+            </td>
+            <td>
+                <form method="post" asp-action="Delete" asp-route-id="@r.MemberId" onsubmit="return confirm('حذف العضو؟');">
+                    @Html.AntiForgeryToken()
+                    <button class="btn btn-sm btn-outline-danger">حذف</button>
+                </form>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>
+</div>

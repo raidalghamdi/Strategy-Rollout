@@ -80,6 +80,8 @@ builder.Services.AddScoped<ProgrammePosterPdfService>();
 // Phase 4 — assessment
 builder.Services.AddScoped<QuizGeneratorService>();
 builder.Services.AddScoped<SurveyReportPdfService>();
+// Phase 6 — DB-only chatbot
+builder.Services.AddScoped<ChatbotService>();
 
 var app = builder.Build();
 
@@ -94,6 +96,9 @@ using (var scope = app.Services.CreateScope())
     // Phase 4 — programme survey (quiz auto-seed removed in Phase 5; admin-controlled).
     var quiz = scope.ServiceProvider.GetRequiredService<QuizGeneratorService>();
     await AssessmentSeeder.RunAsync(db, quiz);
+
+    // Phase 6 — predefined department roster (default-checked attendees in stage 1).
+    await RosterSeeder.RunAsync(db);
 
     // Phase 5 — one-time signature backfill: flip pending signature ink to Approved
     // and regenerate signed-map PDFs so existing maps show their signatures.

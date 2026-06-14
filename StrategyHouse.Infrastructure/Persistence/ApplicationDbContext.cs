@@ -33,6 +33,10 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
     public DbSet<SurveyQuestion> SurveyQuestions => Set<SurveyQuestion>();
     public DbSet<SurveyResponse> SurveyResponses => Set<SurveyResponse>();
 
+    // Phase 6 — predefined roster + chatbot conversation log
+    public DbSet<DepartmentRoster> DepartmentRoster => Set<DepartmentRoster>();
+    public DbSet<ChatbotConversation> ChatbotConversations => Set<ChatbotConversation>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -106,5 +110,9 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
 
         b.Entity<Survey>().HasIndex(s => s.PublicToken).IsUnique();
         b.Entity<QuizQuestion>().HasIndex(q => new { q.Scope, q.IsApproved, q.IsActive });
+
+        // Phase 6
+        b.Entity<DepartmentRoster>().HasIndex(r => new { r.DeptCode, r.IsActive });
+        b.Entity<ChatbotConversation>().HasIndex(c => c.AskedAt);
     }
 }

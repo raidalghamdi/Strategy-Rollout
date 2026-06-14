@@ -93,6 +93,21 @@ public class StrategyMapPdfService
                         c.Item().Text(_content.Mission.Ar);
                     });
 
+                    // Values row (between Mission and Pillars)
+                    if (_content.Values.Any())
+                    {
+                        var valueColors = new[] { Cyan, Green, Gold, "#9DC41A", Primary };
+                        col.Item().Row(row =>
+                        {
+                            for (var vi = 0; vi < _content.Values.Count; vi++)
+                            {
+                                var color = valueColors[vi % valueColors.Length];
+                                row.RelativeItem().Padding(3).Background(color).Padding(6)
+                                    .AlignCenter().Text(_content.Values[vi].Ar).FontColor(Colors.White).Bold().FontSize(10);
+                            }
+                        });
+                    }
+
                     // Pillars row
                     col.Item().Row(row =>
                     {
@@ -123,12 +138,15 @@ public class StrategyMapPdfService
                     // Pledges
                     col.Item().Column(c =>
                     {
-                        c.Item().Text($"تعهدات المساهمة ({pledges.Count})").Bold().FontColor(Gold);
+                        c.Item().Text($"المساهمة ({pledges.Count})").Bold().FontColor(Gold);
                         foreach (var pl in pledges)
                             c.Item().Text($"• [{pl.ElementType}] {pl.ElementCode} — {pl.ContributionKind}").FontSize(9);
                     });
 
-                    // Three text sections — typed text on top, approved ink underneath.
+                    // Text sections — typed text on top, approved ink underneath.
+                    // The commitment section is optional: only render when filled (FIX 11).
+                    var commitmentFilled = !string.IsNullOrWhiteSpace(map.CommitmentsText)
+                        || SectionInk("commitment").Count > 0;
                     col.Item().Row(row =>
                     {
                         void Section(string title, string color, string? text, string kind)
@@ -146,7 +164,8 @@ public class StrategyMapPdfService
                         }
                         Section("الآراء", Primary, map.OpinionsText, "opinion");
                         Section("الأمنيات", Green, map.WishesText, "wish");
-                        Section("الالتزامات", Gold, map.CommitmentsText, "commitment");
+                        if (commitmentFilled)
+                            Section("خطوات بسيطة سنبدأ بها", Gold, map.CommitmentsText, "commitment");
                     });
 
                     // Signatures

@@ -26,9 +26,25 @@
 @if (TempData["Saved"] != null) { <div class="alert alert-success">@TempData["Saved"]</div> }
 @if (TempData["Error"] != null) { <div class="alert alert-danger">@TempData["Error"]</div> }
 
+@{
+    var valueColors = new[] { "#46BCCD", "#009845", "#D79A2B", "#9DC41A", "#194F90" };
+    var values = Model.Content?.Values ?? new List<StrategyHouse.Web.Configuration.LocalizedText>();
+}
 <div class="gac-card mb-3">
     <h2 class="h4 h-md-2">خريطة الاستراتيجية الإدارية — @dept?.NameAr</h2>
     <p class="text-muted">معاينة عناصر إدارتك. اكتب أو ارسم بالقلم في كل قسم.</p>
+    @if (values.Any())
+    {
+        <div class="mb-3">
+            <div class="text-muted small mb-2">القيم</div>
+            <div class="d-flex flex-wrap gap-2">
+                @for (var vi = 0; vi < values.Count; vi++)
+                {
+                    <span class="value-chip" style="background:@valueColors[vi % valueColors.Length];">@values[vi].Ar</span>
+                }
+            </div>
+        </div>
+    }
     <div id="mapCanvas" style="border:1px dashed #46BCCD;border-radius:10px;background:#fff;max-height:60vh;overflow:auto;"></div>
 </div>
 
@@ -40,13 +56,23 @@
             var sections = new[] {
                 ("opinion", "opinions", "الآراء", "#194F90", map?.OpinionsText),
                 ("wish", "wishes", "الأمنيات", "#009845", map?.WishesText),
-                ("commitment", "commitments", "الالتزامات", "#D79A2B", map?.CommitmentsText),
+                ("commitment", "commitments", "خطوات بسيطة سنبدأ بها", "#D79A2B", map?.CommitmentsText),
             };
         }
         @foreach (var (kind, field, label, color, text) in sections)
         {
             <div class="col-12 col-md-4">
-                <label class="form-label fw-bold" style="color:@color;">@label</label>
+                <label class="form-label fw-bold" style="color:@color;">
+                    @label
+                    @if (kind == "commitment")
+                    {
+                        <span class="optional-pill">اختياري</span>
+                    }
+                </label>
+                @if (kind == "commitment")
+                {
+                    <div class="text-muted small mb-2">يمكنك ترك هذا القسم فارغاً إن لم تكن جاهزاً بعد.</div>
+                }
                 <ul class="nav nav-tabs mb-2" role="tablist">
                     <li class="nav-item"><button class="nav-link active" type="button" data-bs-toggle="tab" data-bs-target="#type-@kind">⌨️ كتابة</button></li>
                     <li class="nav-item"><button class="nav-link" type="button" data-bs-toggle="tab" data-bs-target="#pencil-@kind">✍️ بقلم iPad</button></li>
@@ -164,7 +190,7 @@ window.__stageMapInit = (function () {
             layer.destroyChildren();
             column('مؤشرات', kpis, 10, '#194F90');
             column('مشاريع', projects, width/3 + 5, '#009845');
-            column('تعهدات', pledges, 2*width/3, '#D79A2B');
+            column('المساهمة', pledges, 2*width/3, '#D79A2B');
             layer.draw();
         }
         drawColumns();

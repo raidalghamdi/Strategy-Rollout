@@ -116,6 +116,8 @@
         if (stage === 2) initSankey();
         if (stage === 5 && window.__stageMapInit) window.__stageMapInit();
         if (stage === 6 && window.__stageCompleteConfetti) window.__stageCompleteConfetti();
+        // Notify any partial waiting to lazily build its widgets (e.g. Contribute DnD).
+        document.dispatchEvent(new CustomEvent('stageReady', { detail: { stage } }));
     }
 
     function initSankey() {
@@ -123,33 +125,61 @@
         if (!host) return;
         let data = {};
         try { data = JSON.parse(host.getAttribute('data-sankey') || '{}'); } catch (e) {}
+
+        // Objective layer is the dept's focal point → navy; everything else light grey.
+        const NAVY = '#194F90', GREY = '#CECFD2';
+
         function render() {
             host.innerHTML = '';
-            const colors = { vision:'#194F90', pillar:'#009845', objective:'#46BCCD', initiative:'#D79A2B', kpi:'#9DC41A', project:'#194F90' };
             const width = Math.max(640, host.clientWidth);
-            const height = Math.min(520, Math.max(360, width * 0.5));
-            const svg = d3.select('#sankey').append('svg').attr('width', width).attr('height', height);
+            const height = Math.min(560, Math.max(380, (data.nodes ? data.nodes.length : 6) * 26));
+            const svg = d3.select('#sankey').append('svg')
+                .attr('width', width).attr('height', height)
+                .attr('viewBox', '0 0 ' + width + ' ' + height);
             if (!data.nodes || data.nodes.length === 0) {
-                svg.append('text').attr('x', 20).attr('y', 40).text('لا توجد عناصر مرتبطة بهذه الإدارة بعد.').attr('fill','#5a6b80');
+                svg.append('text').attr('x', 20).attr('y', 40)
+                    .text('لا توجد عناصر مرتبطة بهذه الإدارة بعد.').attr('fill', '#5a6b80');
                 return;
             }
-            const sankey = d3.sankey().nodeWidth(16).nodePadding(12).extent([[10,10],[width-10,height-10]]);
-            const graph = sankey({ nodes: data.nodes.map(d => Object.assign({}, d)), links: data.links.map(d => Object.assign({}, d)) });
-            svg.append('g').attr('fill','none').selectAll('path').data(graph.links).join('path')
-                .attr('d', d3.sankeyLinkHorizontal()).attr('stroke', d => colors[d.source.layer] || '#ccc')
-                .attr('stroke-opacity', .35).attr('stroke-width', d => Math.max(1, d.width));
+
+            const sankey = d3.sankey().nodeWidth(20).nodePadding(14)
+                .extent([[10, 10], [width - 10, height - 10]]);
+            const graph = sankey({
+                nodes: data.nodes.map(d => Object.assign({}, d)),
+                links: data.links.map(d => Object.assign({}, d)),
+            });
+
+            const link = svg.append('g').attr('fill', 'none').selectAll('path')
+                .data(graph.links).join('path')
+                .attr('d', d3.sankeyLinkHorizontal())
+                .attr('stroke', '#ECECED').attr('stroke-opacity', 0.7)
+                .attr('stroke-width', d => Math.max(1.5, d.width));
+            link.on('mouseenter', function () { d3.select(this).attr('stroke', NAVY).attr('stroke-opacity', 0.3); })
+                .on('mouseleave', function () { d3.select(this).attr('stroke', '#ECECED').attr('stroke-opacity', 0.7); });
+
             const node = svg.append('g').selectAll('g').data(graph.nodes).join('g');
-            node.append('rect').attr('x', d => d.x0).attr('y', d => d.y0)
+            node.append('rect')
+                .attr('x', d => d.x0).attr('y', d => d.y0)
                 .attr('height', d => Math.max(2, d.y1 - d.y0)).attr('width', d => d.x1 - d.x0)
-                .attr('fill', d => colors[d.layer] || '#194F90');
-            node.append('text').attr('x', d => d.x0 - 6).attr('y', d => (d.y0 + d.y1) / 2)
-                .attr('dy', '0.35em').attr('text-anchor', 'end').attr('font-size', '11px')
-                .text(d => d.name).filter(d => d.x0 < width / 2)
-                .attr('x', d => d.x1 + 6).attr('text-anchor', 'start');
+                .attr('rx', 3)
+                .attr('fill', d => (d.layer === 'objective' || d.layer === 'vision') ? NAVY : GREY);
+            node.append('text')
+                .attr('y', d => (d.y0 + d.y1) / 2).attr('dy', '0.35em')
+                .attr('font-family', 'Cairo, sans-serif').attr('font-size', '13px').attr('fill', '#1F242F')
+                .attr('x', d => d.x0 < width / 2 ? d.x1 + 8 : d.x0 - 8)
+                .attr('text-anchor', d => d.x0 < width / 2 ? 'start' : 'end')
+                .text(d => d.name);
         }
+
         render();
-        let rT;
-        window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(render, 250); });
+        if (window.ResizeObserver) {
+            let rT;
+            const ro = new ResizeObserver(() => { clearTimeout(rT); rT = setTimeout(render, 200); });
+            ro.observe(host);
+        } else {
+            let rT;
+            window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(render, 250); });
+        }
     }
 
     pips.forEach(p => p.addEventListener('click', () => gotoStage(+p.dataset.stage)));

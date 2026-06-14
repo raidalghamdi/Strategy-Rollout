@@ -3,30 +3,58 @@
     var objectives = Model.Objectives;
     var initiatives = Model.Initiatives;
     var pledges = Model.Pledges;
+    var pledgedKeys = pledges.Select(p => p.ElementType + ":" + p.ElementCode).ToHashSet();
+
+    string Name(string type, string code)
+    {
+        if (type == "OBJ") return objectives.FirstOrDefault(o => o.ObjectiveCode == code)?.ObjectiveName ?? code;
+        if (type == "INIT") return initiatives.FirstOrDefault(i => i.InitiativeCode == code)?.InitiativeName ?? code;
+        return code;
+    }
 }
 <div class="gac-card">
     <h2 class="h4 h-md-2">أين ترغب إدارتك بالمساهمة؟</h2>
-    <p class="text-muted">اسحب العناصر التي ترغب إدارتك بدعمها إلى قائمة المساهمات.</p>
+    <p class="text-muted">اسحب العناصر التي ترغب إدارتك بدعمها من العمود الأيمن إلى عمود «أرغب بالمساهمة».</p>
     <div class="row g-3">
         <div class="col-12 col-md-6">
-            <h5 class="h6">العناصر المتاحة</h5>
-            <ul id="available" class="list-group" style="min-height:240px;">
+            <div class="contribute-col-head">
+                <h5 class="h6 mb-0">العناصر المتاحة</h5>
+                <span class="count" id="availCount">0</span>
+            </div>
+            <ul id="available" class="dnd-list" data-empty="لا توجد عناصر متاحة">
                 @foreach (var o in objectives)
                 {
-                    <li class="list-group-item" data-type="OBJ" data-code="@o.ObjectiveCode">@o.ObjectiveName</li>
+                    if (pledgedKeys.Contains("OBJ:" + o.ObjectiveCode)) { continue; }
+                    <li class="dnd-item" data-type="OBJ" data-code="@o.ObjectiveCode">
+                        <span class="handle">⠿</span>
+                        <span class="type-badge t-OBJ">هدف</span>
+                        <span class="el-name">@o.ObjectiveName</span>
+                    </li>
                 }
                 @foreach (var i in initiatives)
                 {
-                    <li class="list-group-item" data-type="INIT" data-code="@i.InitiativeCode">@i.InitiativeName</li>
+                    if (pledgedKeys.Contains("INIT:" + i.InitiativeCode)) { continue; }
+                    <li class="dnd-item" data-type="INIT" data-code="@i.InitiativeCode">
+                        <span class="handle">⠿</span>
+                        <span class="type-badge t-INIT">مبادرة</span>
+                        <span class="el-name">@i.InitiativeName</span>
+                    </li>
                 }
             </ul>
         </div>
         <div class="col-12 col-md-6">
-            <h5 class="h6">أرغب بالمساهمة</h5>
-            <ul id="chosen" class="list-group" style="min-height:240px;background:#eaf4ec;border-radius:8px;">
+            <div class="contribute-col-head">
+                <h5 class="h6 mb-0">أرغب بالمساهمة</h5>
+                <span class="count" id="chosenCount">0</span>
+            </div>
+            <ul id="chosen" class="dnd-list" data-empty="اسحب العناصر هنا لإضافتها">
                 @foreach (var p in pledges)
                 {
-                    <li class="list-group-item" data-type="@p.ElementType" data-code="@p.ElementCode" data-saved="1">@p.ElementCode — @p.ContributionKind</li>
+                    <li class="dnd-item" data-type="@p.ElementType" data-code="@p.ElementCode" data-saved="1" data-kind="@p.ContributionKind">
+                        <span class="handle">⠿</span>
+                        <span class="type-badge t-@p.ElementType">@(p.ElementType == "OBJ" ? "هدف" : p.ElementType == "INIT" ? "مبادرة" : p.ElementType)</span>
+                        <span class="el-name">@Name(p.ElementType, p.ElementCode)<span class="el-kind"> — @p.ContributionKind</span></span>
+                    </li>
                 }
             </ul>
         </div>
@@ -35,22 +63,65 @@
 
 <script>
 (function () {
-    const sessionId = '@Model.Session.Id';
-    const kinds = ['تنفيذ مباشر','دعم فني','موارد بشرية','بيانات','استشاري'];
-    new Sortable(document.getElementById('available'), { group: 'pledges', animation: 150 });
-    new Sortable(document.getElementById('chosen'), {
-        group: 'pledges', animation: 150,
-        onAdd: function (evt) {
-            const el = evt.item;
-            if (el.dataset.saved) return;
-            const kind = prompt('نوع المساهمة:\n' + kinds.join(' / '), kinds[0]) || kinds[0];
-            el.textContent = el.dataset.code + ' — ' + kind;
-            el.dataset.saved = '1';
-            fetch('@Url.Action("SavePledge")', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId, elementType: el.dataset.type, elementCode: el.dataset.code, contributionKind: kind })
-            });
-        }
-    });
+    var sessionId = '@Model.Session.Id';
+    var kinds = ['تنفيذ مباشر', 'دعم فني', 'موارد بشرية', 'بيانات', 'استشاري'];
+    var available = document.getElementById('available');
+    var chosen = document.getElementById('chosen');
+    if (!available || !chosen) return;
+
+    function counts() {
+        document.getElementById('availCount').textContent = available.querySelectorAll('.dnd-item').length;
+        document.getElementById('chosenCount').textContent = chosen.querySelectorAll('.dnd-item').length;
+    }
+
+    function badge(type) {
+        return type === 'OBJ' ? 'هدف' : type === 'INIT' ? 'مبادرة' : type;
+    }
+
+    var booted = false;
+    function boot() {
+        if (booted) return; booted = true;
+        counts();
+        new Sortable(available, { group: 'pledges', animation: 150, handle: '.handle' });
+        new Sortable(chosen, {
+            group: 'pledges', animation: 150, handle: '.handle',
+            onAdd: function (evt) {
+                var el = evt.item;
+                if (el.dataset.saved) { counts(); return; }
+                var kind = prompt('نوع المساهمة:\n' + kinds.join(' / '), kinds[0]) || kinds[0];
+                el.dataset.saved = '1';
+                el.dataset.kind = kind;
+                var nameEl = el.querySelector('.el-name');
+                var base = nameEl.childNodes[0] ? nameEl.childNodes[0].textContent : nameEl.textContent;
+                nameEl.innerHTML = base + '<span class="el-kind"> — ' + kind + '</span>';
+                fetch('@Url.Action("SavePledge")', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: sessionId, elementType: el.dataset.type, elementCode: el.dataset.code, contributionKind: kind })
+                });
+                counts();
+            },
+            onRemove: function (evt) {
+                // Moved back to available → delete the pledge and clear its kind.
+                var el = evt.item;
+                if (el.dataset.saved) {
+                    fetch('@Url.Action("RemovePledge")', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sessionId: sessionId, elementType: el.dataset.type, elementCode: el.dataset.code })
+                    });
+                    delete el.dataset.saved;
+                    delete el.dataset.kind;
+                    var nameEl = el.querySelector('.el-name');
+                    var base = nameEl.childNodes[0] ? nameEl.childNodes[0].textContent : nameEl.textContent;
+                    nameEl.innerHTML = base;
+                }
+                counts();
+            }
+        });
+    }
+
+    // Lazy init: SortableJS only when stage 4 first becomes active (fixes drag bug).
+    document.addEventListener('stageReady', function (e) { if (e.detail && e.detail.stage === 4) boot(); });
+    // Fallback in case stage 4 is the initial deep-link target.
+    if (document.getElementById('stage-4') && document.getElementById('stage-4').classList.contains('is-active')) boot();
 })();
 </script>
