@@ -4,8 +4,9 @@ using StrategyHouse.Web.Services;
 
 namespace StrategyHouse.Web.Controllers;
 
-// Phase 6 — chatbot API. Anonymous so the widget works on public + authed pages.
-[AllowAnonymous]
+// Phase 7 — chatbot API restricted to authenticated users; the widget is only
+// rendered for signed-in admins, and anonymous POSTs are rejected with 401.
+[Authorize]
 [Route("api/chatbot")]
 public class ChatbotController : Controller
 {
