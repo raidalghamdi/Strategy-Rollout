@@ -1,6 +1,7 @@
 @model List<StrategyHouse.Domain.Entities.Project>
 @{ ViewData["Title"] = "المشاريع"; }
 <h1>المشاريع (@Model.Count)</h1>
+<div class="table-responsive">
 <table class="table">
     <thead>
         <tr><th>الرمز</th><th>الاسم</th><th>المبادرة</th><th>النوع</th><th>الحالة</th><th>الإدارة</th><th>الميزانية</th></tr>
@@ -20,3 +21,4 @@
     }
     </tbody>
 </table>
+</div>

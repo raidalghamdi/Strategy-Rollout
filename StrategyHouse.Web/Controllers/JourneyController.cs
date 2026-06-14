@@ -53,18 +53,47 @@ public class JourneyController : Controller
         };
         _db.StrategySessions.Add(session);
         await _db.SaveChangesAsync();
-        return RedirectToAction(nameof(Members), new { sessionId = session.Id });
+        return RedirectToAction(nameof(Run), new { sessionId = session.Id });
     }
 
-    // GET /Journey/Members/{sessionId}
-    [HttpGet("Journey/Members/{sessionId:guid}")]
-    public async Task<IActionResult> Members(Guid sessionId)
+    // GET /Journey/Run/{sessionId} — single-page journey (all stages stacked).
+    [HttpGet("Journey/Run/{sessionId:guid}")]
+    public async Task<IActionResult> Run(Guid sessionId)
     {
         var session = await LoadSessionAsync(sessionId);
         if (session == null) return NotFound();
-        ViewBag.Dept = await _db.Departments.FindAsync(session.DeptCode);
-        return View(session);
+
+        var dept = await _db.Departments.FindAsync(session.DeptCode);
+        var map = await _db.DepartmentStrategyMaps.FirstOrDefaultAsync(m => m.SessionId == sessionId);
+
+        var vm = new JourneyRunViewModel
+        {
+            Session = session,
+            Dept = dept,
+            Content = _content,
+            Sankey = await BuildSankeyAsync(session.DeptCode),
+            Pillars = await _db.Pillars.OrderBy(p => p.PlrCode).ToListAsync(),
+            Objectives = await _db.Objectives.OrderBy(o => o.ObjectiveCode).ToListAsync(),
+            DeptObjectiveCodes = await _db.Kpis.Where(k => k.DepartmentCode == session.DeptCode)
+                .Select(k => k.ObjectiveCode).Distinct().ToListAsync(),
+            Initiatives = await _db.Initiatives.OrderBy(i => i.InitiativeCode).Take(40).ToListAsync(),
+            Pledges = await _db.ContributionPledges.Where(p => p.SessionId == sessionId).ToListAsync(),
+            Kpis = await _db.Kpis.Where(k => k.DepartmentCode == session.DeptCode).ToListAsync(),
+            Projects = await _db.Projects.Where(p => p.DepartmentCode == session.DeptCode).ToListAsync(),
+            Map = map,
+            InkAssets = map == null
+                ? new List<MapInkAsset>()
+                : await _db.MapInkAssets.Where(a => a.MapId == map.Id && a.IsActive).ToListAsync(),
+        };
+        return View(vm);
     }
+
+    // GET /Journey/Members/{sessionId} — deep-link alias → single page section.
+    [HttpGet("Journey/Members/{sessionId:guid}")]
+    public IActionResult Members(Guid sessionId) => RedirectToRun(sessionId, 1);
+
+    private IActionResult RedirectToRun(Guid sessionId, int stage) =>
+        Redirect(Url.Action(nameof(Run), new { sessionId }) + $"#stage-{stage}");
 
     [HttpPost("Journey/AddMembers/{sessionId:guid}")]
     [ValidateAntiForgeryToken]
@@ -83,49 +112,20 @@ public class JourneyController : Controller
             });
         }
         await _db.SaveChangesAsync();
-        return RedirectToAction(nameof(BigPicture), new { sessionId });
+        return RedirectToRun(sessionId, 2);
     }
 
-    // GET /Journey/BigPicture/{sessionId} — Stage 1: D3 sankey.
+    // GET /Journey/BigPicture/{sessionId} — deep-link alias → single page section.
     [HttpGet("Journey/BigPicture/{sessionId:guid}")]
-    public async Task<IActionResult> BigPicture(Guid sessionId)
-    {
-        var session = await LoadSessionAsync(sessionId);
-        if (session == null) return NotFound();
-        ViewBag.Dept = await _db.Departments.FindAsync(session.DeptCode);
-        ViewBag.Content = _content;
-        ViewBag.Sankey = await BuildSankeyAsync(session.DeptCode);
-        return View(session);
-    }
+    public IActionResult BigPicture(Guid sessionId) => RedirectToRun(sessionId, 2);
 
-    // GET /Journey/StrategyHouse/{sessionId} — Stage 2: top-down house.
+    // GET /Journey/StrategyHouse/{sessionId} — deep-link alias → single page section.
     [HttpGet("Journey/StrategyHouse/{sessionId:guid}")]
-    public async Task<IActionResult> StrategyHouse(Guid sessionId)
-    {
-        var session = await LoadSessionAsync(sessionId);
-        if (session == null) return NotFound();
-        ViewBag.Dept = await _db.Departments.FindAsync(session.DeptCode);
-        ViewBag.Content = _content;
-        ViewBag.Pillars = await _db.Pillars.OrderBy(p => p.PlrCode).ToListAsync();
-        ViewBag.Objectives = await _db.Objectives.OrderBy(o => o.ObjectiveCode).ToListAsync();
-        var deptKpiObj = await _db.Kpis.Where(k => k.DepartmentCode == session.DeptCode)
-            .Select(k => k.ObjectiveCode).Distinct().ToListAsync();
-        ViewBag.DeptObjectiveCodes = deptKpiObj;
-        return View(session);
-    }
+    public IActionResult StrategyHouse(Guid sessionId) => RedirectToRun(sessionId, 3);
 
-    // GET /Journey/Contribute/{sessionId} — Stage 3: drag/drop pledges.
+    // GET /Journey/Contribute/{sessionId} — deep-link alias → single page section.
     [HttpGet("Journey/Contribute/{sessionId:guid}")]
-    public async Task<IActionResult> Contribute(Guid sessionId)
-    {
-        var session = await LoadSessionAsync(sessionId);
-        if (session == null) return NotFound();
-        ViewBag.Dept = await _db.Departments.FindAsync(session.DeptCode);
-        ViewBag.Objectives = await _db.Objectives.OrderBy(o => o.ObjectiveCode).ToListAsync();
-        ViewBag.Initiatives = await _db.Initiatives.OrderBy(i => i.InitiativeCode).Take(40).ToListAsync();
-        ViewBag.Pledges = await _db.ContributionPledges.Where(p => p.SessionId == sessionId).ToListAsync();
-        return View(session);
-    }
+    public IActionResult Contribute(Guid sessionId) => RedirectToRun(sessionId, 4);
 
     // POST /Journey/SavePledge — JSON endpoint.
     [HttpPost("Journey/SavePledge")]
@@ -147,24 +147,9 @@ public class JourneyController : Controller
         return Json(new { ok = true, id = pledge.Id });
     }
 
-    // GET /Journey/Map/{sessionId} — Stage 4: map + textareas + sign panel.
+    // GET /Journey/Map/{sessionId} — deep-link alias → single page section.
     [HttpGet("Journey/Map/{sessionId:guid}")]
-    public async Task<IActionResult> Map(Guid sessionId)
-    {
-        var session = await LoadSessionAsync(sessionId);
-        if (session == null) return NotFound();
-        ViewBag.Dept = await _db.Departments.FindAsync(session.DeptCode);
-        ViewBag.Content = _content;
-        ViewBag.Kpis = await _db.Kpis.Where(k => k.DepartmentCode == session.DeptCode).ToListAsync();
-        ViewBag.Projects = await _db.Projects.Where(p => p.DepartmentCode == session.DeptCode).ToListAsync();
-        ViewBag.Pledges = await _db.ContributionPledges.Where(p => p.SessionId == sessionId).ToListAsync();
-        var map = await _db.DepartmentStrategyMaps.FirstOrDefaultAsync(m => m.SessionId == sessionId);
-        ViewBag.Map = map;
-        ViewBag.InkAssets = map == null
-            ? new List<MapInkAsset>()
-            : await _db.MapInkAssets.Where(a => a.MapId == map.Id && a.IsActive).ToListAsync();
-        return View(session);
-    }
+    public IActionResult Map(Guid sessionId) => RedirectToRun(sessionId, 5);
 
     // GET /Journey/Ink/{assetId} — streams a captured ink/signature PNG (for in-journey preview).
     [HttpGet("Journey/Ink/{assetId:guid}")]
@@ -191,7 +176,7 @@ public class JourneyController : Controller
         if (map.SignedAt != null)
         {
             TempData["Error"] = "الخريطة موقّعة ومقفلة.";
-            return RedirectToAction(nameof(Map), new { sessionId });
+            return RedirectToRun(sessionId, 5);
         }
         map.MapLayoutJson = mapLayoutJson;
         map.OpinionsText = opinions;
@@ -199,7 +184,7 @@ public class JourneyController : Controller
         map.CommitmentsText = commitments;
         await _db.SaveChangesAsync();
         TempData["Saved"] = "تم حفظ الخريطة.";
-        return RedirectToAction(nameof(Map), new { sessionId });
+        return RedirectToRun(sessionId, 5);
     }
 
     // POST /Journey/SignMap — lock map, generate PDF.
@@ -313,6 +298,7 @@ public class JourneyController : Controller
         var png = DecodePng(dto.PngBase64);
         if (png == null) return BadRequest(new { ok = false, error = "png" });
 
+        var now = DateTime.UtcNow;
         var asset = new MapInkAsset
         {
             MapId = map.Id,
@@ -321,10 +307,22 @@ public class JourneyController : Controller
             StrokesJson = dto.StrokesJson,
             AuthorName = member.NameAr,
             MemberId = member.Id,
-            ModerationStatus = "Pending",
+            // Signatures are the member's own work — auto-approve so they appear in the PDF.
+            ModerationStatus = "Approved",
+            ModeratedAt = now,
+            ModeratedBy = "system:auto-sig",
+            IsActive = true,
         };
         _db.MapInkAssets.Add(asset);
-        member.SignedAt = DateTime.UtcNow;
+        member.SignedAt = now;
+        _db.ModerationAuditLogs.Add(new ModerationAuditLog
+        {
+            TargetType = "MapInkAsset",
+            TargetId = asset.Id,
+            Action = "Approve",
+            ActorUserId = "system:auto-sig",
+            Note = "auto-approved signature on capture",
+        });
         await _db.SaveChangesAsync();
         return Json(new { ok = true, assetId = asset.Id });
     }
@@ -444,6 +442,24 @@ public class JourneyController : Controller
 
         return new { nodes, links };
     }
+}
+
+// Named view model for the single-page journey (Razor dynamic boundary rejects anonymous types).
+public class JourneyRunViewModel
+{
+    public StrategySession Session { get; set; } = null!;
+    public Department? Dept { get; set; }
+    public StrategyContentService Content { get; set; } = null!;
+    public object Sankey { get; set; } = new { };
+    public List<Pillar> Pillars { get; set; } = new();
+    public List<Objective> Objectives { get; set; } = new();
+    public List<string?> DeptObjectiveCodes { get; set; } = new();
+    public List<Initiative> Initiatives { get; set; } = new();
+    public List<ContributionPledge> Pledges { get; set; } = new();
+    public List<Kpi> Kpis { get; set; } = new();
+    public List<Project> Projects { get; set; } = new();
+    public DepartmentStrategyMap? Map { get; set; }
+    public List<MapInkAsset> InkAssets { get; set; } = new();
 }
 
 public class PledgeDto

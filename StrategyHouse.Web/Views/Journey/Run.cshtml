@@ -1,0 +1,175 @@
+@model StrategyHouse.Web.Controllers.JourneyRunViewModel
+@{
+    Layout = "_JourneyLayout";
+    ViewData["Title"] = "رحلة الاستراتيجية";
+    var dept = Model.Dept;
+    var stages = new[]
+    {
+        (1, "الفريق"),
+        (2, "الصورة الكبرى"),
+        (3, "بيت الاستراتيجية"),
+        (4, "المساهمة"),
+        (5, "الخريطة والتوقيع"),
+        (6, "الإتمام"),
+    };
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/responsive.css" asp-append-version="true" />
+    <style>
+        .journey-stepper {
+            position: sticky; top: 0; z-index: 50; background: #fff;
+            box-shadow: 0 2px 12px rgba(25,79,144,.08);
+            display: flex; gap: 6px; padding: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+        }
+        .journey-stepper .pip {
+            flex: 1 0 auto; min-width: 96px; text-align: center; padding: 8px 10px;
+            border-radius: 10px; background: #e7edf5; color: #5a6b80; font-size: .82rem;
+            cursor: pointer; border: none; white-space: nowrap; transition: background .2s;
+        }
+        .journey-stepper .pip.active { background: var(--gac-cyan); color: #04303a; font-weight: 700; }
+        .journey-stepper .pip.done { background: var(--gac-green); color: #fff; }
+        .journey-section { scroll-margin-top: 80px; padding: 18px 0; opacity: .55; transition: opacity .3s; }
+        .journey-section.is-active { opacity: 1; }
+        .journey-section .section-title { color: var(--gac-primary); margin-bottom: 12px; }
+        @@media (max-width: 576px) {
+            .journey-stepper .pip { min-width: 76px; font-size: .72rem; padding: 8px 6px; }
+        }
+    </style>
+}
+
+<div class="journey-stepper" id="stepper">
+    @foreach (var (n, label) in stages)
+    {
+        <button type="button" class="pip @(n == 1 ? "active" : "")" data-stage="@n">@n. @label</button>
+    }
+</div>
+
+<div class="container-fluid px-0 px-md-2 mt-2">
+    <h1 class="h4 text-center my-3">رحلة @dept?.NameAr</h1>
+
+    <section id="stage-1" class="journey-section is-active" data-stage="1">
+        <h2 class="section-title h5">1 — فريق العمل</h2>
+        @await Html.PartialAsync("_StageMembers", Model)
+        <div class="text-end mt-3"><button type="button" class="btn gac-btn-primary text-white next-stage" data-next="2">التالي ⟵</button></div>
+    </section>
+
+    <section id="stage-2" class="journey-section" data-stage="2">
+        <h2 class="section-title h5">2 — الصورة الكبرى</h2>
+        @await Html.PartialAsync("_StageBigPicture", Model)
+        <div class="text-end mt-3"><button type="button" class="btn gac-btn-primary text-white next-stage" data-next="3">التالي ⟵</button></div>
+    </section>
+
+    <section id="stage-3" class="journey-section" data-stage="3">
+        <h2 class="section-title h5">3 — بيت الاستراتيجية</h2>
+        @await Html.PartialAsync("_StageStrategyHouse", Model)
+        <div class="text-end mt-3"><button type="button" class="btn gac-btn-primary text-white next-stage" data-next="4">التالي ⟵</button></div>
+    </section>
+
+    <section id="stage-4" class="journey-section" data-stage="4">
+        <h2 class="section-title h5">4 — المساهمة</h2>
+        @await Html.PartialAsync("_StageContribute", Model)
+        <div class="text-end mt-3"><button type="button" class="btn gac-btn-primary text-white next-stage" data-next="5">التالي ⟵</button></div>
+    </section>
+
+    <section id="stage-5" class="journey-section" data-stage="5">
+        <h2 class="section-title h5">5 — الخريطة والتوقيع</h2>
+        @await Html.PartialAsync("_StageMap", Model)
+        <div class="text-end mt-3"><button type="button" class="btn gac-btn-primary text-white next-stage" data-next="6">التالي ⟵</button></div>
+    </section>
+
+    <section id="stage-6" class="journey-section" data-stage="6">
+        <h2 class="section-title h5">6 — الإتمام</h2>
+        @await Html.PartialAsync("_StageComplete", Model)
+    </section>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    const sections = Array.from(document.querySelectorAll('.journey-section'));
+    const pips = Array.from(document.querySelectorAll('#stepper .pip'));
+    let current = 1;
+
+    function setActive(stage) {
+        current = stage;
+        sections.forEach(s => s.classList.toggle('is-active', +s.dataset.stage === stage));
+        pips.forEach(p => {
+            const n = +p.dataset.stage;
+            p.classList.toggle('active', n === stage);
+            p.classList.toggle('done', n < stage);
+        });
+        lazyInit(stage);
+    }
+
+    function gotoStage(stage) {
+        const el = document.getElementById('stage-' + stage);
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setActive(stage);
+    }
+
+    // Lazy-init heavy widgets only when their section first becomes active.
+    const inited = {};
+    function lazyInit(stage) {
+        if (inited[stage]) return; inited[stage] = true;
+        if (stage === 2) initSankey();
+        if (stage === 5 && window.__stageMapInit) window.__stageMapInit();
+        if (stage === 6 && window.__stageCompleteConfetti) window.__stageCompleteConfetti();
+    }
+
+    function initSankey() {
+        const host = document.getElementById('sankey');
+        if (!host) return;
+        let data = {};
+        try { data = JSON.parse(host.getAttribute('data-sankey') || '{}'); } catch (e) {}
+        function render() {
+            host.innerHTML = '';
+            const colors = { vision:'#194F90', pillar:'#009845', objective:'#46BCCD', initiative:'#D79A2B', kpi:'#9DC41A', project:'#194F90' };
+            const width = Math.max(640, host.clientWidth);
+            const height = Math.min(520, Math.max(360, width * 0.5));
+            const svg = d3.select('#sankey').append('svg').attr('width', width).attr('height', height);
+            if (!data.nodes || data.nodes.length === 0) {
+                svg.append('text').attr('x', 20).attr('y', 40).text('لا توجد عناصر مرتبطة بهذه الإدارة بعد.').attr('fill','#5a6b80');
+                return;
+            }
+            const sankey = d3.sankey().nodeWidth(16).nodePadding(12).extent([[10,10],[width-10,height-10]]);
+            const graph = sankey({ nodes: data.nodes.map(d => Object.assign({}, d)), links: data.links.map(d => Object.assign({}, d)) });
+            svg.append('g').attr('fill','none').selectAll('path').data(graph.links).join('path')
+                .attr('d', d3.sankeyLinkHorizontal()).attr('stroke', d => colors[d.source.layer] || '#ccc')
+                .attr('stroke-opacity', .35).attr('stroke-width', d => Math.max(1, d.width));
+            const node = svg.append('g').selectAll('g').data(graph.nodes).join('g');
+            node.append('rect').attr('x', d => d.x0).attr('y', d => d.y0)
+                .attr('height', d => Math.max(2, d.y1 - d.y0)).attr('width', d => d.x1 - d.x0)
+                .attr('fill', d => colors[d.layer] || '#194F90');
+            node.append('text').attr('x', d => d.x0 - 6).attr('y', d => (d.y0 + d.y1) / 2)
+                .attr('dy', '0.35em').attr('text-anchor', 'end').attr('font-size', '11px')
+                .text(d => d.name).filter(d => d.x0 < width / 2)
+                .attr('x', d => d.x1 + 6).attr('text-anchor', 'start');
+        }
+        render();
+        let rT;
+        window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(render, 250); });
+    }
+
+    pips.forEach(p => p.addEventListener('click', () => gotoStage(+p.dataset.stage)));
+    document.querySelectorAll('.next-stage').forEach(b => b.addEventListener('click', () => gotoStage(+b.dataset.next)));
+
+    // Track active section while scrolling.
+    const io = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+            if (e.isIntersecting && e.intersectionRatio > 0.4) {
+                const n = +e.target.dataset.stage;
+                if (n !== current) setActive(n);
+            }
+        });
+    }, { threshold: [0.4] });
+    sections.forEach(s => io.observe(s));
+
+    // Honour deep-link hash (#stage-N) from the old route aliases.
+    const m = (location.hash || '').match(/stage-(\d)/);
+    if (m) { const s = +m[1]; setTimeout(() => gotoStage(s), 100); }
+    else setActive(1);
+})();
+</script>
+}

@@ -44,8 +44,8 @@
     </div>
 
     <div class="row g-3">
-        <div class="col-md-6"><div class="ins-card"><h5>الخط الزمني للإتمام</h5><canvas id="timelineChart" height="180"></canvas></div></div>
-        <div class="col-md-6"><div class="ins-card"><h5>معدل التوقيع لكل إدارة</h5><canvas id="rateChart" height="180"></canvas></div></div>
+        <div class="col-12 col-md-6"><div class="ins-card"><h5>الخط الزمني للإتمام</h5><div class="chart-box"><canvas id="timelineChart"></canvas></div></div></div>
+        <div class="col-12 col-md-6"><div class="ins-card"><h5>معدل التوقيع لكل إدارة</h5><div class="chart-box"><canvas id="rateChart"></canvas></div></div></div>
     </div>
 </div>
 
@@ -57,7 +57,7 @@
         new Chart(document.getElementById('timelineChart'), {
             type: 'line',
             data: { labels: tl.map(x => x.date), datasets: [{ label: 'جلسات مكتملة', data: tl.map(x => x.count), borderColor: '#194F90', backgroundColor: 'rgba(70,188,205,.3)', fill: true, tension: .3 }] },
-            options: { plugins: { legend: { labels: { font: { family: "'Noto Naskh Arabic'" } } } } }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { font: { family: "'Noto Naskh Arabic'" } } } } }
         });
         const rt = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(rate));
         new Chart(document.getElementById('rateChart'), {
@@ -66,7 +66,7 @@
                 { label: 'بدأت', data: rt.map(x => x.started), backgroundColor: '#9DC41A' },
                 { label: 'موقّعة', data: rt.map(x => x.signed), backgroundColor: '#194F90' }
             ] },
-            options: { indexAxis: 'y', scales: { x: { beginAtZero: true } } }
+            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true } } }
         });
     </script>
 }

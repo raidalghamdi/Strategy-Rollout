@@ -1,6 +1,7 @@
 @model List<StrategyHouse.Domain.Entities.Initiative>
 @{ ViewData["Title"] = "المبادرات"; }
 <h1>المبادرات (@Model.Count)</h1>
+<div class="table-responsive">
 <table class="table">
     <thead>
         <tr><th>الرمز</th><th>الاسم</th><th>الهدف</th><th>المالك</th><th>الميزانية</th></tr>
@@ -18,3 +19,4 @@
     }
     </tbody>
 </table>
+</div>

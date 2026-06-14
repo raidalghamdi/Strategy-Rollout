@@ -1,0 +1,51 @@
+/* Phase 5 — global responsive rules. Imported by _Layout and _JourneyLayout.
+   Mobile ≤576px, tablet ≤992px, desktop >992px. */
+
+/* Prevent horizontal overflow from wide tables / canvases / SVGs. */
+html, body { max-width: 100%; overflow-x: hidden; }
+img, svg, canvas, table { max-width: 100%; }
+
+/* Tables: always allow horizontal scroll inside their wrapper. */
+.table-responsive { -webkit-overflow-scrolling: touch; }
+
+/* Charts (Chart.js) — fixed-height parent so responsive:true works. */
+.chart-box { position: relative; height: 300px; width: 100%; }
+@media (max-width: 576px) { .chart-box { height: 240px; } }
+
+/* Cards stack cleanly on small screens. */
+@media (max-width: 576px) {
+    .gac-card { padding: 16px; border-radius: 12px; }
+    h1 { font-size: 1.5rem; }
+    h2 { font-size: 1.25rem; }
+    .btn-lg { font-size: 1rem; padding: .6rem 1rem; }
+}
+
+/* Touch targets — ensure pencil/canvas action buttons are at least 44x44. */
+.btn.ink-save, .btn.ink-clear, .btn.sig-save, .btn.sig-clear { min-height: 44px; }
+
+/* Modals on phones: full-screen-ish + scrollable. */
+@media (max-width: 576px) {
+    .modal-dialog { margin: 0; }
+}
+
+/* Konva / canvas containers shouldn't blow out the viewport on mobile. */
+@media (max-width: 992px) {
+    #mapCanvas { max-height: 60vh; }
+    .ink-wrap, .sig-wrap { max-width: 100%; }
+}
+
+/* Heat-map style grids scroll horizontally on small screens. */
+.scroll-x-sm { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Utility: stack form action buttons full-width below md. */
+@media (max-width: 768px) {
+    .w-md-auto { width: 100% !important; }
+}
+@media (min-width: 769px) {
+    .w-md-auto { width: auto !important; }
+}
+
+/* Helper heading sizes used in journey partials. */
+@media (min-width: 769px) {
+    .h-md-2 { font-size: 2rem; }
+}

@@ -3,7 +3,9 @@
     ViewData["Title"] = "إدارة الاختبارات";
     var tab = ViewBag.Tab as string ?? "Pending";
     var counts = ViewBag.Counts as StrategyHouse.Web.Controllers.QuizCounts ?? new();
-    var tabs = new[] { ("Pending", "قيد المراجعة"), ("Approved", "معتمدة"), ("Rejected", "مرفوضة") };
+    var total = (int)(ViewBag.Total ?? 0);
+    var depts = ViewBag.Departments as List<StrategyHouse.Web.Controllers.DeptOption> ?? new();
+    var tabs = new[] { ("Pending", "قيد المراجعة"), ("Approved", "معتمدة"), ("Rejected", "غير نشطة / مرفوضة") };
 }
 
 @section Styles {
@@ -11,20 +13,23 @@
 }
 
 <div class="container py-3" dir="rtl">
-    <div class="d-flex justify-content-between align-items-center">
-        <h1 style="color:#194F90;">إدارة بنك الأسئلة</h1>
-        <div>
-            <form method="post" asp-action="Generate" class="d-inline">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h1 class="h3" style="color:#194F90;">إدارة بنك الأسئلة <span class="badge bg-secondary">الإجمالي: @total</span></h1>
+        <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createModal">إضافة سؤال يدوياً</button>
+            <form method="post" asp-action="Regenerate" class="d-inline">
                 @Html.AntiForgeryToken()
-                <button class="btn btn-outline-primary btn-sm">توليد أسئلة</button>
+                <button class="btn btn-outline-success btn-sm">إعادة توليد تلقائياً</button>
             </form>
+            <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#resetModal">إعادة تعيين بنك الأسئلة</button>
             <a class="btn btn-outline-secondary btn-sm" href="/Admin">رجوع</a>
         </div>
     </div>
 
     @if (TempData["Saved"] != null) { <div class="alert alert-success mt-2">@TempData["Saved"]</div> }
+    @if (TempData["Error"] != null) { <div class="alert alert-danger mt-2">@TempData["Error"]</div> }
 
-    <ul class="nav nav-pills my-3">
+    <ul class="nav nav-pills my-3 flex-wrap">
         @foreach (var (key, label) in tabs)
         {
             var c = key == "Pending" ? counts.Pending : key == "Approved" ? counts.Approved : counts.Rejected;
@@ -34,7 +39,7 @@
 
     @if (tab == "Pending")
     {
-        <form method="post" asp-action="BulkApprove" class="mb-3 d-flex gap-2">
+        <form method="post" asp-action="BulkApprove" class="mb-3 d-flex flex-wrap gap-2">
             @Html.AntiForgeryToken()
             <input type="hidden" name="tab" value="@tab" />
             <select name="scope" class="form-select form-select-sm" style="max-width:240px;">
@@ -56,22 +61,40 @@
         {
             var opts = System.Text.Json.JsonSerializer.Deserialize<List<string>>(q.OptionsJson) ?? new();
             <div class="card mb-2"><div class="card-body">
-                <div class="d-flex justify-content-between">
+                <div class="d-flex justify-content-between flex-wrap gap-2">
                     <div>
                         <span class="badge bg-secondary">@q.QuestionType</span>
                         <span class="badge bg-info text-dark">@q.Scope @(q.DeptCodeFilter)</span>
                         <span class="badge bg-light text-dark">@q.Source</span>
+                        @if (!q.IsActive) { <span class="badge bg-dark">غير نشط</span> }
                     </div>
-                    <div class="btn-group">
-                        <form method="post" asp-action="Approve" asp-route-id="@q.Id" class="d-inline">
-                            @Html.AntiForgeryToken()<input type="hidden" name="tab" value="@tab" />
-                            <button class="btn btn-sm btn-success">اعتماد</button>
-                        </form>
-                        <form method="post" asp-action="Reject" asp-route-id="@q.Id" class="d-inline">
-                            @Html.AntiForgeryToken()<input type="hidden" name="tab" value="@tab" />
-                            <button class="btn btn-sm btn-danger">رفض</button>
-                        </form>
+                    <div class="btn-group flex-wrap">
+                        @if (q.IsActive && !q.IsApproved)
+                        {
+                            <form method="post" asp-action="Approve" asp-route-id="@q.Id" class="d-inline">
+                                @Html.AntiForgeryToken()<input type="hidden" name="tab" value="@tab" />
+                                <button class="btn btn-sm btn-success">اعتماد</button>
+                            </form>
+                        }
+                        @if (q.IsActive)
+                        {
+                            <form method="post" asp-action="Reject" asp-route-id="@q.Id" class="d-inline">
+                                @Html.AntiForgeryToken()<input type="hidden" name="tab" value="@tab" />
+                                <button class="btn btn-sm btn-warning">رفض</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <form method="post" asp-action="Approve" asp-route-id="@q.Id" class="d-inline">
+                                @Html.AntiForgeryToken()<input type="hidden" name="tab" value="@tab" />
+                                <button class="btn btn-sm btn-outline-success">إعادة تفعيل</button>
+                            </form>
+                        }
                         <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#edit-@q.Id">تعديل</button>
+                        <form method="post" asp-action="Delete" asp-route-id="@q.Id" class="d-inline" onsubmit="return confirm('حذف هذا السؤال؟ (سيُحفظ سجل المحاولات)');">
+                            @Html.AntiForgeryToken()<input type="hidden" name="tab" value="@tab" />
+                            <button class="btn btn-sm btn-danger">حذف</button>
+                        </form>
                     </div>
                 </div>
                 <h6 class="mt-2">@q.QuestionAr</h6>
@@ -88,14 +111,136 @@
                         @Html.AntiForgeryToken()<input type="hidden" name="tab" value="@tab" />
                         <input class="form-control form-control-sm mb-1" name="questionAr" value="@q.QuestionAr" />
                         <input class="form-control form-control-sm mb-1" name="optionsCsv" value="@string.Join(" | ", opts)" placeholder="الخيارات مفصولة بـ |" />
-                        <div class="d-flex gap-2">
-                            <input class="form-control form-control-sm" type="number" name="correctIndex" value="@q.CorrectIndex" style="max-width:120px;" />
-                            <input class="form-control form-control-sm" name="explanationAr" value="@q.ExplanationAr" placeholder="شرح" />
-                            <button class="btn btn-sm btn-primary">حفظ</button>
+                        <div class="row g-2">
+                            <div class="col-12 col-md-3">
+                                <input class="form-control form-control-sm" type="number" name="correctIndex" value="@q.CorrectIndex" placeholder="رقم الصحيح" />
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <select class="form-select form-select-sm" name="scope">
+                                    <option value="General" selected="@(q.Scope == "General")">عام</option>
+                                    <option value="Department" selected="@(q.Scope == "Department")">إدارة</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <select class="form-select form-select-sm" name="deptCode">
+                                    <option value="">— الإدارة —</option>
+                                    @foreach (var d in depts)
+                                    {
+                                        <option value="@d.Code" selected="@(q.DeptCodeFilter == d.Code)">@d.Name</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <button class="btn btn-sm btn-primary w-100">حفظ</button>
+                            </div>
                         </div>
+                        <input class="form-control form-control-sm mt-1" name="explanationAr" value="@q.ExplanationAr" placeholder="شرح (اختياري)" />
                     </form>
                 </div>
             </div></div>
         }
     }
 </div>
+
+<!-- Reset confirmation modal -->
+<div class="modal fade" id="resetModal" tabindex="-1" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">تأكيد إعادة التعيين</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                سيؤدي هذا إلى <strong>حذف جميع الأسئلة (@total) وجميع محاولات الاختبار نهائياً</strong>. لا يمكن التراجع.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <form method="post" asp-action="Reset">
+                    @Html.AntiForgeryToken()
+                    <button class="btn btn-danger">نعم، احذف كل شيء</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manual create modal -->
+<div class="modal fade" id="createModal" tabindex="-1" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <form method="post" asp-action="Create">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title">إضافة سؤال يدوياً</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">النطاق</label>
+                            <select class="form-select" name="scope" id="m-scope">
+                                <option value="General">عام</option>
+                                <option value="Department">إدارة</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6" id="m-dept-wrap" style="display:none;">
+                            <label class="form-label">الإدارة</label>
+                            <select class="form-select" name="deptCode">
+                                <option value="">— اختر —</option>
+                                @foreach (var d in depts) { <option value="@d.Code">@d.Name</option> }
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">نوع السؤال</label>
+                            <select class="form-select" name="questionType" id="m-type">
+                                <option value="MCQ">اختيار من متعدد</option>
+                                <option value="TrueFalse">صح / خطأ</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">نص السؤال</label>
+                            <textarea class="form-control" name="questionAr" rows="2" required></textarea>
+                        </div>
+                        <div class="col-12" id="m-opts-wrap">
+                            <label class="form-label">الخيارات (مفصولة بـ |)</label>
+                            <input class="form-control" name="optionsCsv" placeholder="الخيار 1 | الخيار 2 | الخيار 3 | الخيار 4" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">رقم الخيار الصحيح (يبدأ من 0)</label>
+                            <input class="form-control" type="number" name="correctIndex" value="0" min="0" />
+                            <div class="form-text" id="m-tf-hint" style="display:none;">0 = صح، 1 = خطأ</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">شرح (اختياري)</label>
+                            <input class="form-control" name="explanationAr" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button class="btn btn-primary">حفظ السؤال</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const scopeSel = document.getElementById('m-scope');
+        const deptWrap = document.getElementById('m-dept-wrap');
+        const typeSel = document.getElementById('m-type');
+        const optsWrap = document.getElementById('m-opts-wrap');
+        const tfHint = document.getElementById('m-tf-hint');
+        function sync() {
+            deptWrap.style.display = scopeSel.value === 'Department' ? '' : 'none';
+            const tf = typeSel.value === 'TrueFalse';
+            optsWrap.style.display = tf ? 'none' : '';
+            tfHint.style.display = tf ? '' : 'none';
+        }
+        scopeSel.addEventListener('change', sync);
+        typeSel.addEventListener('change', sync);
+        sync();
+    </script>
+}

@@ -1,0 +1,265 @@
+@model StrategyHouse.Web.Controllers.JourneyRunViewModel
+@{
+    var dept = Model.Dept;
+    var kpis = Model.Kpis;
+    var projects = Model.Projects;
+    var pledges = Model.Pledges;
+    var map = Model.Map;
+    var ink = Model.InkAssets;
+    var locked = map?.SignedAt != null;
+    var mapId = map?.Id ?? Guid.Empty;
+
+    Dictionary<Guid, StrategyHouse.Domain.Entities.MapInkAsset?> sigByMember =
+        ink.Where(a => a.AssetKind == "signature" && a.MemberId != null)
+           .GroupBy(a => a.MemberId!.Value)
+           .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.CapturedAt).FirstOrDefault());
+
+    string StatusBadge(StrategyHouse.Domain.Entities.MapInkAsset a) => a.ModerationStatus switch
+    {
+        "Approved" => "<span class='badge bg-success'>معتمد</span>",
+        "Rejected" => "<span class='badge bg-danger'>مرفوض</span>",
+        "Hidden" => "<span class='badge bg-secondary'>مخفي</span>",
+        _ => "<span class='badge bg-warning text-dark'>في انتظار الاعتماد</span>",
+    };
+}
+
+@if (TempData["Saved"] != null) { <div class="alert alert-success">@TempData["Saved"]</div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger">@TempData["Error"]</div> }
+
+<div class="gac-card mb-3">
+    <h2 class="h4 h-md-2">خريطة الاستراتيجية الإدارية — @dept?.NameAr</h2>
+    <p class="text-muted">معاينة عناصر إدارتك. اكتب أو ارسم بالقلم في كل قسم.</p>
+    <div id="mapCanvas" style="border:1px dashed #46BCCD;border-radius:10px;background:#fff;max-height:60vh;overflow:auto;"></div>
+</div>
+
+<form method="post" asp-action="SaveMap" asp-route-sessionId="@Model.Session.Id" class="gac-card mb-3">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="mapLayoutJson" value="@(map?.MapLayoutJson)" />
+    <div class="row g-3">
+        @{
+            var sections = new[] {
+                ("opinion", "opinions", "الآراء", "#194F90", map?.OpinionsText),
+                ("wish", "wishes", "الأمنيات", "#009845", map?.WishesText),
+                ("commitment", "commitments", "الالتزامات", "#D79A2B", map?.CommitmentsText),
+            };
+        }
+        @foreach (var (kind, field, label, color, text) in sections)
+        {
+            <div class="col-12 col-md-4">
+                <label class="form-label fw-bold" style="color:@color;">@label</label>
+                <ul class="nav nav-tabs mb-2" role="tablist">
+                    <li class="nav-item"><button class="nav-link active" type="button" data-bs-toggle="tab" data-bs-target="#type-@kind">⌨️ كتابة</button></li>
+                    <li class="nav-item"><button class="nav-link" type="button" data-bs-toggle="tab" data-bs-target="#pencil-@kind">✍️ بقلم iPad</button></li>
+                </ul>
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="type-@kind">
+                        <textarea name="@field" class="form-control" rows="5" @(locked ? "disabled" : "")>@text</textarea>
+                    </div>
+                    <div class="tab-pane fade" id="pencil-@kind">
+                        @if (locked)
+                        {
+                            <div class="alert alert-secondary">الخريطة مقفلة.</div>
+                        }
+                        else
+                        {
+                            <div class="ink-wrap" style="touch-action:none;border:1px solid @color;border-radius:8px;background:#fff;">
+                                <div id="ink-@kind" data-kind="@kind" data-color="@color"></div>
+                            </div>
+                            <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
+                                <button type="button" class="btn btn-sm btn-success ink-save" data-kind="@kind" style="min-height:44px;">حفظ الرسم</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary ink-clear" data-kind="@kind" style="min-height:44px;">مسح</button>
+                                <span class="ink-status text-muted small" data-kind="@kind"></span>
+                            </div>
+                        }
+                        <div class="mt-2 d-flex flex-wrap gap-2">
+                            @foreach (var a in ink.Where(x => x.AssetKind == kind).OrderByDescending(x => x.CapturedAt))
+                            {
+                                <div class="text-center">
+                                    <img src="/Journey/Ink/@a.Id" style="width:120px;height:60px;object-fit:contain;border:1px solid #eee;border-radius:6px;" />
+                                    <div class="small">@Html.Raw(StatusBadge(a))</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+    @if (!locked)
+    {
+        <button type="submit" class="btn btn-outline-primary mt-3 w-100 w-md-auto">حفظ النصوص</button>
+    }
+</form>
+
+<div class="gac-card">
+    <h3 class="h5">توقيع أعضاء الفريق</h3>
+    @if (locked)
+    {
+        <div class="alert alert-success">تم توقيع الخريطة وقفلها.</div>
+    }
+    else
+    {
+        <p class="text-muted small">يوقّع كل عضو باسمه بالقلم. بعد توقيع الجميع، اضغط "اعتماد الخريطة".</p>
+        @foreach (var m in Model.Session.Members)
+        {
+            var hasSig = sigByMember.TryGetValue(m.Id, out var sig) && sig != null;
+            <div class="row g-2 mb-3 align-items-center border-bottom pb-2">
+                <div class="col-12 col-md-3"><strong>@m.NameAr</strong> <div class="text-muted small">@m.Role</div></div>
+                <div class="col-12 col-md-6">
+                    <div class="sig-wrap" data-member="@m.Id" style="touch-action:none;border:1px solid #46BCCD;border-radius:8px;background:#fff;@(hasSig ? "display:none;" : "")">
+                        <div id="sig-@m.Id"></div>
+                    </div>
+                    @if (hasSig)
+                    {
+                        <img id="sigimg-@m.Id" src="/Journey/Ink/@sig!.Id" style="max-width:100%;width:240px;height:80px;object-fit:contain;border:1px solid #eee;border-radius:6px;" />
+                    }
+                </div>
+                <div class="col-12 col-md-3 d-flex flex-wrap gap-2 align-items-center">
+                    <button type="button" class="btn btn-sm gac-btn-primary text-white sig-save" data-member="@m.Id" style="min-height:44px;@(hasSig ? "display:none;" : "")">وقّع باسمك</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary sig-clear" data-member="@m.Id" style="min-height:44px;@(hasSig ? "display:none;" : "")">مسح</button>
+                    <span class="sig-status text-success small" data-member="@m.Id">@(hasSig ? "تم التوقيع ✓" : "")</span>
+                </div>
+            </div>
+        }
+        <form method="post" asp-action="SignMap" asp-route-sessionId="@Model.Session.Id" class="mt-2">
+            @Html.AntiForgeryToken()
+            @foreach (var m in Model.Session.Members)
+            {
+                <input type="hidden" name="memberIds" value="@m.Id" />
+                <input type="hidden" name="signatures" value="@m.NameAr" />
+            }
+            <button type="submit" class="btn gac-btn-primary text-white mt-2 w-100 w-md-auto">اعتماد وقفل الخريطة</button>
+        </form>
+    }
+</div>
+
+<script>
+// Lazily initialised when stage-5 first becomes visible (heavy Konva work).
+window.__stageMapInit = (function () {
+    let done = false;
+    return function () {
+        if (done) return; done = true;
+
+        const sessionId = "@Model.Session.Id";
+        const mapId = "@mapId";
+        const csrf = document.querySelector('#stage-5 input[name="__RequestVerificationToken"]')?.value
+                   || document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+
+        const kpis = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(kpis.Select(k => k.KpiName ?? k.KpiCode)));
+        const projects = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(projects.Select(p => p.ProjectName ?? p.ProjectCode)));
+        const pledges = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(pledges.Select(p => p.ElementCode + " — " + p.ContributionKind)));
+        const cont = document.getElementById('mapCanvas');
+        let width = cont.clientWidth || 900;
+        const stage = new Konva.Stage({ container: 'mapCanvas', width, height: 360 });
+        const layer = new Konva.Layer(); stage.add(layer);
+        function column(title, items, x, color) {
+            layer.add(new Konva.Text({ x, y: 10, text: title, fontSize: 16, fontStyle: 'bold', fill: color, width: width/3 - 20, align: 'right' }));
+            items.slice(0, 8).forEach((t, i) => {
+                const y = 40 + i * 38;
+                layer.add(new Konva.Rect({ x, y, width: width/3 - 20, height: 32, fill: '#FAFBFC', stroke: color, cornerRadius: 6, draggable: true }));
+                layer.add(new Konva.Text({ x: x + 6, y: y + 8, text: t, fontSize: 12, fill: '#1d2733', width: width/3 - 32, align: 'right' }));
+            });
+        }
+        function drawColumns() {
+            layer.destroyChildren();
+            column('مؤشرات', kpis, 10, '#194F90');
+            column('مشاريع', projects, width/3 + 5, '#009845');
+            column('تعهدات', pledges, 2*width/3, '#D79A2B');
+            layer.draw();
+        }
+        drawColumns();
+        // Resize map canvas with the container.
+        let rT;
+        window.addEventListener('resize', () => {
+            clearTimeout(rT);
+            rT = setTimeout(() => {
+                const w = cont.clientWidth || width;
+                if (Math.abs(w - width) < 8) return;
+                width = w; stage.width(width); drawColumns();
+            }, 200);
+        });
+
+        function buildPad(containerId, w, h, color) {
+            const el = document.getElementById(containerId);
+            if (!el) return null;
+            const st = new Konva.Stage({ container: containerId, width: w, height: h });
+            const ly = new Konva.Layer(); st.add(ly);
+            let painting = false, line = null;
+            const strokes = [];
+            st.on('pointerdown', (e) => {
+                painting = true;
+                const pos = st.getPointerPosition();
+                const pressure = (e.evt && e.evt.pressure) ? e.evt.pressure : 0.5;
+                line = new Konva.Line({ stroke: color, strokeWidth: 1 + pressure * 3, lineCap: 'round', lineJoin: 'round', points: [pos.x, pos.y], tension: 0.2 });
+                ly.add(line);
+                strokes.push({ c: color, p: [pos.x, pos.y] });
+            });
+            st.on('pointermove', (e) => {
+                if (!painting || !line) return;
+                const pos = st.getPointerPosition();
+                line.points(line.points().concat([pos.x, pos.y]));
+                strokes[strokes.length - 1].p.push(pos.x, pos.y);
+                ly.batchDraw();
+            });
+            const stop = () => { painting = false; line = null; };
+            st.on('pointerup', stop); st.on('pointerleave', stop);
+            return {
+                stage: st,
+                clear() { ly.destroyChildren(); ly.draw(); strokes.length = 0; },
+                isEmpty() { return strokes.length === 0; },
+                png() { return st.toDataURL({ pixelRatio: 1, mimeType: 'image/png' }); },
+                strokesJson() { return JSON.stringify(strokes); }
+            };
+        }
+
+        @if (!locked)
+        {
+            <text>
+            const pads = {};
+            ['opinion','wish','commitment'].forEach(kind => {
+                const node = document.getElementById('ink-' + kind);
+                if (!node) return;
+                const color = node.getAttribute('data-color');
+                const w = node.parentElement.clientWidth || 360;
+                pads[kind] = buildPad('ink-' + kind, w, 400, color);
+            });
+            document.querySelectorAll('#stage-5 .ink-clear').forEach(b => b.addEventListener('click', () => pads[b.dataset.kind]?.clear()));
+            document.querySelectorAll('#stage-5 .ink-save').forEach(b => b.addEventListener('click', async () => {
+                const kind = b.dataset.kind, pad = pads[kind];
+                const status = document.querySelector('#stage-5 .ink-status[data-kind="' + kind + '"]');
+                if (!pad || pad.isEmpty()) { status.textContent = 'لا يوجد رسم'; return; }
+                status.textContent = 'جارٍ الحفظ...';
+                const res = await fetch('/Journey/SaveInk', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': csrf },
+                    body: JSON.stringify({ sessionId, mapId, assetKind: kind, pngBase64: pad.png(), strokesJson: pad.strokesJson() })
+                });
+                const data = await res.json().catch(() => ({}));
+                status.textContent = data.ok ? 'تم الحفظ ✓ (بانتظار الاعتماد)' : 'تعذّر الحفظ';
+                if (data.ok) setTimeout(() => location.reload(), 700);
+            }));
+
+            const sigs = {};
+            document.querySelectorAll('#stage-5 .sig-wrap').forEach(node => {
+                const mid = node.getAttribute('data-member');
+                const w = node.clientWidth || 600;
+                sigs[mid] = buildPad('sig-' + mid, Math.min(w, 600), 200, '#194F90');
+            });
+            document.querySelectorAll('#stage-5 .sig-clear').forEach(b => b.addEventListener('click', () => sigs[b.dataset.member]?.clear()));
+            document.querySelectorAll('#stage-5 .sig-save').forEach(b => b.addEventListener('click', async () => {
+                const mid = b.dataset.member, pad = sigs[mid];
+                const status = document.querySelector('#stage-5 .sig-status[data-member="' + mid + '"]');
+                if (!pad || pad.isEmpty()) { status.textContent = 'وقّع أولاً'; status.className = 'sig-status text-danger small'; return; }
+                status.textContent = 'جارٍ الحفظ...';
+                const res = await fetch('/Journey/SaveSignature', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': csrf },
+                    body: JSON.stringify({ memberId: mid, pngBase64: pad.png(), strokesJson: pad.strokesJson() })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (data.ok) { status.textContent = 'تم التوقيع ✓'; status.className = 'sig-status text-success small'; setTimeout(() => location.reload(), 700); }
+                else { status.textContent = 'تعذّر الحفظ'; status.className = 'sig-status text-danger small'; }
+            }));
+            </text>
+        }
+    };
+})();
+</script>
