@@ -1,0 +1,86 @@
+@* Phase 6 — floating DB-only assistant. Mounted in both layouts (anon + authed). *@
+<button type="button" class="chatbot-fab" id="chatbotFab" aria-label="افتح المساعد الذكي" title="المساعد الذكي">💬</button>
+
+<div class="chatbot-panel" id="chatbotPanel" role="dialog" aria-label="المساعد الذكي">
+    <div class="chatbot-header">
+        <span class="title"><span class="dot"></span> المساعد الذكي</span>
+        <button type="button" class="chatbot-close" id="chatbotClose" aria-label="إغلاق">&times;</button>
+    </div>
+    <div class="chatbot-body" id="chatbotBody">
+        <div class="chatbot-msg bot"><div class="bubble">مرحباً 👋 أنا مساعد استراتيجية الهيئة العامة للمنافسة. اسألني عن الرؤية أو الركائز أو المشاريع.</div></div>
+    </div>
+    <div class="chatbot-chips" id="chatbotChips">
+        <button type="button" class="chatbot-chip">ما هي رؤية الهيئة؟</button>
+        <button type="button" class="chatbot-chip">كم عدد الركائز؟</button>
+        <button type="button" class="chatbot-chip">كم عدد المشاريع؟</button>
+        <button type="button" class="chatbot-chip">ما هي القيم؟</button>
+        <button type="button" class="chatbot-chip">اذكر الإدارات</button>
+    </div>
+    <form class="chatbot-input" id="chatbotForm" autocomplete="off">
+        <input type="text" id="chatbotInput" placeholder="اكتب سؤالك هنا..." aria-label="سؤالك" />
+        <button type="submit" class="chatbot-send" aria-label="إرسال">↑</button>
+    </form>
+</div>
+
+<script>
+(function () {
+    var fab = document.getElementById('chatbotFab');
+    var panel = document.getElementById('chatbotPanel');
+    var closeBtn = document.getElementById('chatbotClose');
+    var body = document.getElementById('chatbotBody');
+    var form = document.getElementById('chatbotForm');
+    var input = document.getElementById('chatbotInput');
+    var chips = document.getElementById('chatbotChips');
+    if (!fab || !panel) return;
+
+    // Best-effort sessionId from /Journey/Run/{guid} URL so turns can be linked.
+    var sessionId = null;
+    var m = location.pathname.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    if (m) sessionId = m[0];
+
+    function open() { panel.classList.add('open'); setTimeout(function () { input.focus(); }, 50); }
+    function close() { panel.classList.remove('open'); }
+    fab.addEventListener('click', function () { panel.classList.contains('open') ? close() : open(); });
+    closeBtn.addEventListener('click', close);
+
+    function addMsg(text, who) {
+        var wrap = document.createElement('div');
+        wrap.className = 'chatbot-msg ' + who;
+        var b = document.createElement('div');
+        b.className = 'bubble';
+        b.textContent = text;
+        wrap.appendChild(b);
+        body.appendChild(wrap);
+        body.scrollTop = body.scrollHeight;
+        return b;
+    }
+
+    async function ask(question) {
+        addMsg(question, 'user');
+        var thinking = addMsg('…', 'bot');
+        try {
+            var res = await fetch('/api/chatbot/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question: question, sessionId: sessionId })
+            });
+            var data = await res.json();
+            thinking.textContent = data.answer || 'عذراً، حدث خطأ.';
+        } catch (e) {
+            thinking.textContent = 'تعذّر الاتصال بالخادم. حاول مرة أخرى.';
+        }
+    }
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var q = input.value.trim();
+        if (!q) return;
+        input.value = '';
+        ask(q);
+    });
+
+    chips.addEventListener('click', function (e) {
+        if (e.target.classList.contains('chatbot-chip')) ask(e.target.textContent.trim());
+    });
+})();
+</script>

@@ -1,20 +1,53 @@
 @model StrategyHouse.Web.Controllers.JourneyRunViewModel
 @{
     var dept = Model.Dept;
+    var registered = Model.Session.Members.Select(m => m.NameAr).ToHashSet();
 }
 <div class="gac-card">
     <h2 class="h4 h-md-2">@dept?.NameAr</h2>
-    <p class="text-muted">أضف أعضاء فريق الإدارة المشاركين في هذه الرحلة.</p>
+    <p class="text-muted">اختر أعضاء فريق الإدارة المشاركين في هذه الرحلة. الأسماء المعتمدة محددة مسبقاً — يمكنك إلغاء تحديد من لن يحضر أو إضافة أعضاء جدد.</p>
 
     <form method="post" asp-action="AddMembers" asp-route-sessionId="@Model.Session.Id">
         @Html.AntiForgeryToken()
+
+        @if (Model.Roster.Any())
+        {
+            <h6 class="text-muted">أعضاء الإدارة المعتمدون</h6>
+            <ul class="list-group mb-3">
+                @foreach (var r in Model.Roster)
+                {
+                    var already = registered.Contains(r.NameAr);
+                    <li class="list-group-item d-flex align-items-center gap-2">
+                        <input class="form-check-input mt-0" type="checkbox" name="rosterIds" value="@r.MemberId"
+                               id="rost-@r.MemberId" @(r.IsDefaultAttending || already ? "checked" : "") @(already ? "disabled" : "") />
+                        <label class="form-check-label flex-grow-1" for="rost-@r.MemberId">
+                            <span>@r.NameAr</span>
+                            @if (!string.IsNullOrWhiteSpace(r.Role))
+                            {
+                                <span class="text-muted small ms-2">— @r.Role</span>
+                            }
+                        </label>
+                        @if (already)
+                        {
+                            <span class="badge bg-success">مسجّل</span>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p class="text-muted small">لا يوجد أعضاء معتمدون لهذه الإدارة بعد — أضف الأعضاء يدوياً أدناه.</p>
+        }
+
+        <h6 class="text-muted">إضافة عضو غير مدرج</h6>
         <div id="members">
             <div class="row g-2 mb-2 member-row">
-                <div class="col-12 col-md-7"><input name="names" class="form-control" placeholder="الاسم" required /></div>
+                <div class="col-12 col-md-7"><input name="names" class="form-control" placeholder="الاسم" /></div>
                 <div class="col-12 col-md-5"><input name="roles" class="form-control" placeholder="الدور / المنصب" /></div>
             </div>
         </div>
-        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addRow()">+ إضافة عضو</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addRow()">+ إضافة عضو آخر</button>
         <hr />
         <button type="submit" class="btn gac-btn-primary text-white w-100 w-md-auto">حفظ الفريق والمتابعة</button>
     </form>
@@ -39,7 +72,6 @@
 function addRow() {
     const tpl = document.querySelector('#members .member-row').cloneNode(true);
     tpl.querySelectorAll('input').forEach(i => i.value = '');
-    tpl.querySelector('input[name="names"]').removeAttribute('required');
     document.getElementById('members').appendChild(tpl);
 }
 </script>

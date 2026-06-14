@@ -1,0 +1,185 @@
+/* ============================================================================
+   compat.css — bridges Bootstrap (loaded first) with dga.css (loaded after).
+   We KEEP Bootstrap as the grid/utility base and layer the DGA Nazm look on
+   top. This file resolves the few places the two systems disagree and adds
+   the chatbot widget + Phase 6 contribute/sankey helpers.
+   ============================================================================ */
+
+/* dga.css sets body font-size:14px; restore a comfortable base for content. */
+body { font-size: 1rem; }
+
+/* Bootstrap .btn-* should keep working even though dga.css owns base .btn.
+   Re-assert the brand fills for the Bootstrap variants our views use. */
+.btn-outline-primary {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    background: #fff;
+}
+.btn-outline-primary:hover {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+}
+.btn-outline-secondary { color: var(--color-gray-700); border-color: var(--color-gray-300); }
+.btn-outline-secondary:hover { background: var(--color-gray-50); color: var(--color-gray-900); }
+.btn-success { background: #009845; border-color: #009845; color: #fff; }
+.btn-success:hover { background: #007a37; border-color: #007a37; color: #fff; }
+
+/* Bootstrap list-group used by contribute/members — give it the DGA card feel. */
+.list-group { border-radius: var(--radius-lg); }
+.list-group-item { border-color: var(--color-gray-200); }
+
+/* Bootstrap tabs (map ink) — brand the active tab. */
+.nav-tabs .nav-link.active { color: var(--color-primary); border-bottom-color: #fff; }
+.nav-tabs .nav-link { color: var(--color-gray-600); }
+
+/* Keep page content readable inside the authenticated app shell. */
+.app-content .container,
+.app-content .container-fluid { padding-inline: 0; }
+
+/* ── Phase 6: Contribute (drag & drop) ─────────────────────────────────────── */
+.dnd-list {
+    list-style: none;
+    margin: 0;
+    padding: 8px;
+    min-height: 260px;
+    border-radius: var(--radius-lg);
+    background: var(--color-gray-50);
+    border: 1px solid var(--color-gray-200);
+}
+.dnd-list.picked { background: var(--color-brand-25); border: 1px dashed var(--color-brand-300); }
+.dnd-list:empty::before {
+    content: attr(data-empty);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 240px;
+    color: var(--color-gray-400);
+    font-size: .9rem;
+    text-align: center;
+    border: 2px dashed var(--color-gray-300);
+    border-radius: var(--radius-md);
+}
+.dnd-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #fff;
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    box-shadow: var(--shadow-xs);
+    cursor: grab;
+    transition: box-shadow .15s, border-color .15s;
+}
+.dnd-item:hover { box-shadow: var(--shadow-sm); border-color: var(--color-brand-300); }
+.dnd-item.sortable-ghost { opacity: .4; }
+.dnd-item.sortable-chosen { box-shadow: var(--shadow-md); }
+.dnd-item .handle { color: var(--color-gray-400); font-size: 1.1rem; cursor: grab; }
+.dnd-item .type-badge {
+    font-size: .68rem; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-full);
+    flex-shrink: 0;
+}
+.type-badge.t-OBJ  { background: #C9DCF1; color: #103768; }
+.type-badge.t-INIT { background: #FEF0C7; color: #93370D; }
+.type-badge.t-KPI  { background: #DCFAE6; color: #166A45; }
+.type-badge.t-PRJ  { background: #E0EAFF; color: #1849A9; }
+.dnd-item .el-name { flex: 1; font-size: .9rem; color: var(--color-gray-800); }
+.dnd-item .el-kind { font-size: .72rem; color: var(--color-gray-500); }
+
+.contribute-col-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+}
+.contribute-col-head .count {
+    background: var(--color-gray-100); color: var(--color-gray-600);
+    border-radius: var(--radius-full); padding: 1px 9px; font-size: .75rem; font-weight: 600;
+}
+
+/* ── Phase 6: optional pill ─────────────────────────────────────────────────── */
+.optional-pill {
+    display: inline-flex; align-items: center;
+    background: var(--color-gray-100); color: var(--color-gray-600);
+    border-radius: var(--radius-full); padding: 2px 10px;
+    font-size: .72rem; font-weight: 600; margin-inline-start: 8px;
+}
+
+/* ── Phase 6: value chips (map) ─────────────────────────────────────────────── */
+.value-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 6px 14px; border-radius: var(--radius-full);
+    color: #fff; font-weight: 700; font-size: .85rem;
+}
+
+/* ── Phase 6: sankey ────────────────────────────────────────────────────────── */
+#sankey svg text { font-family: 'Cairo', sans-serif; }
+
+/* ── Phase 6: Chatbot widget ────────────────────────────────────────────────── */
+.chatbot-fab {
+    position: fixed;
+    inset-block-end: 24px;
+    inset-inline-end: 24px;
+    width: 58px; height: 58px;
+    border-radius: var(--radius-full);
+    background: var(--color-primary);
+    color: #fff; border: 0;
+    box-shadow: var(--shadow-lg);
+    cursor: pointer; z-index: 1080;
+    font-size: 1.5rem; line-height: 1;
+    display: grid; place-items: center;
+    transition: transform .15s, background .15s;
+}
+.chatbot-fab:hover { background: var(--color-primary-700); transform: translateY(-2px); }
+.chatbot-panel {
+    position: fixed;
+    inset-block-end: 92px;
+    inset-inline-end: 24px;
+    width: 380px; max-width: calc(100vw - 32px);
+    height: 520px; max-height: calc(100vh - 120px);
+    background: #fff;
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-2xl);
+    z-index: 1080;
+    display: none; flex-direction: column;
+    overflow: hidden;
+}
+.chatbot-panel.open { display: flex; }
+.chatbot-header {
+    background: var(--color-primary);
+    color: #fff; padding: 14px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+}
+.chatbot-header .title { font-weight: 700; display:flex; align-items:center; gap:8px; }
+.chatbot-header .title .dot { width: 8px; height: 8px; border-radius: 50%; background: #9DC41A; }
+.chatbot-close { background: transparent; border: 0; color: #fff; font-size: 1.3rem; cursor: pointer; line-height: 1; }
+.chatbot-body { flex: 1; overflow-y: auto; padding: 14px; background: var(--color-gray-50); }
+.chatbot-msg { margin-bottom: 10px; display: flex; }
+.chatbot-msg .bubble {
+    max-width: 80%; padding: 9px 13px; border-radius: 14px; font-size: .88rem; line-height: 1.6;
+    white-space: pre-wrap; word-wrap: break-word;
+}
+.chatbot-msg.user { justify-content: flex-start; }
+.chatbot-msg.user .bubble { background: var(--color-primary); color: #fff; border-bottom-right-radius: 4px; }
+.chatbot-msg.bot { justify-content: flex-end; }
+.chatbot-msg.bot .bubble { background: #fff; color: var(--color-gray-800); border: 1px solid var(--color-gray-200); border-bottom-left-radius: 4px; }
+.chatbot-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--color-gray-100); background:#fff; }
+.chatbot-chip {
+    background: var(--color-brand-50); color: var(--color-primary);
+    border: 1px solid var(--color-brand-200); border-radius: var(--radius-full);
+    padding: 5px 11px; font-size: .76rem; cursor: pointer; font-weight: 600;
+}
+.chatbot-chip:hover { background: var(--color-brand-100); }
+.chatbot-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--color-gray-200); background: #fff; }
+.chatbot-input input {
+    flex: 1; padding: 9px 13px; border: 1px solid var(--color-gray-300);
+    border-radius: var(--radius-full); font: inherit; font-size: .88rem;
+}
+.chatbot-input input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(25,79,144,.12); }
+.chatbot-send {
+    background: var(--color-primary); color: #fff; border: 0;
+    border-radius: var(--radius-full); width: 40px; height: 40px;
+    cursor: pointer; flex-shrink: 0; font-size: 1.1rem;
+}
+.chatbot-send:hover { background: var(--color-primary-700); }

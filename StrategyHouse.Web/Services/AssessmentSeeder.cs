@@ -15,9 +15,68 @@ public static class AssessmentSeeder
 
     // Phase 5: quiz auto-seed removed — production starts with 0 questions until an
     // admin clicks "Regenerate" or adds questions manually. Survey seed remains.
+    // Phase 6: seed 5 hand-crafted demo questions so the quiz is never empty.
     public static async Task RunAsync(ApplicationDbContext db, QuizGeneratorService quiz)
     {
+        await SeedDemoQuizAsync(db);
         await SeedProgrammeSurveyAsync(db);
+    }
+
+    // Phase 6 — idempotent: only seeds when the bank is completely empty so admin
+    // curation is never overwritten. All five are approved + active demo questions.
+    private static async Task SeedDemoQuizAsync(ApplicationDbContext db)
+    {
+        if (await db.QuizQuestions.AnyAsync()) return;
+
+        QuizQuestion Mcq(string q, string[] opts, int correct) => new()
+        {
+            Scope = "General",
+            QuestionType = "MCQ",
+            QuestionAr = q,
+            OptionsJson = JsonSerializer.Serialize(opts),
+            CorrectIndex = correct,
+            IsApproved = true,
+            IsActive = true,
+            Source = "Demo",
+        };
+        QuizQuestion TrueFalse(string q, bool answer) => new()
+        {
+            Scope = "General",
+            QuestionType = "TrueFalse",
+            QuestionAr = q,
+            OptionsJson = JsonSerializer.Serialize(new[] { "صحيح", "خطأ" }),
+            CorrectIndex = answer ? 0 : 1,
+            IsApproved = true,
+            IsActive = true,
+            Source = "Demo",
+        };
+
+        var demo = new List<QuizQuestion>
+        {
+            Mcq("ما هي رؤية الهيئة العامة للمنافسة؟", new[]
+            {
+                "بيئة منافسة رائدة عالمياً تسهم في الازدهار الاقتصادي",
+                "تحقيق الريادة في الاقتصاد السعودي",
+                "رفع كفاءة الأسواق المحلية",
+                "تطوير منظومة المنافسة",
+            }, 0),
+            Mcq("كم عدد ركائز الاستراتيجية في الهيئة العامة للمنافسة؟", new[]
+            {
+                "3", "4", "5", "6",
+            }, 2),
+            Mcq("أي من التالي ليس من قيم الهيئة؟", new[]
+            {
+                "الشفافية", "العدالة", "الابتكار", "الكفاءة",
+            }, 3),
+            TrueFalse("تعمل الهيئة العامة للمنافسة على تطبيق أحكام نظام المنافسة في المملكة.", true),
+            Mcq("أي ركيزة من ركائز الاستراتيجية تختص بحماية الأسواق من الممارسات الاحتكارية؟", new[]
+            {
+                "تمكين المنافسة", "حماية المنافسة", "الشراكة والتعاون", "الكفاءة المؤسسية",
+            }, 1),
+        };
+
+        db.QuizQuestions.AddRange(demo);
+        await db.SaveChangesAsync();
     }
 
     private static async Task SeedProgrammeSurveyAsync(ApplicationDbContext db)

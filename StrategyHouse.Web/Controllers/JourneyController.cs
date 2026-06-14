@@ -77,6 +77,9 @@ public class JourneyController : Controller
             DeptObjectiveCodes = await _db.Kpis.Where(k => k.DepartmentCode == session.DeptCode)
                 .Select(k => k.ObjectiveCode).Distinct().ToListAsync(),
             Initiatives = await _db.Initiatives.OrderBy(i => i.InitiativeCode).Take(40).ToListAsync(),
+            Roster = await _db.DepartmentRoster
+                .Where(r => r.DeptCode == session.DeptCode && r.IsActive)
+                .OrderBy(r => r.NameAr).ToListAsync(),
             Pledges = await _db.ContributionPledges.Where(p => p.SessionId == sessionId).ToListAsync(),
             Kpis = await _db.Kpis.Where(k => k.DepartmentCode == session.DeptCode).ToListAsync(),
             Projects = await _db.Projects.Where(p => p.DepartmentCode == session.DeptCode).ToListAsync(),
@@ -97,20 +100,47 @@ public class JourneyController : Controller
 
     [HttpPost("Journey/AddMembers/{sessionId:guid}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AddMembers(Guid sessionId, string[] names, string[] roles)
+    public async Task<IActionResult> AddMembers(Guid sessionId, string[]? rosterIds, string[]? names, string[]? roles)
     {
-        var session = await _db.StrategySessions.FindAsync(sessionId);
+        var session = await _db.StrategySessions
+            .Include(s => s.Members)
+            .FirstOrDefaultAsync(s => s.Id == sessionId);
         if (session == null) return NotFound();
-        for (var i = 0; i < names.Length; i++)
+
+        var existing = session.Members.Select(m => m.NameAr).ToHashSet();
+
+        // Checked roster members (Phase 6) — resolve names from the roster table.
+        var ids = (rosterIds ?? Array.Empty<string>())
+            .Select(x => Guid.TryParse(x, out var g) ? g : Guid.Empty)
+            .Where(g => g != Guid.Empty).ToList();
+        if (ids.Count > 0)
         {
-            if (string.IsNullOrWhiteSpace(names[i])) continue;
+            var roster = await _db.DepartmentRoster
+                .Where(r => ids.Contains(r.MemberId) && r.DeptCode == session.DeptCode)
+                .ToListAsync();
+            foreach (var r in roster)
+            {
+                if (!existing.Add(r.NameAr)) continue;
+                _db.SessionMembers.Add(new SessionMember { SessionId = sessionId, NameAr = r.NameAr, Role = r.Role });
+            }
+        }
+
+        // Manually typed extra members.
+        var nm = names ?? Array.Empty<string>();
+        var rl = roles ?? Array.Empty<string>();
+        for (var i = 0; i < nm.Length; i++)
+        {
+            if (string.IsNullOrWhiteSpace(nm[i])) continue;
+            var name = nm[i].Trim();
+            if (!existing.Add(name)) continue;
             _db.SessionMembers.Add(new SessionMember
             {
                 SessionId = sessionId,
-                NameAr = names[i].Trim(),
-                Role = i < roles.Length ? roles[i]?.Trim() : null,
+                NameAr = name,
+                Role = i < rl.Length ? rl[i]?.Trim() : null,
             });
         }
+
         await _db.SaveChangesAsync();
         return RedirectToRun(sessionId, 2);
     }
@@ -145,6 +175,21 @@ public class JourneyController : Controller
         _db.ContributionPledges.Add(pledge);
         await _db.SaveChangesAsync();
         return Json(new { ok = true, id = pledge.Id });
+    }
+
+    // POST /Journey/RemovePledge — JSON endpoint; removes a pledge by element or id.
+    [HttpPost("Journey/RemovePledge")]
+    public async Task<IActionResult> RemovePledge([FromBody] RemovePledgeDto dto)
+    {
+        IQueryable<ContributionPledge> q = _db.ContributionPledges.Where(p => p.SessionId == dto.SessionId);
+        if (dto.Id is Guid id) q = q.Where(p => p.Id == id);
+        else q = q.Where(p => p.ElementType == dto.ElementType && p.ElementCode == dto.ElementCode);
+
+        var matches = await q.ToListAsync();
+        if (matches.Count == 0) return Json(new { ok = true, removed = 0 });
+        _db.ContributionPledges.RemoveRange(matches);
+        await _db.SaveChangesAsync();
+        return Json(new { ok = true, removed = matches.Count });
     }
 
     // GET /Journey/Map/{sessionId} — deep-link alias → single page section.
@@ -455,6 +500,7 @@ public class JourneyRunViewModel
     public List<Objective> Objectives { get; set; } = new();
     public List<string?> DeptObjectiveCodes { get; set; } = new();
     public List<Initiative> Initiatives { get; set; } = new();
+    public List<DepartmentRoster> Roster { get; set; } = new();
     public List<ContributionPledge> Pledges { get; set; } = new();
     public List<Kpi> Kpis { get; set; } = new();
     public List<Project> Projects { get; set; } = new();
@@ -469,6 +515,14 @@ public class PledgeDto
     public string ElementCode { get; set; } = string.Empty;
     public string? ContributionKind { get; set; }
     public string? Notes { get; set; }
+}
+
+public class RemovePledgeDto
+{
+    public Guid SessionId { get; set; }
+    public Guid? Id { get; set; }
+    public string? ElementType { get; set; }
+    public string? ElementCode { get; set; }
 }
 
 public class InkDto
