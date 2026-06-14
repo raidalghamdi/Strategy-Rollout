@@ -14,7 +14,7 @@
         <div class="label">الرؤية</div>
         <div>@content?.Vision.Ar</div>
     </div>
-    <div class="text-center p-2 mb-2" style="background:#46BCCD;border-radius:10px;">
+    <div class="text-center p-2 mb-2" style="background:#299ECE;border-radius:10px;">
         <strong>الرسالة:</strong> @content?.Mission.Ar
     </div>
 
@@ -22,7 +22,7 @@
         @foreach (var p in pillars)
         {
             <div class="col-6 col-md">
-                <div class="p-2 text-white text-center" style="background:#009845;border-radius:10px;height:100%;">@p.PillarName</div>
+                <div class="p-2 text-white text-center" style="background:#5F9600;border-radius:10px;height:100%;">@p.PillarName</div>
             </div>
         }
     </div>
@@ -31,7 +31,7 @@
         @foreach (var o in objectives)
         {
             var mine = deptObjCodes.Contains(o.ObjectiveCode);
-            var bg = mine ? "#194F90" : "#e7edf5";
+            var bg = mine ? "#28334A" : "#e7edf5";
             var fg = mine ? "#fff" : "#9aa7b8";
             <div class="col-6 col-md-3">
                 <div class="p-2 text-center house-obj" style="background:@bg;color:@fg;border-radius:8px;cursor:pointer;font-size:.85rem;"
@@ -45,7 +45,7 @@
     <div class="row g-2 mt-3 text-center">
         @foreach (var v in content?.Values ?? new List<StrategyHouse.Web.Configuration.LocalizedText>())
         {
-            <div class="col-6 col-md"><span class="badge" style="background:#D79A2B;">@v.Ar</span></div>
+            <div class="col-6 col-md"><span class="badge" style="background:#FAC126;">@v.Ar</span></div>
         }
     </div>
 </div>

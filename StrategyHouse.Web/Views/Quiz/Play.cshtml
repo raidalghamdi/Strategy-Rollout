@@ -24,7 +24,7 @@ else
 {
     <div class="gac-card" style="max-width:720px;margin:0 auto;">
         <div class="progress mb-3" style="height:10px;">
-            <div id="bar" class="progress-bar" role="progressbar" style="width:0%;background:#194F90;"></div>
+            <div id="bar" class="progress-bar" role="progressbar" style="width:0%;background:#28334A;"></div>
         </div>
         <div id="quizArea"></div>
         <div id="resultArea" style="display:none;"></div>
@@ -79,7 +79,7 @@ async function submit() {
     const r = document.getElementById('resultArea');
     r.style.display = 'block';
     let html = `<div class="text-center mb-4"><h2>نتيجتك</h2>
-        <div style="font-size:3rem;font-weight:800;color:#194F90;">${data.score} / ${data.total}</div></div>`;
+        <div style="font-size:3rem;font-weight:800;color:#28334A;">${data.score} / ${data.total}</div></div>`;
     data.detail.forEach((d, i) => {
         const q = questions.find(x => x.id === d.qid);
         const picked = d.picked >= 0 ? q.options[d.picked] : '— لم تتم الإجابة —';

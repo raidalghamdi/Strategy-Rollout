@@ -6,7 +6,7 @@
     {
         0 => "#EEF2F7",
         <= 2 => "#CFE3F4",
-        <= 5 => "#194F90",
+        <= 5 => "#28334A",
         _ => "#0E2E55",
     };
     string TextColor(int total) => total >= 3 ? "#fff" : "#1d2733";
@@ -19,7 +19,7 @@
         table.heat { border-collapse:collapse; font-size:.78rem; }
         table.heat th, table.heat td { border:1px solid #dde5ef; padding:4px; text-align:center; min-width:42px; }
         table.heat th.rowhdr { text-align:right; min-width:220px; position:sticky; right:0; background:#fff; z-index:1; }
-        table.heat thead th { background:#194F90; color:#fff; font-weight:600; writing-mode:vertical-rl; height:120px; }
+        table.heat thead th { background:#28334A; color:#fff; font-weight:600; writing-mode:vertical-rl; height:120px; }
         table.heat td.cell { cursor:default; position:relative; font-weight:700; }
         .legend span { display:inline-block;width:18px;height:18px;border-radius:3px;vertical-align:middle;margin-inline-start:4px; }
     </style>
@@ -27,7 +27,7 @@
 
 <div class="container-fluid py-3" dir="rtl">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1 style="color:#194F90;">خريطة التغطية الاستراتيجية</h1>
+        <h1 style="color:#28334A;">خريطة التغطية الاستراتيجية</h1>
         <a class="btn btn-outline-secondary btn-sm" href="/Admin/Insights">رجوع للوحة</a>
     </div>
 
@@ -41,7 +41,7 @@
             القيمة = مؤشرات + مشاريع + تعهدات الإدارة على هذا العنصر.
             <span style="background:#EEF2F7;border:1px solid #ccc;"></span>0
             <span style="background:#CFE3F4;"></span>1-2
-            <span style="background:#194F90;"></span>3-5
+            <span style="background:#28334A;"></span>3-5
             <span style="background:#0E2E55;"></span>6+
         </span>
     </div>

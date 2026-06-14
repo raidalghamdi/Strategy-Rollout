@@ -2,7 +2,8 @@
    dga.css — DGA Nazm Design System for the GAC UAT platform.
    ----------------------------------------------------------------------------
    Tokens sourced from https://design.dga.gov.sa/ (index-PDaQ7SHU.css).
-   Brand color: GAC blue (#194F90). Fonts served LOCALLY from wwwroot/fonts/.
+   Brand: GAC gold #FAC126 + navy #00192B/#28334A (Phase 7). Fonts: GE SS Two
+   (licensed) with Cairo web fallback.
    No external HTTP traffic.
    ============================================================================ */
 
@@ -51,26 +52,82 @@
 /* --- Design tokens --------------------------------------------------------- */
 
 :root {
-    /* ── GAC brand palette (blue #194F90) — re-themed from DGA Nazm green ── */
-    --color-brand-25:  #F5F9FE;
-    --color-brand-50:  #EAF2FB;
-    --color-brand-100: #C9DCF1;
-    --color-brand-200: #94B8DF;
-    --color-brand-300: #5E91CD;
-    --color-brand-400: #2F6FB5;
-    --color-brand-500: #194F90;
-    --color-brand-600: #15457F;
-    --color-brand-700: #103768;
-    --color-brand-800: #0C2A4F;
-    --color-brand-900: #081E37;
-    --color-brand-950: #051426;
+    /* ════════════════════════════════════════════════════════════════════
+       GAC Brand Identity (Phase 7) — gold #FAC126 + navy #00192B / #28334A
+       Source of truth: frontend_gac_enterprise_design_skill.md
+       ════════════════════════════════════════════════════════════════════ */
 
-    /* Aliases used throughout views */
-    --color-primary:      #194F90;
-    --color-primary-700:  #103768;
-    --color-primary-800:  #0C2A4F;
-    --color-primary-100:  #C9DCF1;
-    --color-primary-050:  #EAF2FB;
+    /* Brand — Primary (gold) */
+    --gac-gold: #FAC126;
+    --gac-gold-hover: #E5AF1F;
+    --gac-gold-soft: #FFF4D1;
+
+    /* Brand — Navy */
+    --gac-navy-dark: #00192B;
+    --gac-navy: #28334A;
+    --gac-navy-soft: rgba(40, 51, 74, 0.08);
+
+    /* Brand — Institutional Blue */
+    --gac-blue: #0069A7;
+    --gac-blue-hover: #005897;
+    --gac-blue-accent: #299ECE;
+
+    /* Service tiles (accents/categorization) */
+    --gac-service-green: #5F9600;
+    --gac-service-gold: #FAC126;
+    --gac-service-gray: #626467;
+    --gac-service-blue: #0069A7;
+
+    /* Backgrounds */
+    --bg-page: #EDEFF1;
+    --bg-card: #F4F4F4;
+    --bg-soft: #EFEFEF;
+    --bg-white: #FFFFFF;
+
+    /* Text */
+    --text-primary: #060606;          /* required text color on gold */
+    --text-on-gold: #060606;          /* NEVER white on gold */
+    --text-on-navy: #FFFFFF;
+    --text-muted: #626467;
+
+    /* Borders */
+    --border-soft: #E5E7EB;
+    --border-strong: #28334A;
+
+    /* GAC radii */
+    --radius-pill: 100px;
+    --radius-input: 22px;
+    --radius-card: 10px;
+
+    /* GAC shadows */
+    --shadow-soft: 0 10px 30px 0 rgba(145, 156, 212, .20);
+    --shadow-focus-gold: 0 0 0 5px rgba(250, 193, 38, .35);
+
+    /* GAC layout */
+    --max-width: 1520px;
+    --section-py: 50px;
+    --card-padding: 20px;
+
+    /* ── Brand palette mapped to GAC navy (legacy --color-brand-* / --color-primary-* aliases) ── */
+    --color-brand-25:  #EAEDF1;
+    --color-brand-50:  #DCE0E8;
+    --color-brand-100: #B7C0CF;
+    --color-brand-200: #8B97AD;
+    --color-brand-300: #5E6E8B;
+    --color-brand-400: #3D4D6B;
+    --color-brand-500: #28334A;
+    --color-brand-600: #1F2940;
+    --color-brand-700: #141E33;
+    --color-brand-800: #0A1322;
+    --color-brand-900: #00192B;
+    --color-brand-950: #000F1B;
+
+    /* Aliases used throughout views — now GAC navy */
+    --color-primary:      #28334A;
+    --color-primary-700:  #141E33;
+    --color-primary-800:  #00192B;
+    --color-primary-100:  #B7C0CF;
+    --color-primary-050:  #DCE0E8;
 
     /* ── DGA Nazm gray scale ── */
     --color-white:     #FFFFFF;
@@ -91,7 +148,7 @@
     --color-success: #166A45;
     --color-warning: #B54708;
     --color-danger:  #B42318;
-    --color-info:    #175CD3;
+    --color-info:    #0069A7;
 
     /* ── Border radius — DGA Nazm scale ── */
     --radius-none: 0;
@@ -119,9 +176,9 @@
     --sidebar-width:  264px;
     --header-height:  72px;
 
-    /* Typography */
-    --font-en: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
-    --font-ar: "Cairo", "IBM Plex Sans", system-ui, sans-serif;
+    /* Typography — GAC (GE SS Two licensed → Cairo web fallback) */
+    --font-en: "Exo 2", "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    --font-ar: "GE SS Two", "Cairo", tahoma, "IBM Plex Sans", system-ui, sans-serif;
 }
 
 /* --- Resets ---------------------------------------------------------------- */
@@ -131,9 +188,9 @@
 html, body {
     margin: 0;
     padding: 0;
-    background: var(--color-gray-50);
+    background: var(--bg-page);
     color: var(--color-gray-900);
-    font-family: var(--font-en);
+    font-family: var(--font-ar);
     font-size: 14px;
     line-height: 1.5;
 }
@@ -166,9 +223,9 @@ img { max-width: 100%; height: auto; }
 /* ── Sidebar — white background, green active accent ── */
 
 .app-sidebar {
-    background: var(--color-white);
-    color: var(--color-gray-700);
-    border-inline-end: 1px solid var(--color-gray-200);
+    background: var(--gac-navy-dark);
+    color: var(--text-on-navy);
+    border-inline-end: 1px solid var(--gac-navy);
     padding: 20px 0;
     position: sticky;
     top: 0;
@@ -182,15 +239,15 @@ img { max-width: 100%; height: auto; }
     align-items: center;
     gap: 10px;
     padding: 0 16px 20px;
-    border-bottom: 1px solid var(--color-gray-100);
+    border-bottom: 1px solid rgba(255,255,255,.12);
     margin-bottom: 12px;
 }
 
 .app-sidebar .brand .logo {
     width: 36px;
     height: 36px;
-    background: var(--color-primary);
-    color: var(--color-white);
+    background: var(--gac-gold);
+    color: var(--text-on-gold);
     border-radius: var(--radius-md);
     display: grid;
     place-items: center;
@@ -201,13 +258,13 @@ img { max-width: 100%; height: auto; }
 
 .app-sidebar .brand .name {
     font-size: .9rem;
-    font-weight: 600;
-    color: var(--color-gray-900);
+    font-weight: 700;
+    color: var(--text-on-navy);
     line-height: 1.2;
 }
 .app-sidebar .brand .tag {
     font-size: .7rem;
-    color: var(--color-gray-500);
+    color: var(--gac-gold);
 }
 
 .app-sidebar nav { display: flex; flex-direction: column; }
@@ -216,7 +273,7 @@ img { max-width: 100%; height: auto; }
     display: flex;
     align-items: center;
     gap: 10px;
-    color: var(--color-gray-600);
+    color: rgba(255,255,255,.82);
     padding: 9px 16px;
     font-size: .875rem;
     font-weight: 500;
@@ -225,15 +282,15 @@ img { max-width: 100%; height: auto; }
 }
 
 .app-sidebar nav a:hover {
-    background: var(--color-brand-25);
-    color: var(--color-brand-700);
+    background: rgba(255,255,255,.06);
+    color: var(--gac-gold);
     text-decoration: none;
 }
 
 .app-sidebar nav a.active {
-    background: var(--color-brand-50);
-    color: var(--color-primary);
-    border-inline-start-color: var(--color-primary);
+    background: rgba(250,193,38,.12);
+    color: var(--gac-gold);
+    border-inline-start-color: var(--gac-gold);
     font-weight: 600;
 }
 
@@ -242,7 +299,7 @@ img { max-width: 100%; height: auto; }
     font-size: .68rem;
     letter-spacing: .08em;
     text-transform: uppercase;
-    color: var(--color-gray-400);
+    color: rgba(255,255,255,.45);
     font-weight: 600;
 }
 
@@ -253,7 +310,7 @@ img { max-width: 100%; height: auto; }
 .app-header {
     height: var(--header-height);
     background: var(--color-white);
-    border-bottom: 1px solid var(--color-gray-200);
+    border-bottom: 4px solid var(--gac-gold);
     padding: 0 24px;
     display: flex;
     align-items: center;
@@ -430,52 +487,69 @@ img { max-width: 100%; height: auto; }
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 9px 16px;
+    padding: 10px 28px;
     border: 1px solid transparent;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-pill);
     font: inherit;
     font-size: .875rem;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     text-decoration: none;
     line-height: 1.4;
-    transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
+    transition: background .2s, border-color .15s, color .15s, box-shadow .15s, transform .1s;
     white-space: nowrap;
 }
 
-.btn-primary {
-    background: var(--color-primary);
-    color: var(--color-white);
-    border-color: var(--color-primary);
+/* Primary CTA — gold pill with dark text (NEVER white on gold) */
+.btn-primary, .btn-gac-primary {
+    background: var(--gac-gold);
+    color: var(--text-on-gold) !important;
+    border-color: var(--gac-gold);
     box-shadow: var(--shadow-xs);
 }
-.btn-primary:hover {
-    background: var(--color-primary-700);
-    border-color: var(--color-primary-700);
-    color: var(--color-white);
+.btn-primary:hover, .btn-gac-primary:hover {
+    background: var(--gac-gold-hover);
+    border-color: var(--gac-gold-hover);
+    color: var(--text-on-gold) !important;
     text-decoration: none;
     box-shadow: var(--shadow-sm);
 }
-.btn-primary:focus {
+.btn-primary:focus, .btn-gac-primary:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(25,79,144,.25);
+    box-shadow: var(--shadow-focus-gold);
 }
 
-.btn-secondary {
-    background: var(--color-white);
-    color: var(--color-primary);
-    border-color: var(--color-primary);
+/* Secondary CTA — navy pill */
+.btn-secondary, .btn-gac-secondary {
+    background: var(--gac-navy);
+    color: var(--text-on-navy) !important;
+    border-color: var(--gac-navy);
+    font-weight: 600;
 }
-.btn-secondary:hover {
-    background: var(--color-brand-50);
-    color: var(--color-primary-700);
+.btn-secondary:hover, .btn-gac-secondary:hover {
+    background: var(--gac-navy-dark);
+    border-color: var(--gac-navy-dark);
+    color: var(--text-on-navy) !important;
     text-decoration: none;
+}
+
+/* Outline CTA — navy outline pill */
+.btn-outline-primary {
+    border: 2px solid var(--gac-navy);
+    color: var(--gac-navy);
+    background: transparent;
+    font-weight: 600;
+}
+.btn-outline-primary:hover {
+    background: var(--gac-navy);
+    color: #fff;
 }
 
 .btn-ghost {
     background: var(--color-white);
     color: var(--color-gray-700);
     border-color: var(--color-gray-300);
+    font-weight: 600;
 }
 .btn-ghost:hover {
     background: var(--color-gray-50);
@@ -496,12 +570,12 @@ img { max-width: 100%; height: auto; }
 }
 
 .btn-sm {
-    padding: 6px 12px;
+    padding: 6px 16px;
     font-size: .8rem;
 }
 
 .btn-lg {
-    padding: 12px 20px;
+    padding: 12px 30px;
     font-size: 1rem;
 }
 
@@ -602,7 +676,7 @@ img { max-width: 100%; height: auto; }
 .tag--success { background: var(--color-brand-50);  color: var(--color-brand-700); border-color: var(--color-brand-200); }
 .tag--warning { background: #FFFAEB; color: #B54708; border-color: #FEDF89; }
 .tag--destruct { background: #FFF1F3; color: #C01048; border-color: #FECDD6; }
-.tag--info    { background: #EFF8FF; color: #175CD3; border-color: #B2DDFF; }
+.tag--info    { background: #EFF8FF; color: #0069A7; border-color: #B2DDFF; }
 .tag--gray    { background: var(--color-gray-50); color: var(--color-gray-700); border-color: var(--color-gray-200); }
 
 /* --- Forms ----------------------------------------------------------------- */
@@ -888,30 +962,31 @@ img { max-width: 100%; height: auto; }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 32px;
-    background: var(--color-white);
-    border-bottom: 1px solid var(--color-gray-200);
+    padding: 12px 32px;
+    background: var(--gac-navy-dark);
+    border-bottom: 4px solid var(--gac-gold);
     box-shadow: var(--shadow-xs);
 }
 .cx-public-brand { display: flex; align-items: center; gap: 14px; }
+.cx-public-brand .brand-logo { height: 48px; width: auto; display: block; }
 .cx-public-brand .logo {
     width: 40px;
     height: 40px;
     border-radius: var(--radius-lg);
-    background: var(--color-primary);
-    color: var(--color-white);
+    background: var(--gac-gold);
+    color: var(--text-on-gold);
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
     font-size: 14px;
 }
-.cx-public-brand .cx-name { font-weight: 700; color: var(--color-gray-900); }
-.cx-public-brand .cx-tag  { color: var(--color-gray-500); font-size: .78rem; }
+.cx-public-brand .cx-name { font-weight: 700; color: var(--text-on-navy); }
+.cx-public-brand .cx-tag  { color: var(--gac-gold); font-size: .78rem; }
 .cx-public-actions { display: flex; align-items: center; gap: 14px; }
-.cx-public-actions a { color: var(--color-gray-600); text-decoration: none; font-size: .875rem; font-weight: 500; }
-.cx-public-actions a:hover { color: var(--color-primary); }
-.cx-public-actions a.active { font-weight: 700; color: var(--color-primary); }
+.cx-public-actions a { color: rgba(255,255,255,.85); text-decoration: none; font-size: .875rem; font-weight: 500; }
+.cx-public-actions a:hover { color: var(--gac-gold); }
+.cx-public-actions a.active { font-weight: 700; color: var(--gac-gold); }
 .cx-public-main { max-width: 1200px; margin: 0 auto; padding: 48px 32px; }
 .cx-public-footer { text-align: center; padding: 24px; color: var(--color-gray-400); font-size: .82rem; border-top: 1px solid var(--color-gray-200); background: var(--color-white); }
 
@@ -1051,3 +1126,42 @@ ul.timeline li code {
     margin-top: 8px;
     padding-top: 8px;
 }
+
+/* =============================================================================
+   GAC Brand Identity (Phase 7) — components layered on DGA structure.
+   Tokens defined in :root above. Only swaps brand chrome; structure intact.
+   ============================================================================= */
+
+/* Pill inputs */
+.form-control, .form-select,
+input[type=text], input[type=email], input[type=password], input[type=number], textarea {
+    border-radius: var(--radius-input);
+    border: 1px solid var(--border-soft);
+}
+.form-control:focus, .form-select:focus,
+input[type=text]:focus, input[type=email]:focus, input[type=password]:focus, textarea:focus {
+    border-color: var(--gac-gold);
+    box-shadow: var(--shadow-focus-gold);
+    outline: none;
+}
+
+/* GAC cards */
+.gac-card, .dga-card {
+    border-radius: var(--radius-card);
+    background: var(--bg-white);
+    border: 1px solid var(--border-soft);
+    box-shadow: var(--shadow-soft);
+    padding: var(--card-padding);
+}
+
+/* Badges/chips */
+.badge-gold { background: var(--gac-gold); color: var(--text-on-gold); border-radius: var(--radius-pill); padding: 4px 12px; font-weight: 700; }
+.badge-navy { background: var(--gac-navy); color: #fff; border-radius: var(--radius-pill); padding: 4px 12px; }
+.badge-soft { background: var(--bg-soft); color: var(--text-primary); border-radius: var(--radius-pill); padding: 4px 12px; }
+
+/* Bootstrap badge brand overrides (used in views) */
+.badge.bg-success { background-color: var(--gac-service-green) !important; }
+
+/* Links use institutional blue for legibility on light surfaces */
+a { color: var(--gac-blue); }
+a:hover { color: var(--gac-blue-hover); }

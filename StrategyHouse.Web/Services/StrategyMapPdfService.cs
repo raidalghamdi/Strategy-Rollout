@@ -9,17 +9,29 @@ namespace StrategyHouse.Web.Services;
 public class StrategyMapPdfService
 {
     private const string Font = "Noto Naskh Arabic";
-    private const string Primary = "#194F90";
-    private const string Cyan = "#46BCCD";
-    private const string Green = "#009845";
-    private const string Gold = "#D79A2B";
+
+    // GAC brand palette (Phase 7) — navy title bar + gold accents.
+    private const string NavyDark = "#00192B";
+    private const string Navy = "#28334A";
+    private const string Gold = "#FAC126";
+    private const string Blue = "#0069A7";
+    private const string Cyan = "#299ECE";
+    private const string Green = "#5F9600";
+    private const string Primary = Navy; // legacy alias used below for body content
 
     private readonly StrategyContentService _content;
+    private readonly byte[]? _logoColor;
 
-    public StrategyMapPdfService(StrategyContentService content)
+    public StrategyMapPdfService(StrategyContentService content, IWebHostEnvironment env)
     {
         _content = content;
         QuestPDF.Settings.License = LicenseType.Community;
+
+        var logoPath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "gac-logo-color.png");
+        if (File.Exists(logoPath))
+        {
+            try { _logoColor = File.ReadAllBytes(logoPath); } catch { _logoColor = null; }
+        }
     }
 
     public byte[] Generate(
@@ -59,20 +71,25 @@ public class StrategyMapPdfService
 
                 page.Header().Column(col =>
                 {
-                    col.Item().Row(row =>
+                    // Navy title bar with the GAC colour logo at the top-right
+                    // (visual-left in RTL) and a gold underline accent beneath.
+                    col.Item().Background(Navy).Padding(12).Row(row =>
                     {
                         row.RelativeItem().Column(c =>
                         {
-                            c.Item().Text("خريطة الاستراتيجية الإدارية").FontSize(22).Bold().FontColor(Primary);
+                            c.Item().Text("خريطة الاستراتيجية الإدارية").FontSize(22).Bold().FontColor(Colors.White);
                             c.Item().Text(deptName).FontSize(16).FontColor(Gold);
                         });
-                        row.ConstantItem(120).AlignLeft().Column(c =>
+                        row.ConstantItem(140).AlignLeft().AlignMiddle().Column(c =>
                         {
-                            c.Item().Text("GAC").FontSize(28).Bold().FontColor(Primary);
-                            c.Item().Text(date).FontSize(10).FontColor(Colors.Grey.Darken1);
+                            if (_logoColor != null)
+                                c.Item().Height(46).AlignLeft().Image(_logoColor).FitHeight();
+                            else
+                                c.Item().Text("GAC").FontSize(28).Bold().FontColor(Gold);
+                            c.Item().PaddingTop(4).Text(date).FontSize(10).FontColor("#C9CDD3");
                         });
                     });
-                    col.Item().PaddingTop(4).LineHorizontal(2).LineColor(Cyan);
+                    col.Item().LineHorizontal(3).LineColor(Gold);
                 });
 
                 page.Content().PaddingVertical(10).Column(col =>
@@ -96,7 +113,7 @@ public class StrategyMapPdfService
                     // Values row (between Mission and Pillars)
                     if (_content.Values.Any())
                     {
-                        var valueColors = new[] { Cyan, Green, Gold, "#9DC41A", Primary };
+                        var valueColors = new[] { Cyan, Green, Gold, Blue, Primary };
                         col.Item().Row(row =>
                         {
                             for (var vi = 0; vi < _content.Values.Count; vi++)
