@@ -1,0 +1,101 @@
+@model List<StrategyHouse.Domain.Entities.QuizQuestion>
+@{
+    ViewData["Title"] = "إدارة الاختبارات";
+    var tab = ViewBag.Tab as string ?? "Pending";
+    var counts = ViewBag.Counts as StrategyHouse.Web.Controllers.QuizCounts ?? new();
+    var tabs = new[] { ("Pending", "قيد المراجعة"), ("Approved", "معتمدة"), ("Rejected", "مرفوضة") };
+}
+
+@section Styles {
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
+}
+
+<div class="container py-3" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center">
+        <h1 style="color:#194F90;">إدارة بنك الأسئلة</h1>
+        <div>
+            <form method="post" asp-action="Generate" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button class="btn btn-outline-primary btn-sm">توليد أسئلة</button>
+            </form>
+            <a class="btn btn-outline-secondary btn-sm" href="/Admin">رجوع</a>
+        </div>
+    </div>
+
+    @if (TempData["Saved"] != null) { <div class="alert alert-success mt-2">@TempData["Saved"]</div> }
+
+    <ul class="nav nav-pills my-3">
+        @foreach (var (key, label) in tabs)
+        {
+            var c = key == "Pending" ? counts.Pending : key == "Approved" ? counts.Approved : counts.Rejected;
+            <li class="nav-item"><a class="nav-link @(key == tab ? "active" : "")" asp-action="Index" asp-route-tab="@key">@label (@c)</a></li>
+        }
+    </ul>
+
+    @if (tab == "Pending")
+    {
+        <form method="post" asp-action="BulkApprove" class="mb-3 d-flex gap-2">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="tab" value="@tab" />
+            <select name="scope" class="form-select form-select-sm" style="max-width:240px;">
+                <option value="General">عام</option>
+                <option value="Department">إدارات</option>
+                <option value="All">الكل</option>
+            </select>
+            <button class="btn btn-sm btn-success">اعتماد كل النطاق</button>
+        </form>
+    }
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info">لا توجد أسئلة في هذا التبويب.</div>
+    }
+    else
+    {
+        foreach (var q in Model)
+        {
+            var opts = System.Text.Json.JsonSerializer.Deserialize<List<string>>(q.OptionsJson) ?? new();
+            <div class="card mb-2"><div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <span class="badge bg-secondary">@q.QuestionType</span>
+                        <span class="badge bg-info text-dark">@q.Scope @(q.DeptCodeFilter)</span>
+                        <span class="badge bg-light text-dark">@q.Source</span>
+                    </div>
+                    <div class="btn-group">
+                        <form method="post" asp-action="Approve" asp-route-id="@q.Id" class="d-inline">
+                            @Html.AntiForgeryToken()<input type="hidden" name="tab" value="@tab" />
+                            <button class="btn btn-sm btn-success">اعتماد</button>
+                        </form>
+                        <form method="post" asp-action="Reject" asp-route-id="@q.Id" class="d-inline">
+                            @Html.AntiForgeryToken()<input type="hidden" name="tab" value="@tab" />
+                            <button class="btn btn-sm btn-danger">رفض</button>
+                        </form>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#edit-@q.Id">تعديل</button>
+                    </div>
+                </div>
+                <h6 class="mt-2">@q.QuestionAr</h6>
+                <ol type="A">
+                    @for (int i = 0; i < opts.Count; i++)
+                    {
+                        <li class="@(i == q.CorrectIndex ? "fw-bold text-success" : "")">@opts[i] @(i == q.CorrectIndex ? "✓" : "")</li>
+                    }
+                </ol>
+                @if (!string.IsNullOrEmpty(q.ExplanationAr)) { <div class="small text-muted">@q.ExplanationAr</div> }
+
+                <div class="collapse mt-2" id="edit-@q.Id">
+                    <form method="post" asp-action="Edit" asp-route-id="@q.Id" class="border rounded p-2">
+                        @Html.AntiForgeryToken()<input type="hidden" name="tab" value="@tab" />
+                        <input class="form-control form-control-sm mb-1" name="questionAr" value="@q.QuestionAr" />
+                        <input class="form-control form-control-sm mb-1" name="optionsCsv" value="@string.Join(" | ", opts)" placeholder="الخيارات مفصولة بـ |" />
+                        <div class="d-flex gap-2">
+                            <input class="form-control form-control-sm" type="number" name="correctIndex" value="@q.CorrectIndex" style="max-width:120px;" />
+                            <input class="form-control form-control-sm" name="explanationAr" value="@q.ExplanationAr" placeholder="شرح" />
+                            <button class="btn btn-sm btn-primary">حفظ</button>
+                        </div>
+                    </form>
+                </div>
+            </div></div>
+        }
+    }
+</div>

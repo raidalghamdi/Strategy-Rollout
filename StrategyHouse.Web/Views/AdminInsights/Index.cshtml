@@ -1,0 +1,72 @@
+@{
+    ViewData["Title"] = "تحليلات القيادة";
+    int deptCount = ViewBag.DeptCount;
+    int completedDepts = ViewBag.CompletedDepts;
+    int signedMaps = ViewBag.SignedMaps;
+    int approvedMaps = ViewBag.ApprovedMaps;
+    int totalPledges = ViewBag.TotalPledges;
+    int quizAttempts = ViewBag.QuizAttempts;
+    int surveyResponses = ViewBag.SurveyResponses;
+    var rate = ViewBag.SignatureRate as System.Collections.IEnumerable;
+    var timeline = ViewBag.Timeline as System.Collections.IEnumerable;
+    string Pct(int a, int b) => b == 0 ? "0%" : Math.Round(100.0 * a / b) + "%";
+}
+
+@section Styles {
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
+    <style>
+        .ins-card { background:#fff;border-radius:14px;box-shadow:0 4px 16px rgba(25,79,144,.08);padding:18px;text-align:center; }
+        .ins-card .num { font-size:2.2rem;font-weight:800;color:#194F90; }
+        .ins-card .lbl { color:#5a6b80;font-size:.9rem; }
+        .ins-nav a { margin-inline-start:8px; }
+    </style>
+}
+
+<div class="container py-3" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 style="color:#194F90;">تحليلات القيادة</h1>
+        <div class="ins-nav">
+            <a class="btn btn-outline-primary btn-sm" href="/Admin/Insights/Coverage">خريطة التغطية</a>
+            <a class="btn btn-outline-primary btn-sm" href="/Admin/Insights/Pledges">تحليل التعهدات</a>
+            <a class="btn btn-outline-success btn-sm" href="/Admin/Insights/Poster">بوستر A2</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/Admin">رجوع</a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3"><div class="ins-card"><div class="num">@Pct(completedDepts, deptCount)</div><div class="lbl">إدارات أكملت الرحلة</div></div></div>
+        <div class="col-6 col-md-3"><div class="ins-card"><div class="num">@signedMaps</div><div class="lbl">خرائط موقّعة</div></div></div>
+        <div class="col-6 col-md-3"><div class="ins-card"><div class="num">@approvedMaps</div><div class="lbl">خرائط معتمدة</div></div></div>
+        <div class="col-6 col-md-3"><div class="ins-card"><div class="num">@totalPledges</div><div class="lbl">إجمالي التعهدات</div></div></div>
+        <div class="col-6 col-md-3"><div class="ins-card"><div class="num">@quizAttempts</div><div class="lbl">محاولات الاختبار</div></div></div>
+        <div class="col-6 col-md-3"><div class="ins-card"><div class="num">@surveyResponses</div><div class="lbl">ردود الاستبيان</div></div></div>
+        <div class="col-6 col-md-3"><div class="ins-card"><div class="num">@deptCount</div><div class="lbl">إجمالي الإدارات</div></div></div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6"><div class="ins-card"><h5>الخط الزمني للإتمام</h5><canvas id="timelineChart" height="180"></canvas></div></div>
+        <div class="col-md-6"><div class="ins-card"><h5>معدل التوقيع لكل إدارة</h5><canvas id="rateChart" height="180"></canvas></div></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+        Chart.defaults.font.family = "'Noto Naskh Arabic','Tajawal',sans-serif";
+        const tl = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(timeline));
+        new Chart(document.getElementById('timelineChart'), {
+            type: 'line',
+            data: { labels: tl.map(x => x.date), datasets: [{ label: 'جلسات مكتملة', data: tl.map(x => x.count), borderColor: '#194F90', backgroundColor: 'rgba(70,188,205,.3)', fill: true, tension: .3 }] },
+            options: { plugins: { legend: { labels: { font: { family: "'Noto Naskh Arabic'" } } } } }
+        });
+        const rt = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(rate));
+        new Chart(document.getElementById('rateChart'), {
+            type: 'bar',
+            data: { labels: rt.map(x => x.dept), datasets: [
+                { label: 'بدأت', data: rt.map(x => x.started), backgroundColor: '#9DC41A' },
+                { label: 'موقّعة', data: rt.map(x => x.signed), backgroundColor: '#194F90' }
+            ] },
+            options: { indexAxis: 'y', scales: { x: { beginAtZero: true } } }
+        });
+    </script>
+}

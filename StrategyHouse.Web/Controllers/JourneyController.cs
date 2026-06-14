@@ -158,8 +158,21 @@ public class JourneyController : Controller
         ViewBag.Kpis = await _db.Kpis.Where(k => k.DepartmentCode == session.DeptCode).ToListAsync();
         ViewBag.Projects = await _db.Projects.Where(p => p.DepartmentCode == session.DeptCode).ToListAsync();
         ViewBag.Pledges = await _db.ContributionPledges.Where(p => p.SessionId == sessionId).ToListAsync();
-        ViewBag.Map = await _db.DepartmentStrategyMaps.FirstOrDefaultAsync(m => m.SessionId == sessionId);
+        var map = await _db.DepartmentStrategyMaps.FirstOrDefaultAsync(m => m.SessionId == sessionId);
+        ViewBag.Map = map;
+        ViewBag.InkAssets = map == null
+            ? new List<MapInkAsset>()
+            : await _db.MapInkAssets.Where(a => a.MapId == map.Id && a.IsActive).ToListAsync();
         return View(session);
+    }
+
+    // GET /Journey/Ink/{assetId} — streams a captured ink/signature PNG (for in-journey preview).
+    [HttpGet("Journey/Ink/{assetId:guid}")]
+    public async Task<IActionResult> Ink(Guid assetId)
+    {
+        var asset = await _db.MapInkAssets.FindAsync(assetId);
+        if (asset?.PngBlob == null) return NotFound();
+        return File(asset.PngBlob, "image/png");
     }
 
     // POST /Journey/SaveMap — saves layout JSON + texts.
@@ -227,9 +240,10 @@ public class JourneyController : Controller
         var pillars = await _db.Pillars.OrderBy(p => p.PlrCode).ToListAsync();
         var kpis = await _db.Kpis.Where(k => k.DepartmentCode == session.DeptCode).ToListAsync();
         var projects = await _db.Projects.Where(p => p.DepartmentCode == session.DeptCode).ToListAsync();
+        var inkAssets = await _db.MapInkAssets.Where(a => a.MapId == map.Id).ToListAsync();
         try
         {
-            map.PdfBlob = _pdf.Generate(map, dept, session.Members.ToList(), pledges, pillars, kpis, projects);
+            map.PdfBlob = _pdf.Generate(map, dept, session.Members.ToList(), pledges, pillars, kpis, projects, inkAssets);
             await _db.SaveChangesAsync();
         }
         catch
@@ -238,6 +252,90 @@ public class JourneyController : Controller
         }
 
         return RedirectToAction(nameof(Complete), new { sessionId });
+    }
+
+    // POST /Journey/SaveInk — Phase 3 handwriting capture for a map text section.
+    [HttpPost("Journey/SaveInk")]
+    [RequestSizeLimit(25_000_000)]
+    public async Task<IActionResult> SaveInk([FromBody] InkDto dto)
+    {
+        var session = await _db.StrategySessions.FindAsync(dto.SessionId);
+        if (session == null) return NotFound();
+
+        var map = await _db.DepartmentStrategyMaps.FirstOrDefaultAsync(m => m.SessionId == dto.SessionId);
+        if (map == null)
+        {
+            map = new DepartmentStrategyMap { SessionId = dto.SessionId, DeptCode = session.DeptCode };
+            _db.DepartmentStrategyMaps.Add(map);
+            await _db.SaveChangesAsync();
+        }
+        if (map.SignedAt != null) return BadRequest(new { ok = false, error = "locked" });
+
+        var kind = (dto.AssetKind ?? "").Trim().ToLowerInvariant();
+        if (kind is not ("opinion" or "wish" or "commitment"))
+            return BadRequest(new { ok = false, error = "kind" });
+
+        var png = DecodePng(dto.PngBase64);
+        if (png == null) return BadRequest(new { ok = false, error = "png" });
+
+        var asset = new MapInkAsset
+        {
+            MapId = map.Id,
+            AssetKind = kind,
+            PngBlob = png,
+            StrokesJson = dto.StrokesJson,
+            ModerationStatus = "Pending",
+        };
+        _db.MapInkAssets.Add(asset);
+        await _db.SaveChangesAsync();
+        return Json(new { ok = true, assetId = asset.Id });
+    }
+
+    // POST /Journey/SaveSignature — Phase 3 pencil signature for a session member.
+    [HttpPost("Journey/SaveSignature")]
+    [RequestSizeLimit(25_000_000)]
+    public async Task<IActionResult> SaveSignature([FromBody] SignatureDto dto)
+    {
+        var member = await _db.SessionMembers.FindAsync(dto.MemberId);
+        if (member == null) return NotFound();
+        var session = await _db.StrategySessions.FindAsync(member.SessionId);
+        if (session == null) return NotFound();
+
+        var map = await _db.DepartmentStrategyMaps.FirstOrDefaultAsync(m => m.SessionId == member.SessionId);
+        if (map == null)
+        {
+            map = new DepartmentStrategyMap { SessionId = member.SessionId, DeptCode = session.DeptCode };
+            _db.DepartmentStrategyMaps.Add(map);
+            await _db.SaveChangesAsync();
+        }
+        if (map.SignedAt != null) return BadRequest(new { ok = false, error = "locked" });
+
+        var png = DecodePng(dto.PngBase64);
+        if (png == null) return BadRequest(new { ok = false, error = "png" });
+
+        var asset = new MapInkAsset
+        {
+            MapId = map.Id,
+            AssetKind = "signature",
+            PngBlob = png,
+            StrokesJson = dto.StrokesJson,
+            AuthorName = member.NameAr,
+            MemberId = member.Id,
+            ModerationStatus = "Pending",
+        };
+        _db.MapInkAssets.Add(asset);
+        member.SignedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return Json(new { ok = true, assetId = asset.Id });
+    }
+
+    private static byte[]? DecodePng(string? dataUrl)
+    {
+        if (string.IsNullOrWhiteSpace(dataUrl)) return null;
+        var idx = dataUrl.IndexOf("base64,", StringComparison.OrdinalIgnoreCase);
+        var b64 = idx >= 0 ? dataUrl[(idx + 7)..] : dataUrl;
+        try { return Convert.FromBase64String(b64); }
+        catch { return null; }
     }
 
     // GET /Journey/Complete/{sessionId}
@@ -355,4 +453,20 @@ public class PledgeDto
     public string ElementCode { get; set; } = string.Empty;
     public string? ContributionKind { get; set; }
     public string? Notes { get; set; }
+}
+
+public class InkDto
+{
+    public Guid SessionId { get; set; }
+    public Guid MapId { get; set; }
+    public string? AssetKind { get; set; }
+    public string? PngBase64 { get; set; }
+    public string? StrokesJson { get; set; }
+}
+
+public class SignatureDto
+{
+    public Guid MemberId { get; set; }
+    public string? PngBase64 { get; set; }
+    public string? StrokesJson { get; set; }
 }

@@ -100,6 +100,7 @@ public class MapInkAsset
     [Column(TypeName = "longblob")] public byte[]? PngBlob { get; set; }
     [Column(TypeName = "longtext")] public string? StrokesJson { get; set; } // Phase 3 raw strokes
     [MaxLength(255)] public string? AuthorName { get; set; }
+    public Guid? MemberId { get; set; } // Phase 3 — links a signature asset to a SessionMember
     public DateTime CapturedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
     [MaxLength(20)] public string ModerationStatus { get; set; } = "Pending"; // Pending / Approved / Rejected / Hidden
