@@ -1,0 +1,59 @@
+@model List<StrategyHouse.Domain.Entities.DepartmentAccessCode>
+@{
+    ViewData["Title"] = "رموز الدخول";
+    var depts = ViewBag.Departments as List<StrategyHouse.Domain.Entities.Department> ?? new();
+    var deptNames = depts.ToDictionary(d => d.DeptCode, d => d.NameAr ?? d.DeptCode);
+}
+
+<h1>رموز دخول الإدارات</h1>
+
+@if (TempData["Saved"] != null) { <div class="alert alert-success">@TempData["Saved"]</div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger">@TempData["Error"]</div> }
+
+<form method="post" asp-action="Generate" class="row g-2 align-items-end mb-4" style="max-width:600px;">
+    @Html.AntiForgeryToken()
+    <div class="col-md-8">
+        <label class="form-label">الإدارة</label>
+        <select name="deptCode" class="form-select" required>
+            <option value="">— اختر الإدارة —</option>
+            @foreach (var d in depts)
+            {
+                <option value="@d.DeptCode">@d.DeptCode — @d.NameAr</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-4">
+        <button type="submit" class="btn btn-primary w-100">إنشاء رمز</button>
+    </div>
+</form>
+
+<table class="table table-striped">
+    <thead>
+        <tr><th>الرمز</th><th>الإدارة</th><th>الحالة</th><th>مرات الاستخدام</th><th>تاريخ الإنشاء</th><th></th></tr>
+    </thead>
+    <tbody>
+    @foreach (var c in Model)
+    {
+        <tr>
+            <td style="font-weight:700;letter-spacing:.2em;">@c.Code</td>
+            <td>@(deptNames.TryGetValue(c.DeptCode, out var n) ? n : c.DeptCode)</td>
+            <td>
+                @if (c.IsActive) { <span class="badge bg-success">مفعّل</span> }
+                else { <span class="badge bg-secondary">ملغى</span> }
+            </td>
+            <td>@c.UsedCount</td>
+            <td>@c.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+            <td>
+                <a class="btn btn-sm btn-outline-primary" asp-action="Sheet" asp-route-deptCode="@c.DeptCode" target="_blank">ورقة الطباعة</a>
+                @if (c.IsActive)
+                {
+                    <form method="post" asp-action="Revoke" asp-route-code="@c.Code" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <button class="btn btn-sm btn-outline-danger">إلغاء</button>
+                    </form>
+                }
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>

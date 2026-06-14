@@ -2,9 +2,19 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using StrategyHouse.Domain.Entities;
 using StrategyHouse.Infrastructure.Persistence;
+using StrategyHouse.Web.Configuration;
 using StrategyHouse.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Register the bundled Arabic font for QuestPDF (falls back gracefully if missing).
+var arabicFontPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "fonts", "NotoNaskhArabic-Regular.ttf");
+if (File.Exists(arabicFontPath))
+{
+    using var fontStream = File.OpenRead(arabicFontPath);
+    QuestPDF.Drawing.FontManager.RegisterFont(fontStream);
+}
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 // Database — SQLite (dev) / MySQL (production), provider-switchable via appsettings.
 var provider = builder.Configuration["Database:Provider"] ?? "Sqlite";
@@ -49,7 +59,11 @@ builder.Services.AddControllersWithViews()
     .AddRazorRuntimeCompilation();
 
 // App services
+builder.Services.Configure<StrategyContentOptions>(builder.Configuration.GetSection("StrategyContent"));
+builder.Services.AddSingleton<StrategyContentService>();
 builder.Services.AddScoped<QrService>();
+builder.Services.AddScoped<AccessCodeService>();
+builder.Services.AddScoped<StrategyMapPdfService>();
 
 var app = builder.Build();
 

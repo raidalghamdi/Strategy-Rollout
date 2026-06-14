@@ -1,0 +1,52 @@
+@model List<StrategyHouse.Domain.Entities.MapInkAsset>
+@{
+    ViewData["Title"] = "مراجعة المحتوى";
+    var status = ViewBag.Status as string ?? "Pending";
+    var mapDept = ViewBag.MapDept as Dictionary<Guid, string> ?? new();
+    var statuses = new[] { "Pending", "Approved", "Rejected", "Hidden" };
+}
+
+<div class="d-flex justify-content-between align-items-center">
+    <h1>مراجعة المحتوى</h1>
+    <a class="btn btn-outline-secondary" asp-action="AuditLog">سجل المراجعة</a>
+</div>
+
+<ul class="nav nav-pills my-3">
+    @foreach (var s in statuses)
+    {
+        <li class="nav-item">
+            <a class="nav-link @(s == status ? "active" : "")" asp-action="Index" asp-route-status="@s">@s</a>
+        </li>
+    }
+</ul>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">لا توجد عناصر بحالة "@status". (سيتم تعبئة هذه القائمة في المرحلة الثالثة عند تفعيل الرسم بالقلم.)</div>
+}
+else
+{
+    <form method="post" asp-action="Bulk">
+        @Html.AntiForgeryToken()
+        <div class="mb-2">
+            <button name="action" value="Approve" class="btn btn-sm btn-success">قبول المحدد</button>
+            <button name="action" value="Reject" class="btn btn-sm btn-danger">رفض المحدد</button>
+            <button name="action" value="Hide" class="btn btn-sm btn-warning">إخفاء المحدد</button>
+        </div>
+        <div class="row g-3">
+            @foreach (var a in Model)
+            {
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <input type="checkbox" name="ids" value="@a.Id" />
+                            <div><strong>@(mapDept.TryGetValue(a.MapId, out var d) ? d : "—")</strong></div>
+                            <div class="text-muted">@a.AssetKind</div>
+                            <div class="small">@a.AuthorName</div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </form>
+}

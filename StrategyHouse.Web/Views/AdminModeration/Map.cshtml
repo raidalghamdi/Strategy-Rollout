@@ -1,0 +1,40 @@
+@model StrategyHouse.Domain.Entities.DepartmentStrategyMap
+@{
+    ViewData["Title"] = "مراجعة خريطة";
+    var assets = ViewBag.Assets as List<StrategyHouse.Domain.Entities.MapInkAsset> ?? new();
+}
+
+<h1>خريطة @Model.DeptCode</h1>
+<p class="text-muted">أنشئت: @Model.CreatedAt.ToString("yyyy-MM-dd") — الحالة: @(Model.SignedAt != null ? "موقّعة" : "مسودة")</p>
+
+<div class="row">
+    <div class="col-md-4"><h5>الآراء</h5><p>@Model.OpinionsText</p></div>
+    <div class="col-md-4"><h5>الأمنيات</h5><p>@Model.WishesText</p></div>
+    <div class="col-md-4"><h5>الالتزامات</h5><p>@Model.CommitmentsText</p></div>
+</div>
+
+<h3 class="mt-4">العناصر المرفقة (@assets.Count)</h3>
+@if (!assets.Any())
+{
+    <div class="alert alert-info">لا توجد عناصر مرفقة (الرسم بالقلم في المرحلة الثالثة).</div>
+}
+else
+{
+    <table class="table">
+        <thead><tr><th>النوع</th><th>المؤلف</th><th>الحالة</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var a in assets)
+        {
+            <tr>
+                <td>@a.AssetKind</td>
+                <td>@a.AuthorName</td>
+                <td>@a.ModerationStatus</td>
+                <td>
+                    <form method="post" asp-action="Approve" asp-route-id="@a.Id" class="d-inline">@Html.AntiForgeryToken()<button class="btn btn-sm btn-success">قبول</button></form>
+                    <form method="post" asp-action="Hide" asp-route-id="@a.Id" class="d-inline">@Html.AntiForgeryToken()<button class="btn btn-sm btn-warning">إخفاء</button></form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
