@@ -1,0 +1,42 @@
+@model List<StrategyHouse.Domain.Entities.DepartmentStrategyMap>
+@{
+    ViewData["Title"] = "جدار الخرائط";
+    var names = ViewBag.DeptNames as Dictionary<string, string> ?? new();
+}
+
+<div class="d-flex justify-content-between align-items-center">
+    <h1>جدار خرائط الاستراتيجية</h1>
+    @if (Model.Any())
+    {
+        <a class="btn btn-outline-primary" asp-action="ExportAll">تصدير الكل (ZIP)</a>
+    }
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info mt-3">لا توجد خرائط موقّعة بعد. ستظهر هنا بعد أن توقّع الإدارات خرائطها.</div>
+}
+else
+{
+    <div class="row g-3 mt-2">
+        @foreach (var m in Model)
+        {
+            <div class="col-md-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title" style="color:#194F90;">@(names.TryGetValue(m.DeptCode, out var n) ? n : m.DeptCode)</h5>
+                        <p class="text-muted small">وُقّعت: @m.SignedAt?.ToString("yyyy-MM-dd")</p>
+                        @if (m.PdfBlob != null)
+                        {
+                            <a class="btn btn-sm btn-primary" asp-action="Pdf" asp-route-mapId="@m.Id" target="_blank">عرض PDF</a>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">لا يوجد PDF</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}

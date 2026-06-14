@@ -1,0 +1,38 @@
+@{
+    Layout = null;
+    var dept = ViewBag.Dept as StrategyHouse.Domain.Entities.Department;
+    var code = ViewBag.Code as string;
+    var qr = ViewBag.Qr as string;
+    var url = ViewBag.Url as string;
+}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <title>ورقة دخول — @dept?.NameAr</title>
+    <style>
+        @@page { size: A4; margin: 0; }
+        body { font-family: 'Tajawal','Segoe UI',sans-serif; margin: 0; }
+        .sheet { width: 210mm; height: 297mm; box-sizing: border-box; padding: 30mm 20mm;
+                 display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .gac { font-size: 48px; font-weight: 900; color: #194F90; letter-spacing: 2px; }
+        .dept { font-size: 40px; font-weight: 800; color: #194F90; margin: 24px 0; }
+        .label { font-size: 22px; color: #46BCCD; margin-top: 30px; }
+        .code { font-size: 92px; font-weight: 900; letter-spacing: .2em; color: #009845; margin: 10px 0 30px; }
+        .qr img { width: 220px; height: 220px; }
+        .url { font-size: 14px; color: #777; margin-top: 12px; direction: ltr; }
+        @@media print { .noprint { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="sheet">
+        <div class="gac">GAC — الهيئة العامة للمنافسة</div>
+        <div class="dept">@dept?.NameAr</div>
+        <div class="label">رمز الدخول إلى رحلة الاستراتيجية</div>
+        <div class="code">@code</div>
+        <div class="qr"><img src="@qr" alt="QR" /></div>
+        <div class="url">@url</div>
+        <button class="noprint" style="margin-top:30px;padding:10px 30px;" onclick="window.print()">طباعة</button>
+    </div>
+</body>
+</html>

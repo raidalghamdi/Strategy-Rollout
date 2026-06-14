@@ -1,0 +1,105 @@
+@model StrategyHouse.Domain.Entities.StrategySession
+@{
+    Layout = "_JourneyLayout";
+    ViewData["Title"] = "خريطة الاستراتيجية";
+    var dept = ViewBag.Dept as StrategyHouse.Domain.Entities.Department;
+    var kpis = ViewBag.Kpis as List<StrategyHouse.Domain.Entities.Kpi> ?? new();
+    var projects = ViewBag.Projects as List<StrategyHouse.Domain.Entities.Project> ?? new();
+    var pledges = ViewBag.Pledges as List<StrategyHouse.Domain.Entities.ContributionPledge> ?? new();
+    var map = ViewBag.Map as StrategyHouse.Domain.Entities.DepartmentStrategyMap;
+    var locked = map?.SignedAt != null;
+}
+
+<div class="gac-step">
+    <div class="pip done">الفريق</div>
+    <div class="pip done">الصورة الكبرى</div>
+    <div class="pip done">بيت الاستراتيجية</div>
+    <div class="pip done">المساهمة</div>
+    <div class="pip active">الخريطة</div>
+    <div class="pip">التوقيع</div>
+</div>
+
+@if (TempData["Saved"] != null) { <div class="alert alert-success">@TempData["Saved"]</div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger">@TempData["Error"]</div> }
+
+<div class="gac-card mb-3">
+    <h2>خريطة الاستراتيجية الإدارية — @dept?.NameAr</h2>
+    <p class="text-muted">معاينة عناصر إدارتك. (مرحلة لاحقة: الرسم بالقلم)</p>
+    <div id="mapCanvas" style="border:1px dashed #46BCCD;border-radius:10px;background:#fff;"></div>
+</div>
+
+<form method="post" asp-action="SaveMap" asp-route-sessionId="@Model.Id" class="gac-card mb-3">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="mapLayoutJson" value="@(map?.MapLayoutJson)" />
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label fw-bold" style="color:#194F90;">الآراء</label>
+            <textarea name="opinions" class="form-control" rows="5" @(locked ? "disabled" : "")>@(map?.OpinionsText)</textarea>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label fw-bold" style="color:#009845;">الأمنيات</label>
+            <textarea name="wishes" class="form-control" rows="5" @(locked ? "disabled" : "")>@(map?.WishesText)</textarea>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label fw-bold" style="color:#D79A2B;">الالتزامات</label>
+            <textarea name="commitments" class="form-control" rows="5" @(locked ? "disabled" : "")>@(map?.CommitmentsText)</textarea>
+        </div>
+    </div>
+    @if (!locked)
+    {
+        <button type="submit" class="btn btn-outline-primary mt-3">حفظ الخريطة</button>
+    }
+</form>
+
+<div class="gac-card">
+    <h3>توقيع أعضاء الفريق</h3>
+    @if (locked)
+    {
+        <div class="alert alert-success">تم توقيع الخريطة وقفلها. <a asp-action="Complete" asp-route-sessionId="@Model.Id">عرض شاشة الإتمام</a></div>
+    }
+    else
+    {
+        <form method="post" asp-action="SignMap" asp-route-sessionId="@Model.Id">
+            @Html.AntiForgeryToken()
+            @foreach (var m in Model.Members)
+            {
+                <div class="row g-2 mb-2 align-items-center">
+                    <div class="col-md-4"><strong>@m.NameAr</strong> <span class="text-muted">@m.Role</span></div>
+                    <div class="col-md-8">
+                        <input type="hidden" name="memberIds" value="@m.Id" />
+                        <input name="signatures" class="form-control" placeholder="التوقيع (اكتب اسمك)" />
+                    </div>
+                </div>
+            }
+            <button type="submit" class="btn gac-btn-primary text-white mt-2">توقيع وقفل الخريطة</button>
+        </form>
+    }
+</div>
+
+@section Scripts {
+<script>
+const kpis = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(kpis.Select(k => k.KpiName ?? k.KpiCode)));
+const projects = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(projects.Select(p => p.ProjectName ?? p.ProjectCode)));
+const pledges = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(pledges.Select(p => p.ElementCode + " — " + p.ContributionKind)));
+
+const cont = document.getElementById('mapCanvas');
+const width = cont.clientWidth || 900;
+const height = 360;
+const stage = new Konva.Stage({ container: 'mapCanvas', width, height });
+const layer = new Konva.Layer();
+stage.add(layer);
+
+function column(title, items, x, color) {
+    layer.add(new Konva.Text({ x, y: 10, text: title, fontSize: 16, fontStyle: 'bold', fill: color, width: width/3 - 20, align: 'right' }));
+    items.slice(0, 8).forEach((t, i) => {
+        const y = 40 + i * 38;
+        layer.add(new Konva.Rect({ x, y, width: width/3 - 20, height: 32, fill: '#FAFBFC', stroke: color, cornerRadius: 6, draggable: true }));
+        layer.add(new Konva.Text({ x: x + 6, y: y + 8, text: t, fontSize: 12, fill: '#1d2733', width: width/3 - 32, align: 'right' }));
+    });
+}
+column('مؤشرات', kpis, 10, '#194F90');
+column('مشاريع', projects, width/3 + 5, '#009845');
+column('تعهدات', pledges, 2*width/3, '#D79A2B');
+layer.draw();
+</script>
+}

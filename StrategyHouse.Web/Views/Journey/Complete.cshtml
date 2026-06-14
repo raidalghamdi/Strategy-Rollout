@@ -1,0 +1,57 @@
+@model StrategyHouse.Domain.Entities.StrategySession
+@{
+    Layout = "_JourneyLayout";
+    ViewData["Title"] = "تهانينا";
+    var dept = ViewBag.Dept as StrategyHouse.Domain.Entities.Department;
+    var map = ViewBag.Map as StrategyHouse.Domain.Entities.DepartmentStrategyMap;
+    var hasPdf = map?.PdfBlob != null;
+}
+
+<div class="gac-step">
+    <div class="pip done">الفريق</div>
+    <div class="pip done">الصورة الكبرى</div>
+    <div class="pip done">بيت الاستراتيجية</div>
+    <div class="pip done">المساهمة</div>
+    <div class="pip done">الخريطة</div>
+    <div class="pip done">التوقيع</div>
+</div>
+
+<div class="gac-card text-center">
+    <div style="font-size:3rem;">🎉</div>
+    <h1>تهانينا، @dept?.NameAr!</h1>
+    <p class="lead text-muted">لقد أتممت رحلة الاستراتيجية الإدارية ووقّعت خريطتكم.</p>
+
+    @if (hasPdf)
+    {
+        <a class="btn btn-lg gac-btn-primary text-white mt-2" asp-action="Pdf" asp-route-sessionId="@Model.Id">تحميل خريطة الاستراتيجية (PDF)</a>
+    }
+    else
+    {
+        <p class="text-muted">سيتم تجهيز ملف الـ PDF قريباً.</p>
+    }
+
+    <div class="mt-4">
+        <span class="badge bg-secondary">قريباً: الاختبار التفاعلي (المرحلة الرابعة)</span>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+// Lightweight confetti burst.
+(function () {
+    const c = document.createElement('canvas');
+    c.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:999';
+    document.body.appendChild(c);
+    c.width = innerWidth; c.height = innerHeight;
+    const ctx = c.getContext('2d');
+    const colors = ['#194F90','#46BCCD','#009845','#D79A2B','#9DC41A'];
+    const parts = Array.from({length:120}, () => ({ x: Math.random()*c.width, y: -20-Math.random()*c.height, r: 4+Math.random()*6, c: colors[Math.floor(Math.random()*colors.length)], v: 2+Math.random()*3 }));
+    let frames = 0;
+    (function loop() {
+        ctx.clearRect(0,0,c.width,c.height);
+        parts.forEach(p => { p.y += p.v; ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, p.r, p.r); });
+        if (frames++ < 200) requestAnimationFrame(loop); else c.remove();
+    })();
+})();
+</script>
+}

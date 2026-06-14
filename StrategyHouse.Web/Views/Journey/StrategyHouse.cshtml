@@ -1,0 +1,78 @@
+@model StrategyHouse.Domain.Entities.StrategySession
+@{
+    Layout = "_JourneyLayout";
+    ViewData["Title"] = "بيت الاستراتيجية";
+    var dept = ViewBag.Dept as StrategyHouse.Domain.Entities.Department;
+    var content = ViewBag.Content as StrategyHouse.Web.Services.StrategyContentService;
+    var pillars = ViewBag.Pillars as List<StrategyHouse.Domain.Entities.Pillar> ?? new();
+    var objectives = ViewBag.Objectives as List<StrategyHouse.Domain.Entities.Objective> ?? new();
+    var deptObjCodes = ViewBag.DeptObjectiveCodes as List<string?> ?? new();
+}
+
+<div class="gac-step">
+    <div class="pip done">الفريق</div>
+    <div class="pip done">الصورة الكبرى</div>
+    <div class="pip active">بيت الاستراتيجية</div>
+    <div class="pip">المساهمة</div>
+    <div class="pip">الخريطة</div>
+    <div class="pip">التوقيع</div>
+</div>
+
+<div class="gac-card">
+    <h2>بيت الاستراتيجية — @dept?.NameAr</h2>
+    <p class="text-muted">العناصر المرتبطة بإدارتك مميزة باللون الأزرق. اضغط على أي عنصر لعرض التفاصيل.</p>
+
+    <div class="gac-vision text-center mb-2">
+        <div class="label">الرؤية</div>
+        <div>@content?.Vision.Ar</div>
+    </div>
+    <div class="text-center p-2 mb-2" style="background:#46BCCD;border-radius:10px;">
+        <strong>الرسالة:</strong> @content?.Mission.Ar
+    </div>
+
+    <div class="row g-2 mb-2">
+        @foreach (var p in pillars)
+        {
+            <div class="col">
+                <div class="p-2 text-white text-center" style="background:#009845;border-radius:10px;height:100%;">@p.PillarName</div>
+            </div>
+        }
+    </div>
+
+    <div class="row g-2">
+        @foreach (var o in objectives)
+        {
+            var mine = deptObjCodes.Contains(o.ObjectiveCode);
+            var bg = mine ? "#194F90" : "#e7edf5";
+            var fg = mine ? "#fff" : "#9aa7b8";
+            <div class="col-md-3">
+                <div class="p-2 text-center house-obj" style="background:@bg;color:@fg;border-radius:8px;cursor:pointer;font-size:.85rem;"
+                     data-name="@o.ObjectiveName" data-mine="@mine.ToString().ToLower()">
+                    @o.ObjectiveName
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="row g-2 mt-3 text-center">
+        @foreach (var v in content?.Values ?? new List<StrategyHouse.Web.Configuration.LocalizedText>())
+        {
+            <div class="col"><span class="badge" style="background:#D79A2B;">@v.Ar</span></div>
+        }
+    </div>
+</div>
+
+<div class="text-end mt-3">
+    <a class="btn gac-btn-primary text-white" asp-action="Contribute" asp-route-sessionId="@Model.Id">متابعة إلى المساهمة</a>
+</div>
+
+@section Scripts {
+<script>
+document.querySelectorAll('.house-obj').forEach(el => {
+    el.addEventListener('click', () => {
+        const mine = el.dataset.mine === 'true';
+        alert(el.dataset.name + (mine ? '\n(من مسؤوليات إدارتك)' : ''));
+    });
+});
+</script>
+}

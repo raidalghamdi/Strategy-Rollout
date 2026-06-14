@@ -1,0 +1,39 @@
+@model List<StrategyHouse.Domain.Entities.ModerationAuditLog>
+@{
+    ViewData["Title"] = "سجل المراجعة";
+    var page = (int)(ViewBag.Page ?? 1);
+    var totalPages = (int)(ViewBag.TotalPages ?? 1);
+}
+
+<h1>سجل المراجعة</h1>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">لا توجد سجلات بعد.</div>
+}
+else
+{
+    <table class="table table-sm">
+        <thead><tr><th>التاريخ</th><th>الإجراء</th><th>النوع</th><th>المُنفّذ</th><th>ملاحظة</th></tr></thead>
+        <tbody>
+        @foreach (var l in Model)
+        {
+            <tr>
+                <td>@l.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                <td>@l.Action</td>
+                <td>@l.TargetType</td>
+                <td>@l.ActorUserId</td>
+                <td>@l.Note</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    <nav>
+        <ul class="pagination">
+            @for (var p = 1; p <= totalPages; p++)
+            {
+                <li class="page-item @(p == page ? "active" : "")"><a class="page-link" asp-action="AuditLog" asp-route-page="@p">@p</a></li>
+            }
+        </ul>
+    </nav>
+}

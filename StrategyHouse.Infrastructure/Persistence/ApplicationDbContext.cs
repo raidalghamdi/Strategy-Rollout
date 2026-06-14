@@ -17,6 +17,15 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<Department> Departments => Set<Department>();
 
+    // Phase 1 — Department Strategy Journey
+    public DbSet<DepartmentAccessCode> DepartmentAccessCodes => Set<DepartmentAccessCode>();
+    public DbSet<StrategySession> StrategySessions => Set<StrategySession>();
+    public DbSet<SessionMember> SessionMembers => Set<SessionMember>();
+    public DbSet<ContributionPledge> ContributionPledges => Set<ContributionPledge>();
+    public DbSet<DepartmentStrategyMap> DepartmentStrategyMaps => Set<DepartmentStrategyMap>();
+    public DbSet<MapInkAsset> MapInkAssets => Set<MapInkAsset>();
+    public DbSet<ModerationAuditLog> ModerationAuditLogs => Set<ModerationAuditLog>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -45,6 +54,31 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
             .HasOne(p => p.Initiative)
             .WithMany(i => i.Projects)
             .HasForeignKey(p => p.InitiativeCode)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Phase 1 journey FKs — no cascade deletes, keep all history.
+        b.Entity<SessionMember>()
+            .HasOne(m => m.Session)
+            .WithMany(s => s.Members)
+            .HasForeignKey(m => m.SessionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        b.Entity<ContributionPledge>()
+            .HasOne(p => p.Session)
+            .WithMany()
+            .HasForeignKey(p => p.SessionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        b.Entity<DepartmentStrategyMap>()
+            .HasOne(m => m.Session)
+            .WithMany()
+            .HasForeignKey(m => m.SessionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        b.Entity<MapInkAsset>()
+            .HasOne(a => a.Map)
+            .WithMany()
+            .HasForeignKey(a => a.MapId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

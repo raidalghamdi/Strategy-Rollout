@@ -21,6 +21,27 @@ public static class SeedData
         await db.Database.MigrateAsync();
         await SeedRolesAndAdminAsync(userManager, roleManager);
         await SeedStrategyDataAsync(db);
+        await SeedSampleAccessCodesAsync(db);
+    }
+
+    // Seeds three deterministic sample access codes (one per demo department)
+    // so the journey flow is testable on a fresh install. Idempotent per code.
+    private static async Task SeedSampleAccessCodesAsync(ApplicationDbContext db)
+    {
+        var samples = new (string Code, string Dept)[]
+        {
+            ("GAC202", "DEPT-02"),
+            ("GAC206", "DEPT-06"),
+            ("GAC208", "DEPT-08"),
+        };
+        var added = false;
+        foreach (var (code, dept) in samples)
+        {
+            if (await db.DepartmentAccessCodes.AnyAsync(c => c.Code == code)) continue;
+            db.DepartmentAccessCodes.Add(new DepartmentAccessCode { Code = code, DeptCode = dept, IsActive = true });
+            added = true;
+        }
+        if (added) await db.SaveChangesAsync();
     }
 
     private static async Task SeedRolesAndAdminAsync(

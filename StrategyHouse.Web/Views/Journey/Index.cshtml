@@ -1,0 +1,40 @@
+@{
+    Layout = "_JourneyLayout";
+    ViewData["Title"] = "ابدأ رحلة إدارتك";
+    var code = ViewBag.Code as string;
+    var content = ViewBag.Content as StrategyHouse.Web.Services.StrategyContentService;
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="text-center mb-4">
+            <div style="font-size:3rem;font-weight:900;color:var(--gac-primary);">GAC</div>
+            <h1 class="mt-2">رحلة الاستراتيجية الإدارية</h1>
+            <p class="text-muted">اكتشف كيف يرتبط عمل إدارتك برؤية الهيئة العامة للمنافسة</p>
+        </div>
+
+        @if (content != null)
+        {
+            <div class="gac-vision mb-4 text-center">
+                <div class="label">الرؤية</div>
+                <div style="font-size:1.15rem;">@content.Vision.Ar</div>
+            </div>
+        }
+
+        @if (TempData["Error"] != null)
+        {
+            <div class="alert alert-danger">@TempData["Error"]</div>
+        }
+
+        <div class="gac-card">
+            <form method="post" asp-action="Start">
+                @Html.AntiForgeryToken()
+                <label class="form-label fw-bold">أدخل رمز الدخول الخاص بإدارتك</label>
+                <input name="code" value="@code" class="form-control form-control-lg text-center"
+                       style="letter-spacing:.4em;font-weight:700;text-transform:uppercase;" maxlength="6"
+                       placeholder="XXXXXX" autocomplete="off" required />
+                <button type="submit" class="btn btn-lg gac-btn-primary text-white w-100 mt-3">ابدأ رحلة إدارتك</button>
+            </form>
+        </div>
+    </div>
+</div>
