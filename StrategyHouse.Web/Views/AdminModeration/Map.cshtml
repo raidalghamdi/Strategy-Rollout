@@ -20,7 +20,8 @@
 }
 else
 {
-    <table class="table">
+    <div class="table-responsive">
+<table class="table">
         <thead><tr><th>النوع</th><th>المؤلف</th><th>الحالة</th><th></th></tr></thead>
         <tbody>
         @foreach (var a in assets)
@@ -37,4 +38,5 @@ else
         }
         </tbody>
     </table>
+</div>
 }

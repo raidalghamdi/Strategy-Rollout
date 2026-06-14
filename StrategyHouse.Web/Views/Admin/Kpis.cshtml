@@ -1,6 +1,7 @@
 @model List<StrategyHouse.Domain.Entities.Kpi>
 @{ ViewData["Title"] = "مؤشرات الأداء"; }
 <h1>مؤشرات الأداء (@Model.Count)</h1>
+<div class="table-responsive">
 <table class="table">
     <thead>
         <tr><th>الرمز</th><th>الاسم</th><th>النوع</th><th>الهدف</th><th>الإدارة</th><th>الوحدة</th><th>الحالة</th></tr>
@@ -20,3 +21,4 @@
     }
     </tbody>
 </table>
+</div>

@@ -91,9 +91,14 @@ using (var scope = app.Services.CreateScope())
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<int>>>();
     await SeedData.RunAsync(db, userManager, roleManager);
 
-    // Phase 4 — quiz bank + programme survey (after strategy seed).
+    // Phase 4 — programme survey (quiz auto-seed removed in Phase 5; admin-controlled).
     var quiz = scope.ServiceProvider.GetRequiredService<QuizGeneratorService>();
     await AssessmentSeeder.RunAsync(db, quiz);
+
+    // Phase 5 — one-time signature backfill: flip pending signature ink to Approved
+    // and regenerate signed-map PDFs so existing maps show their signatures.
+    var pdf = scope.ServiceProvider.GetRequiredService<StrategyMapPdfService>();
+    await SignatureBackfill.RunAsync(db, pdf);
 }
 
 if (!app.Environment.IsDevelopment())

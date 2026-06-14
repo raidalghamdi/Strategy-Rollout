@@ -1,0 +1,56 @@
+@model StrategyHouse.Web.Controllers.JourneyRunViewModel
+@{
+    var objectives = Model.Objectives;
+    var initiatives = Model.Initiatives;
+    var pledges = Model.Pledges;
+}
+<div class="gac-card">
+    <h2 class="h4 h-md-2">أين ترغب إدارتك بالمساهمة؟</h2>
+    <p class="text-muted">اسحب العناصر التي ترغب إدارتك بدعمها إلى قائمة المساهمات.</p>
+    <div class="row g-3">
+        <div class="col-12 col-md-6">
+            <h5 class="h6">العناصر المتاحة</h5>
+            <ul id="available" class="list-group" style="min-height:240px;">
+                @foreach (var o in objectives)
+                {
+                    <li class="list-group-item" data-type="OBJ" data-code="@o.ObjectiveCode">@o.ObjectiveName</li>
+                }
+                @foreach (var i in initiatives)
+                {
+                    <li class="list-group-item" data-type="INIT" data-code="@i.InitiativeCode">@i.InitiativeName</li>
+                }
+            </ul>
+        </div>
+        <div class="col-12 col-md-6">
+            <h5 class="h6">أرغب بالمساهمة</h5>
+            <ul id="chosen" class="list-group" style="min-height:240px;background:#eaf4ec;border-radius:8px;">
+                @foreach (var p in pledges)
+                {
+                    <li class="list-group-item" data-type="@p.ElementType" data-code="@p.ElementCode" data-saved="1">@p.ElementCode — @p.ContributionKind</li>
+                }
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const sessionId = '@Model.Session.Id';
+    const kinds = ['تنفيذ مباشر','دعم فني','موارد بشرية','بيانات','استشاري'];
+    new Sortable(document.getElementById('available'), { group: 'pledges', animation: 150 });
+    new Sortable(document.getElementById('chosen'), {
+        group: 'pledges', animation: 150,
+        onAdd: function (evt) {
+            const el = evt.item;
+            if (el.dataset.saved) return;
+            const kind = prompt('نوع المساهمة:\n' + kinds.join(' / '), kinds[0]) || kinds[0];
+            el.textContent = el.dataset.code + ' — ' + kind;
+            el.dataset.saved = '1';
+            fetch('@Url.Action("SavePledge")', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId, elementType: el.dataset.type, elementCode: el.dataset.code, contributionKind: kind })
+            });
+        }
+    });
+})();
+</script>

@@ -43,7 +43,7 @@
 
     <div class="card mb-3"><div class="card-body">
         <h5>أكثر 10 عناصر تعهداً</h5>
-        <canvas id="topChart" height="120"></canvas>
+        <div class="chart-box"><canvas id="topChart"></canvas></div>
     </div></div>
 
     <div class="card"><div class="card-body">
@@ -78,7 +78,7 @@
         new Chart(document.getElementById('topChart'), {
             type: 'bar',
             data: { labels: top.map(x => x.Label), datasets: [{ label: 'عدد التعهدات', data: top.map(x => x.Count), backgroundColor: '#46BCCD' }] },
-            options: { indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
         });
         document.getElementById('filter').addEventListener('input', function () {
             const q = this.value.trim();

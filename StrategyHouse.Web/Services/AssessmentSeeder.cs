@@ -13,9 +13,10 @@ public static class AssessmentSeeder
 {
     private const string ProgrammeSurveyTitle = "تقييم برنامج الاستراتيجية 2025-2030";
 
+    // Phase 5: quiz auto-seed removed — production starts with 0 questions until an
+    // admin clicks "Regenerate" or adds questions manually. Survey seed remains.
     public static async Task RunAsync(ApplicationDbContext db, QuizGeneratorService quiz)
     {
-        await quiz.GenerateAllAsync();
         await SeedProgrammeSurveyAsync(db);
     }
 

@@ -1,6 +1,7 @@
 @model List<StrategyHouse.Domain.Entities.Pillar>
 @{ ViewData["Title"] = "الركائز"; }
 <h1>الركائز (@Model.Count)</h1>
+<div class="table-responsive">
 <table class="table">
     <thead>
         <tr><th>الرمز</th><th>الاسم</th><th>الميزانية</th><th>السيولة</th><th>الفترة</th></tr>
@@ -18,3 +19,4 @@
     }
     </tbody>
 </table>
+</div>

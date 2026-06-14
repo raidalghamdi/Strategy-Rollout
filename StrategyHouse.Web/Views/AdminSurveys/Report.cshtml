@@ -29,7 +29,8 @@
     @if (Model.ByDept.Any())
     {
         <h4 style="color:#194F90;">التوزيع حسب الإدارة</h4>
-        <table class="table table-sm w-auto">
+        <div class="table-responsive">
+<table class="table table-sm w-auto">
             <thead><tr><th>الإدارة</th><th>عدد الردود</th></tr></thead>
             <tbody>
                 @foreach (var (dept, cnt) in Model.ByDept)
@@ -38,6 +39,7 @@
                 }
             </tbody>
         </table>
+</div>
     }
 
     @foreach (var q in Model.Questions)
