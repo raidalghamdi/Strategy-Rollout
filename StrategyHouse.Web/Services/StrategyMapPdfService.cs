@@ -29,10 +29,24 @@ public class StrategyMapPdfService
         IReadOnlyList<ContributionPledge> pledges,
         IReadOnlyList<Pillar> pillars,
         IReadOnlyList<Kpi> kpis,
-        IReadOnlyList<Project> projects)
+        IReadOnlyList<Project> projects,
+        IReadOnlyList<MapInkAsset>? inkAssets = null)
     {
         var deptName = department.NameAr ?? department.DeptCode;
         var date = (map.SignedAt ?? map.CreatedAt).ToString("yyyy-MM-dd");
+
+        inkAssets ??= new List<MapInkAsset>();
+        // Approved & active ink per section kind, and per signing member.
+        List<MapInkAsset> SectionInk(string kind) => inkAssets
+            .Where(a => a.AssetKind == kind && a.ModerationStatus == "Approved" && a.IsActive && a.PngBlob != null)
+            .ToList();
+        bool HasPendingInk(string kind) => inkAssets
+            .Any(a => a.AssetKind == kind && a.ModerationStatus == "Pending");
+        var sigByMember = inkAssets
+            .Where(a => a.AssetKind == "signature" && a.MemberId != null
+                        && a.ModerationStatus == "Approved" && a.IsActive && a.PngBlob != null)
+            .GroupBy(a => a.MemberId!.Value)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.CapturedAt).First().PngBlob!);
 
         var doc = Document.Create(container =>
         {
@@ -114,24 +128,25 @@ public class StrategyMapPdfService
                             c.Item().Text($"• [{pl.ElementType}] {pl.ElementCode} — {pl.ContributionKind}").FontSize(9);
                     });
 
-                    // Three text sections
+                    // Three text sections — typed text on top, approved ink underneath.
                     col.Item().Row(row =>
                     {
-                        row.RelativeItem().Padding(3).Border(1).BorderColor(Cyan).Padding(6).Column(c =>
+                        void Section(string title, string color, string? text, string kind)
                         {
-                            c.Item().Text("الآراء").Bold().FontColor(Primary);
-                            c.Item().Text(map.OpinionsText ?? "—").FontSize(9);
-                        });
-                        row.RelativeItem().Padding(3).Border(1).BorderColor(Green).Padding(6).Column(c =>
-                        {
-                            c.Item().Text("الأمنيات").Bold().FontColor(Green);
-                            c.Item().Text(map.WishesText ?? "—").FontSize(9);
-                        });
-                        row.RelativeItem().Padding(3).Border(1).BorderColor(Gold).Padding(6).Column(c =>
-                        {
-                            c.Item().Text("الالتزامات").Bold().FontColor(Gold);
-                            c.Item().Text(map.CommitmentsText ?? "—").FontSize(9);
-                        });
+                            row.RelativeItem().Padding(3).Border(1).BorderColor(color).Padding(6).Column(c =>
+                            {
+                                c.Item().Text(title).Bold().FontColor(color);
+                                c.Item().Text(text ?? "—").FontSize(9);
+                                foreach (var a in SectionInk(kind))
+                                    c.Item().PaddingTop(4).Height(90).Image(a.PngBlob!).FitArea();
+                                if (HasPendingInk(kind))
+                                    c.Item().PaddingTop(4).Background("#FFF6E5").Padding(4)
+                                        .Text("في انتظار الاعتماد").FontSize(8).FontColor(Gold);
+                            });
+                        }
+                        Section("الآراء", Primary, map.OpinionsText, "opinion");
+                        Section("الأمنيات", Green, map.WishesText, "wish");
+                        Section("الالتزامات", Gold, map.CommitmentsText, "commitment");
                     });
 
                     // Signatures
@@ -144,7 +159,10 @@ public class StrategyMapPdfService
                             {
                                 row.RelativeItem().Padding(3).Column(mc =>
                                 {
-                                    mc.Item().Text(m.TypedSignature ?? m.NameAr).FontSize(12).Italic();
+                                    if (sigByMember.TryGetValue(m.Id, out var sigPng))
+                                        mc.Item().Height(40).AlignRight().Image(sigPng).FitArea();
+                                    else
+                                        mc.Item().Text(m.TypedSignature ?? m.NameAr).FontSize(12).Italic();
                                     mc.Item().LineHorizontal(1).LineColor(Colors.Grey.Medium);
                                     mc.Item().Text($"{m.NameAr} — {m.Role}").FontSize(8).FontColor(Colors.Grey.Darken1);
                                 });

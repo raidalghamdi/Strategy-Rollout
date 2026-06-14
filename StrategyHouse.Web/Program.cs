@@ -58,12 +58,28 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddControllersWithViews()
     .AddRazorRuntimeCompilation();
 
+// Larger request bodies for base64 PNG ink/signature uploads (Phase 3).
+builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(o =>
+    o.Limits.MaxRequestBodySize = 25_000_000);
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
+{
+    o.MultipartBodyLengthLimit = 25_000_000;
+    o.ValueLengthLimit = 25_000_000;
+});
+
 // App services
 builder.Services.Configure<StrategyContentOptions>(builder.Configuration.GetSection("StrategyContent"));
 builder.Services.AddSingleton<StrategyContentService>();
 builder.Services.AddScoped<QrService>();
 builder.Services.AddScoped<AccessCodeService>();
 builder.Services.AddScoped<StrategyMapPdfService>();
+// Phase 2 — leadership analytics
+builder.Services.AddScoped<CoverageService>();
+builder.Services.AddScoped<PledgeAggregateService>();
+builder.Services.AddScoped<ProgrammePosterPdfService>();
+// Phase 4 — assessment
+builder.Services.AddScoped<QuizGeneratorService>();
+builder.Services.AddScoped<SurveyReportPdfService>();
 
 var app = builder.Build();
 
@@ -74,6 +90,10 @@ using (var scope = app.Services.CreateScope())
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<int>>>();
     await SeedData.RunAsync(db, userManager, roleManager);
+
+    // Phase 4 — quiz bank + programme survey (after strategy seed).
+    var quiz = scope.ServiceProvider.GetRequiredService<QuizGeneratorService>();
+    await AssessmentSeeder.RunAsync(db, quiz);
 }
 
 if (!app.Environment.IsDevelopment())

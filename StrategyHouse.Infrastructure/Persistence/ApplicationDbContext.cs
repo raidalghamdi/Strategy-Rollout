@@ -26,6 +26,13 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
     public DbSet<MapInkAsset> MapInkAssets => Set<MapInkAsset>();
     public DbSet<ModerationAuditLog> ModerationAuditLogs => Set<ModerationAuditLog>();
 
+    // Phase 4 — Assessment (quiz bank + surveys)
+    public DbSet<QuizQuestion> QuizQuestions => Set<QuizQuestion>();
+    public DbSet<QuizAttempt> QuizAttempts => Set<QuizAttempt>();
+    public DbSet<Survey> Surveys => Set<Survey>();
+    public DbSet<SurveyQuestion> SurveyQuestions => Set<SurveyQuestion>();
+    public DbSet<SurveyResponse> SurveyResponses => Set<SurveyResponse>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -80,5 +87,24 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
             .WithMany()
             .HasForeignKey(a => a.MapId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Phase 3 — index ink assets by the member who authored a signature.
+        b.Entity<MapInkAsset>().HasIndex(a => a.MemberId);
+
+        // Phase 4 — Assessment FKs. No cascade deletes; preserve all responses.
+        b.Entity<SurveyQuestion>()
+            .HasOne(q => q.Survey)
+            .WithMany(s => s.Questions)
+            .HasForeignKey(q => q.SurveyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        b.Entity<SurveyResponse>()
+            .HasOne(r => r.Survey)
+            .WithMany()
+            .HasForeignKey(r => r.SurveyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        b.Entity<Survey>().HasIndex(s => s.PublicToken).IsUnique();
+        b.Entity<QuizQuestion>().HasIndex(q => new { q.Scope, q.IsApproved, q.IsActive });
     }
 }

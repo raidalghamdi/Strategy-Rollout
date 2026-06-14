@@ -1,0 +1,92 @@
+@model StrategyHouse.Domain.Entities.Survey
+@{
+    Layout = "_JourneyLayout";
+    ViewData["Title"] = Model.TitleAr;
+    var depts = ViewBag.Departments as List<StrategyHouse.Domain.Entities.Department> ?? new();
+}
+
+<div class="gac-card" style="max-width:640px;margin:0 auto;">
+    <h1>@Model.TitleAr</h1>
+    @if (!string.IsNullOrEmpty(Model.DescriptionAr))
+    {
+        <p class="text-muted">@Model.DescriptionAr</p>
+    }
+
+    <form method="post" asp-action="Submit" asp-route-token="@Model.PublicToken">
+        @Html.AntiForgeryToken()
+
+        <div class="row g-2 mb-4">
+            <div class="col-md-4">
+                <label class="form-label">الاسم (اختياري)</label>
+                <input name="Name" class="form-control" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">الدور (اختياري)</label>
+                <input name="Role" class="form-control" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">الإدارة (اختياري)</label>
+                <select name="DeptCode" class="form-select">
+                    <option value="">— غير محدد —</option>
+                    @foreach (var d in depts)
+                    {
+                        <option value="@d.DeptCode">@d.NameAr</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        @foreach (var q in Model.Questions)
+        {
+            var name = $"Answers[{q.Id}]";
+            <div class="mb-4 p-3 border rounded">
+                <label class="form-label fw-bold d-block">@q.QuestionAr @(q.IsRequired ? Html.Raw("<span class='text-danger'>*</span>") : null)</label>
+
+                @switch (q.Type)
+                {
+                    case "Likert5":
+                        <div class="d-flex gap-2 flex-wrap">
+                            @for (int i = 1; i <= 5; i++)
+                            {
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="@name" id="@(q.Id)_@i" value="@i" @(q.IsRequired ? "required" : "") />
+                                    <label class="form-check-label" for="@(q.Id)_@i">@i</label>
+                                </div>
+                            }
+                            <span class="small text-muted ms-2">(1 = غير موافق بشدة · 5 = موافق بشدة)</span>
+                        </div>
+                        break;
+                    case "YesNo":
+                        <div class="d-flex gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="@name" id="@(q.Id)_y" value="yes" @(q.IsRequired ? "required" : "") />
+                                <label class="form-check-label" for="@(q.Id)_y">نعم</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="@name" id="@(q.Id)_n" value="no" />
+                                <label class="form-check-label" for="@(q.Id)_n">لا</label>
+                            </div>
+                        </div>
+                        break;
+                    case "MCQ":
+                        var opts = System.Text.Json.JsonSerializer.Deserialize<List<string>>(q.OptionsJson ?? "[]") ?? new();
+                        @foreach (var (opt, idx) in opts.Select((o, idx) => (o, idx)))
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="@name" id="@(q.Id)_@idx" value="@opt" @(q.IsRequired ? "required" : "") />
+                                <label class="form-check-label" for="@(q.Id)_@idx">@opt</label>
+                            </div>
+                        }
+                        break;
+                    default:
+                        <textarea name="@name" class="form-control" rows="3" @(q.IsRequired ? "required" : "")></textarea>
+                        break;
+                }
+            </div>
+        }
+
+        <div class="text-center">
+            <button type="submit" class="btn gac-btn-primary text-white btn-lg">إرسال</button>
+        </div>
+    </form>
+</div>

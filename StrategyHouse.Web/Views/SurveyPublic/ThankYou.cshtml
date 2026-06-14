@@ -1,0 +1,12 @@
+@model string
+@{
+    Layout = "_JourneyLayout";
+    ViewData["Title"] = "شكراً لك";
+}
+
+<div class="gac-card text-center" style="max-width:560px;margin:0 auto;">
+    <div style="font-size:3rem;">✅</div>
+    <h1>شكراً لمشاركتك</h1>
+    <p class="text-muted">تم استلام إجاباتك على استبيان «@Model».</p>
+    <a href="/" class="btn btn-outline-primary mt-2">العودة للرئيسية</a>
+</div>
