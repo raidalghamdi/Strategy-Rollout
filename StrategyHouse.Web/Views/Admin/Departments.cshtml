@@ -1,23 +1,20 @@
-@using StrategyHouse.Domain.Entities
-@model List<Department>
+@model List<StrategyHouse.Domain.Entities.Department>
 @{ ViewData["Title"] = "الإدارات"; }
-
 <h1>الإدارات (@Model.Count)</h1>
-<p class="muted">قائمة الإدارات الـ ١٨ المسجلة. اضغط على إدارة لإدارة مشاريعها، مؤشراتها، وأدوارها.</p>
-
 <table class="table">
-    <thead><tr><th>الرمز</th><th>الاسم</th><th>مشاريع</th><th>مؤشرات</th><th>أدوار</th><th></th></tr></thead>
+    <thead>
+        <tr><th>الرمز</th><th>الاسم</th><th>القطاع الأم</th><th>المستوى</th><th>الحالة</th></tr>
+    </thead>
     <tbody>
-        @foreach (var d in Model)
-        {
-            <tr>
-                <td><code>@d.Code</code></td>
-                <td>@d.NameAr</td>
-                <td>@d.Projects.Count</td>
-                <td>@d.Kpis.Count</td>
-                <td>@d.Roles.Count</td>
-                <td><a href="/Admin/Department/@d.Id" class="btn btn--sm btn--secondary">إدارة</a></td>
-            </tr>
-        }
+    @foreach (var d in Model)
+    {
+        <tr>
+            <td>@d.DeptCode</td>
+            <td>@d.NameAr</td>
+            <td>@d.ParentSector</td>
+            <td>@d.Level</td>
+            <td>@(d.IsActive ? "نشط" : "غير نشط")</td>
+        </tr>
+    }
     </tbody>
 </table>

@@ -1,0 +1,20 @@
+@model List<StrategyHouse.Domain.Entities.Objective>
+@{ ViewData["Title"] = "الأهداف"; }
+<h1>الأهداف (@Model.Count)</h1>
+<table class="table">
+    <thead>
+        <tr><th>الرمز</th><th>الاسم</th><th>الركيزة</th><th>الميزانية</th><th>السيولة</th></tr>
+    </thead>
+    <tbody>
+    @foreach (var o in Model)
+    {
+        <tr>
+            <td>@o.ObjectiveCode</td>
+            <td>@o.ObjectiveName</td>
+            <td>@o.PlrCode</td>
+            <td>@o.Budget?.ToString("N0")</td>
+            <td>@o.Liquidity?.ToString("N0")</td>
+        </tr>
+    }
+    </tbody>
+</table>

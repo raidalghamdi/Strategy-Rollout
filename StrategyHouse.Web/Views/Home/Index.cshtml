@@ -11,24 +11,24 @@
 
 <div class="stats">
     <div class="stat">
-        <div class="stat__num">@stats.Departments</div>
-        <div class="stat__label">إدارة</div>
+        <div class="stat__num">@stats.Pillars</div>
+        <div class="stat__label">ركيزة</div>
     </div>
     <div class="stat">
-        <div class="stat__num">@stats.Sessions</div>
-        <div class="stat__label">جلسة</div>
+        <div class="stat__num">@stats.Objectives</div>
+        <div class="stat__label">هدف</div>
     </div>
     <div class="stat">
-        <div class="stat__num">@stats.Attendees</div>
-        <div class="stat__label">مشارك مسجل</div>
+        <div class="stat__num">@stats.Initiatives</div>
+        <div class="stat__label">مبادرة</div>
     </div>
     <div class="stat">
-        <div class="stat__num">@stats.Maps</div>
-        <div class="stat__label">خريطة استراتيجية</div>
+        <div class="stat__num">@stats.Projects</div>
+        <div class="stat__label">مشروع</div>
     </div>
     <div class="stat">
-        <div class="stat__num">@stats.Commitments</div>
-        <div class="stat__label">التزام مسجل</div>
+        <div class="stat__num">@stats.Kpis</div>
+        <div class="stat__label">مؤشر أداء</div>
     </div>
 </div>
 
@@ -58,11 +58,9 @@
 
 <div class="card">
     <h2>الدخول السريع</h2>
-    <p class="muted">للحضور: استخدم رمز الجلسة الذي عرضه المُيسّر. للمنظم: سجّل الدخول للوصول إلى لوحة المؤشرات والإدارة.</p>
-    <form method="get" action="/Session/Console" class="row mt-2">
-        <input type="text" name="code" placeholder="رمز الجلسة (مثال: DEMO-001)" class="input" style="max-width: 280px;" required />
-        <button type="submit" class="btn btn--primary">فتح طاولة الجلسة</button>
-        <a href="/Wall" class="btn btn--secondary">جدار الالتزامات</a>
+    <p class="muted">للمنظم: سجّل الدخول للوصول إلى بيانات الاستراتيجية (الركائز، الأهداف، المبادرات، المشاريع، المؤشرات).</p>
+    <div class="row mt-2">
+        <a href="/Admin" class="btn btn--primary">لوحة الإدارة</a>
         <a href="/Account/Login" class="btn btn--secondary">دخول المنظم</a>
-    </form>
+    </div>
 </div>
