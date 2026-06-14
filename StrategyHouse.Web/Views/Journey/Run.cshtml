@@ -19,7 +19,7 @@
     <style>
         .journey-stepper {
             position: sticky; top: 0; z-index: 50; background: #fff;
-            box-shadow: 0 2px 12px rgba(25,79,144,.08);
+            box-shadow: 0 2px 12px rgba(40,51,74,.08);
             display: flex; gap: 6px; padding: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch;
         }
         .journey-stepper .pip {
@@ -127,7 +127,7 @@
         try { data = JSON.parse(host.getAttribute('data-sankey') || '{}'); } catch (e) {}
 
         // Objective layer is the dept's focal point → navy; everything else light grey.
-        const NAVY = '#194F90', GREY = '#CECFD2';
+        const NAVY = '#28334A', GREY = '#CECFD2';
 
         function render() {
             host.innerHTML = '';

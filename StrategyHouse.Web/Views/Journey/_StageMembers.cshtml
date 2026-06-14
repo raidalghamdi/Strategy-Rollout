@@ -66,6 +66,14 @@
             </ul>
         </div>
     }
+
+    @if (Model.Session.MembersSubmittedAt != null)
+    {
+        <div class="mt-4 text-center">
+            <a class="btn btn-primary" href="/Quiz/Start/@Model.Session.Id" target="_blank" rel="noopener">ابدأ الاختبار</a>
+            <p class="text-muted small mt-2 mb-0">اختبار قصير لتعزيز فهم الفريق للاستراتيجية. يمكنكم الإجابة في أي وقت.</p>
+        </div>
+    }
 </div>
 
 <script>

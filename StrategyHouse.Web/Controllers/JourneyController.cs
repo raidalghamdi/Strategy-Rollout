@@ -141,6 +141,11 @@ public class JourneyController : Controller
             });
         }
 
+        // Phase 7 — stamp the first time a team roster is saved so the journey
+        // can surface the quiz launch on Stage 1.
+        if (session.MembersSubmittedAt == null && (session.Members.Count > 0 || existing.Count > 0))
+            session.MembersSubmittedAt = DateTime.UtcNow;
+
         await _db.SaveChangesAsync();
         return RedirectToRun(sessionId, 2);
     }

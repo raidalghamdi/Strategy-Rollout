@@ -15,8 +15,8 @@
 <div class="container py-3" dir="rtl">
     <div class="d-flex justify-content-between align-items-center">
         <div>
-            <h1 style="color:#194F90;">تقرير الاستبيان</h1>
-            <h5 style="color:#D79A2B;">@Model.SurveyTitle</h5>
+            <h1 style="color:#28334A;">تقرير الاستبيان</h1>
+            <h5 style="color:#FAC126;">@Model.SurveyTitle</h5>
         </div>
         <div>
             <a class="btn btn-outline-success btn-sm" asp-action="ReportPdf" asp-route-id="@id">تصدير PDF</a>
@@ -28,7 +28,7 @@
 
     @if (Model.ByDept.Any())
     {
-        <h4 style="color:#194F90;">التوزيع حسب الإدارة</h4>
+        <h4 style="color:#28334A;">التوزيع حسب الإدارة</h4>
         <div class="table-responsive">
 <table class="table table-sm w-auto">
             <thead><tr><th>الإدارة</th><th>عدد الردود</th></tr></thead>
@@ -45,7 +45,7 @@
     @foreach (var q in Model.Questions)
     {
         <div class="card mb-3"><div class="card-body">
-            <h6 style="color:#194F90;">@q.QuestionAr</h6>
+            <h6 style="color:#28334A;">@q.QuestionAr</h6>
             <div class="small text-muted">@TypeAr(q.Type) · عدد الإجابات: @q.Answered</div>
             @if (q.Average != null)
             {
@@ -61,7 +61,7 @@
                         <div class="d-flex align-items-center mb-1">
                             <div style="width:140px;">@label</div>
                             <div class="flex-grow-1 bg-light rounded" style="height:18px;">
-                                <div style="width:@pct%;height:18px;background:#46BCCD;border-radius:4px;"></div>
+                                <div style="width:@pct%;height:18px;background:#299ECE;border-radius:4px;"></div>
                             </div>
                             <div style="width:40px;" class="text-start fw-bold">@cnt</div>
                         </div>
@@ -71,7 +71,7 @@
             @if (q.Verbatim.Any())
             {
                 <div class="mt-2">
-                    <div class="fw-bold" style="color:#D79A2B;">عينة من الإجابات:</div>
+                    <div class="fw-bold" style="color:#FAC126;">عينة من الإجابات:</div>
                     <ul class="small text-muted mb-0">
                         @foreach (var v in q.Verbatim) { <li>@v</li> }
                     </ul>

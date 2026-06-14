@@ -27,7 +27,7 @@
 @if (TempData["Error"] != null) { <div class="alert alert-danger">@TempData["Error"]</div> }
 
 @{
-    var valueColors = new[] { "#46BCCD", "#009845", "#D79A2B", "#9DC41A", "#194F90" };
+    var valueColors = new[] { "#299ECE", "#5F9600", "#FAC126", "#5F9600", "#28334A" };
     var values = Model.Content?.Values ?? new List<StrategyHouse.Web.Configuration.LocalizedText>();
 }
 <div class="gac-card mb-3">
@@ -45,7 +45,7 @@
             </div>
         </div>
     }
-    <div id="mapCanvas" style="border:1px dashed #46BCCD;border-radius:10px;background:#fff;max-height:60vh;overflow:auto;"></div>
+    <div id="mapCanvas" style="border:1px dashed #299ECE;border-radius:10px;background:#fff;max-height:60vh;overflow:auto;"></div>
 </div>
 
 <form method="post" asp-action="SaveMap" asp-route-sessionId="@Model.Session.Id" class="gac-card mb-3">
@@ -54,9 +54,9 @@
     <div class="row g-3">
         @{
             var sections = new[] {
-                ("opinion", "opinions", "الآراء", "#194F90", map?.OpinionsText),
-                ("wish", "wishes", "الأمنيات", "#009845", map?.WishesText),
-                ("commitment", "commitments", "خطوات بسيطة سنبدأ بها", "#D79A2B", map?.CommitmentsText),
+                ("opinion", "opinions", "الآراء", "#28334A", map?.OpinionsText),
+                ("wish", "wishes", "الأمنيات", "#5F9600", map?.WishesText),
+                ("commitment", "commitments", "خطوات بسيطة سنبدأ بها", "#FAC126", map?.CommitmentsText),
             };
         }
         @foreach (var (kind, field, label, color, text) in sections)
@@ -132,7 +132,7 @@
             <div class="row g-2 mb-3 align-items-center border-bottom pb-2">
                 <div class="col-12 col-md-3"><strong>@m.NameAr</strong> <div class="text-muted small">@m.Role</div></div>
                 <div class="col-12 col-md-6">
-                    <div class="sig-wrap" data-member="@m.Id" style="touch-action:none;border:1px solid #46BCCD;border-radius:8px;background:#fff;@(hasSig ? "display:none;" : "")">
+                    <div class="sig-wrap" data-member="@m.Id" style="touch-action:none;border:1px solid #299ECE;border-radius:8px;background:#fff;@(hasSig ? "display:none;" : "")">
                         <div id="sig-@m.Id"></div>
                     </div>
                     @if (hasSig)
@@ -188,9 +188,9 @@ window.__stageMapInit = (function () {
         }
         function drawColumns() {
             layer.destroyChildren();
-            column('مؤشرات', kpis, 10, '#194F90');
-            column('مشاريع', projects, width/3 + 5, '#009845');
-            column('المساهمة', pledges, 2*width/3, '#D79A2B');
+            column('مؤشرات', kpis, 10, '#28334A');
+            column('مشاريع', projects, width/3 + 5, '#5F9600');
+            column('المساهمة', pledges, 2*width/3, '#FAC126');
             layer.draw();
         }
         drawColumns();
@@ -268,7 +268,7 @@ window.__stageMapInit = (function () {
             document.querySelectorAll('#stage-5 .sig-wrap').forEach(node => {
                 const mid = node.getAttribute('data-member');
                 const w = node.clientWidth || 600;
-                sigs[mid] = buildPad('sig-' + mid, Math.min(w, 600), 200, '#194F90');
+                sigs[mid] = buildPad('sig-' + mid, Math.min(w, 600), 200, '#28334A');
             });
             document.querySelectorAll('#stage-5 .sig-clear').forEach(b => b.addEventListener('click', () => sigs[b.dataset.member]?.clear()));
             document.querySelectorAll('#stage-5 .sig-save').forEach(b => b.addEventListener('click', async () => {
