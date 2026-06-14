@@ -73,7 +73,7 @@
 @section Scripts {
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>
-        Chart.defaults.font.family = "'Noto Naskh Arabic','Tajawal',sans-serif";
+        Chart.defaults.font.family = "'Cairo','Noto Naskh Arabic',sans-serif";
         const top = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TopElements));
         new Chart(document.getElementById('topChart'), {
             type: 'bar',

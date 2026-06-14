@@ -3,6 +3,15 @@
    Clean, corporate, government. Arabic RTL throughout.
    =========================================================== */
 
+/* Phase 8.1 — force Cairo upright site-wide; ends Tajawal weight-synthesis oblique */
+:root { --font: "Cairo", "GE SS Two", "Segoe UI", Tahoma, Arial, sans-serif; }
+html, body, *, *::before, *::after {
+    font-family: "Cairo", "GE SS Two", "Segoe UI", Tahoma, Arial, sans-serif !important;
+    font-style: normal !important;
+}
+/* Keep Bootstrap Icons rendering as glyphs, not text */
+[class^="bi-"], [class*=" bi-"], .bi { font-family: bootstrap-icons !important; }
+
 :root {
     --primary: #1B5E7F;
     --primary-dark: #134558;
@@ -26,7 +35,7 @@
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 16px;
-    --font: "Tajawal", "Cairo", "Segoe UI", Tahoma, Arial, sans-serif;
+    --font: "Cairo", "GE SS Two", "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -35,6 +44,7 @@ html, body {
     margin: 0;
     padding: 0;
     font-family: var(--font);
+    font-style: normal !important;
     background: var(--bg);
     color: var(--text);
     line-height: 1.6;
@@ -88,6 +98,7 @@ p { margin: 0 0 12px 0; color: var(--text-soft); }
     font-weight: 800;
     letter-spacing: 1px;
     font-family: "Cairo", sans-serif;
+    font-style: normal !important;
 }
 .brand__name { font-size: 16px; }
 
@@ -136,6 +147,7 @@ p { margin: 0 0 12px 0; color: var(--text-soft); }
     border-radius: var(--radius-sm);
     border: 1px solid transparent;
     font-family: var(--font);
+    font-style: normal !important;
     font-weight: 600;
     font-size: 14px;
     cursor: pointer;
@@ -163,6 +175,7 @@ p { margin: 0 0 12px 0; color: var(--text-soft); }
 .form-row .hint { font-size: 12px; color: var(--text-muted); }
 .input, .select, .textarea {
     font-family: var(--font);
+    font-style: normal !important;
     font-size: 14px;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
@@ -222,6 +235,7 @@ p { margin: 0 0 12px 0; color: var(--text-soft); }
     font-weight: 800;
     color: var(--primary);
     font-family: "Cairo", sans-serif;
+    font-style: normal !important;
     line-height: 1.1;
 }
 .stat__label { font-size: 13px; color: var(--text-soft); margin-top: 4px; }
@@ -590,6 +604,7 @@ p { margin: 0 0 12px 0; color: var(--text-soft); }
 }
 .journey-block__time {
     font-family: "Cairo", sans-serif;
+    font-style: normal !important;
     font-weight: 800;
     color: var(--primary);
     font-size: 14px;
