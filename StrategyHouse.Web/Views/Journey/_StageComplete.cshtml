@@ -31,8 +31,8 @@
     <hr class="my-4" />
     <div class="mt-2">
         <p class="text-muted mb-3">اختبر معرفتك بالاستراتيجية المؤسسية في اختبار قصير وممتع.</p>
-        <a class="btn btn-lg gac-btn-primary text-white w-100 w-md-auto"
-           href="/Quiz/Start/@Model.Session.Id" target="_blank" rel="noopener">ابدأ الاختبار ⟵</a>
+        <a class="btn btn-lg btn-secondary w-100 w-md-auto"
+           href="/Quiz/Start/@Model.Session.Id" target="_blank" rel="noopener">إعادة فتح الاختبار ⟵</a>
     </div>
 </div>
 
@@ -44,7 +44,7 @@ window.__stageCompleteConfetti = function () {
     document.body.appendChild(c);
     c.width = innerWidth; c.height = innerHeight;
     const ctx = c.getContext('2d');
-    const colors = ['#194F90','#46BCCD','#009845','#D79A2B','#9DC41A'];
+    const colors = ['#28334A','#299ECE','#5F9600','#FAC126','#5F9600'];
     const parts = Array.from({length:120}, () => ({ x: Math.random()*c.width, y: -20-Math.random()*c.height, r: 4+Math.random()*6, c: colors[Math.floor(Math.random()*colors.length)], v: 2+Math.random()*3 }));
     let frames = 0;
     (function loop() {

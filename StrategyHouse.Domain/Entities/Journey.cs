@@ -32,6 +32,7 @@ public class StrategySession
     [Required, MaxLength(15)] public string DeptCode { get; set; } = string.Empty;
     [MaxLength(15)] public string? AccessCodeUsed { get; set; }
     public DateTime StartedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? MembersSubmittedAt { get; set; } // Phase 7 — set when the team roster is first saved
     public DateTime? CompletedAt { get; set; }
     public DateTime? SignedAt { get; set; }
     [MaxLength(20)] public string Status { get; set; } = "InProgress"; // InProgress / Signed / Locked
