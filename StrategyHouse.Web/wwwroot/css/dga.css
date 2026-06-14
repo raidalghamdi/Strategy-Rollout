@@ -181,6 +181,46 @@
     --font-ar: "GE SS Two", "Cairo", tahoma, "IBM Plex Sans", system-ui, sans-serif;
 }
 
+/* ============================================================
+   GLOBAL UPRIGHT ENFORCEMENT (Phase 8) — Cairo has no italic
+   variant, so any "italic" request synthesizes a fake oblique.
+   Force all text upright per GAC brand guidelines.
+   ============================================================ */
+html, body, * {
+    font-style: normal !important;
+}
+
+/* Disable synthetic italic in browsers that support it. */
+html {
+    font-synthesis-style: none;
+    -webkit-font-synthesis: style;
+    font-synthesis: weight;
+}
+
+/* Restore emphasis for elements that traditionally use italic,
+   using weight instead of a slant. */
+em, i, cite, address, var, dfn, blockquote {
+    font-style: normal !important;
+    font-weight: 600;
+}
+
+/* Placeholders: many UAs render italic by default. */
+::placeholder,
+::-webkit-input-placeholder,
+::-moz-placeholder,
+:-ms-input-placeholder,
+::-ms-input-placeholder {
+    font-style: normal !important;
+    font-weight: 400;
+    color: var(--text-muted);
+    opacity: 1;
+}
+
+/* Bootstrap utility classes that force italic — neutralize. */
+.fst-italic, .font-italic {
+    font-style: normal !important;
+}
+
 /* --- Resets ---------------------------------------------------------------- */
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -1165,3 +1205,116 @@ input[type=text]:focus, input[type=email]:focus, input[type=password]:focus, tex
 /* Links use institutional blue for legibility on light surfaces */
 a { color: var(--gac-blue); }
 a:hover { color: var(--gac-blue-hover); }
+
+/* ============================================================
+   QUIZ (Phase 8) — GAC-branded learning quiz UI.
+   White cards, navy titles, gold accent + gold pill submit.
+   ============================================================ */
+.quiz-card {
+    max-width: 720px;
+    margin: 0 auto;
+    background: #fff;
+    border: 1px solid var(--border-soft);
+    border-top: 4px solid var(--gac-gold);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-soft);
+    padding: 28px;
+}
+.quiz-card--empty { text-align: center; }
+.quiz-title {
+    color: var(--gac-navy-dark);
+    font-weight: 800;
+    margin: 0 0 18px;
+}
+.quiz-muted { color: var(--text-muted); }
+
+.quiz-progress {
+    height: 10px;
+    background: var(--gac-navy-soft);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+.quiz-progress__fill {
+    height: 100%;
+    background: var(--gac-gold);
+    transition: width .25s ease;
+}
+
+.quiz-step {
+    color: var(--text-muted);
+    font-size: .9rem;
+    margin-bottom: 8px;
+}
+.quiz-question {
+    color: var(--gac-navy);
+    font-weight: 700;
+    margin: 0 0 18px;
+    line-height: 1.6;
+}
+
+.quiz-options { display: flex; flex-direction: column; gap: 10px; }
+.quiz-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border: 1.5px solid var(--border-soft);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+}
+.quiz-option:hover { border-color: var(--gac-gold); background: var(--gac-gold-soft); }
+.quiz-option.is-selected { border-color: var(--gac-gold); background: var(--gac-gold-soft); }
+.quiz-option input { accent-color: var(--gac-gold); width: 18px; height: 18px; }
+.quiz-option span { flex: 1; }
+
+.quiz-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-top: 24px;
+}
+.quiz-nav--center { justify-content: center; }
+
+.quiz-btn {
+    border: none;
+    border-radius: 999px;
+    padding: 12px 28px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.quiz-btn--primary { background: var(--gac-gold); color: var(--gac-navy-dark); }
+.quiz-btn--primary:hover { background: var(--gac-gold-hover); }
+.quiz-btn--ghost {
+    background: transparent;
+    color: var(--gac-navy);
+    border: 1.5px solid var(--border-strong);
+    text-decoration: none;
+    display: inline-block;
+}
+.quiz-btn--ghost:hover { background: var(--gac-navy-soft); color: var(--gac-navy); }
+
+.quiz-score { text-align: center; margin-bottom: 24px; }
+.quiz-score__label { color: var(--gac-navy); font-weight: 700; font-size: 1.1rem; }
+.quiz-score__value { font-size: 3rem; font-weight: 800; color: var(--gac-gold); }
+
+.quiz-review {
+    border: 1.5px solid var(--border-soft);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+}
+.quiz-review.is-correct { border-inline-start: 4px solid var(--gac-service-green, #2e7d32); }
+.quiz-review.is-wrong { border-inline-start: 4px solid #c62828; }
+.quiz-review__q { font-weight: 700; color: var(--gac-navy); margin-bottom: 6px; }
+.quiz-review__a { font-size: .95rem; }
+.quiz-review__correct { font-size: .95rem; color: var(--gac-service-green, #2e7d32); }
+
+@media (max-width: 600px) {
+    .quiz-card { padding: 20px 16px; }
+    .quiz-nav { flex-direction: column-reverse; }
+    .quiz-btn { width: 100%; }
+}
