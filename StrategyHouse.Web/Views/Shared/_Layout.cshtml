@@ -29,6 +29,7 @@
 @if (authed)
 {
     <div class="app-shell">
+        <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
         <aside class="app-sidebar" aria-label="Primary" id="appSidebar">
             <div class="brand">
                 <img src="~/images/gac-logo-white.png" alt="الهيئة العامة للمنافسة" style="height:48px;width:auto;" />
@@ -89,7 +90,19 @@
         (function () {
             var t = document.querySelector('[data-sidebar-toggle]');
             var sb = document.getElementById('appSidebar');
-            if (t && sb) t.addEventListener('click', function () { sb.classList.toggle('open'); });
+            var bd = document.getElementById('sidebarBackdrop');
+            function setOpen(open) {
+                if (!sb) return;
+                sb.classList.toggle('open', open);
+                if (bd) bd.classList.toggle('open', open);
+            }
+            if (t) t.addEventListener('click', function () { setOpen(!sb.classList.contains('open')); });
+            if (bd) bd.addEventListener('click', function () { setOpen(false); });
+            // close sidebar when a nav link is tapped on mobile
+            if (sb) sb.querySelectorAll('nav a').forEach(function (a) {
+                a.addEventListener('click', function () { if (window.matchMedia('(max-width: 900px)').matches) setOpen(false); });
+            });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
         })();
     </script>
 }
