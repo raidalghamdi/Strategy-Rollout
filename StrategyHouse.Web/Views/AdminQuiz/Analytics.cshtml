@@ -1,0 +1,108 @@
+@model StrategyHouse.Web.Controllers.QuizAnalyticsViewModel
+@{
+    ViewData["Title"] = "تحليلات الاختبار";
+}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <h1 class="mb-0">تحليلات الاختبار</h1>
+    <div class="d-flex gap-2">
+        <a href="/Admin/Quiz" class="btn btn--secondary btn-sm">⟶ بنك الأسئلة</a>
+        <a href="/Admin/Quiz/Analytics.csv" class="btn btn--primary btn-sm">تصدير CSV</a>
+    </div>
+</div>
+
+<div class="grid-3 my-3">
+    <div class="card"><h3>@Model.TotalAttempts</h3><p class="muted">إجمالي المحاولات</p></div>
+    <div class="card"><h3>@Model.AverageScorePct%</h3><p class="muted">متوسط النتيجة</p></div>
+    <div class="card"><h3>@Model.PerQuestion.Count</h3><p class="muted">أسئلة مُجابة</p></div>
+</div>
+
+@if (Model.PerDepartment.Any())
+{
+    <div class="card mb-3">
+        <h2 class="h5">متوسط النتيجة لكل إدارة</h2>
+        <canvas id="deptChart" height="120"></canvas>
+    </div>
+}
+
+<div class="card mb-3">
+    <h2 class="h5">نسبة الإجابة الصحيحة لكل سؤال</h2>
+    @if (!Model.PerQuestion.Any())
+    {
+        <p class="muted">لا توجد محاولات بعد.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle" style="background:#fff;">
+                <thead><tr><th>السؤال</th><th>صحيحة</th><th>إجمالي</th><th style="min-width:160px;">النسبة</th></tr></thead>
+                <tbody>
+                    @foreach (var q in Model.PerQuestion)
+                    {
+                        <tr>
+                            <td>@q.QuestionAr</td>
+                            <td>@q.Correct</td>
+                            <td>@q.Total</td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div style="flex:1;background:#e7edf5;border-radius:6px;height:10px;overflow:hidden;min-width:80px;">
+                                        <div style="width:@q.Pct%;background:@(q.Pct < 50 ? "#c0392b" : "#5F9600");height:100%;"></div>
+                                    </div>
+                                    <span class="small">@q.Pct%</span>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<div class="card">
+    <h2 class="h5">أحدث المحاولات</h2>
+    @if (!Model.Recent.Any())
+    {
+        <p class="muted">لا توجد محاولات بعد.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table" style="background:#fff;">
+                <thead><tr><th>المشارك</th><th>الإدارة</th><th>النتيجة</th><th>التاريخ</th></tr></thead>
+                <tbody>
+                    @foreach (var a in Model.Recent)
+                    {
+                        <tr>
+                            <td>@(string.IsNullOrEmpty(a.RespondentName) ? "—" : a.RespondentName)</td>
+                            <td>@a.DeptCode</td>
+                            <td>@a.Score / @a.Total</td>
+                            <td class="small muted">@a.CompletedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    var el = document.getElementById('deptChart');
+    if (!el || typeof Chart === 'undefined') return;
+    new Chart(el, {
+        type: 'bar',
+        data: {
+            labels: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.PerDepartment.Select(d => d.DeptCode))),
+            datasets: [{
+                label: 'متوسط النتيجة %',
+                data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.PerDepartment.Select(d => d.AvgPct))),
+                backgroundColor: '#299ECE'
+            }]
+        },
+        options: { scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
+    });
+})();
+</script>
+}

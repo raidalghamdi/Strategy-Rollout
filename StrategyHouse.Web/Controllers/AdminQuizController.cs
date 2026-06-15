@@ -172,6 +172,76 @@ public class AdminQuizController : Controller
         return RedirectToAction(nameof(Index), new { tab = "Approved" });
     }
 
+    // GET /Admin/Quiz/Analytics — response stats, per-question correctness, per-department.
+    [HttpGet("Analytics")]
+    public async Task<IActionResult> Analytics()
+    {
+        var attempts = await _db.QuizAttempts.OrderByDescending(a => a.CompletedAt).ToListAsync();
+        var questions = await _db.QuizQuestions.ToDictionaryAsync(q => q.Id, q => q.QuestionAr);
+
+        var perQuestion = new Dictionary<Guid, (int Correct, int Total)>();
+        foreach (var a in attempts)
+        {
+            List<QuizAnswerDetail>? parsed = null;
+            try { parsed = JsonSerializer.Deserialize<List<QuizAnswerDetail>>(a.AnswersJson); } catch { }
+            if (parsed == null) continue;
+            foreach (var d in parsed)
+            {
+                if (d.Qid == Guid.Empty) continue;
+                var cur = perQuestion.TryGetValue(d.Qid, out var v) ? v : (0, 0);
+                perQuestion[d.Qid] = (cur.Item1 + (d.Correct ? 1 : 0), cur.Item2 + 1);
+            }
+        }
+
+        var vm = new QuizAnalyticsViewModel
+        {
+            TotalAttempts = attempts.Count,
+            AverageScorePct = attempts.Count == 0 ? 0
+                : Math.Round(attempts.Where(a => a.Total > 0).Select(a => 100.0 * a.Score / a.Total).DefaultIfEmpty(0).Average(), 1),
+            PerQuestion = perQuestion
+                .Select(kv => new QuizQuestionStat
+                {
+                    QuestionAr = questions.TryGetValue(kv.Key, out var t) ? t : kv.Key.ToString(),
+                    Correct = kv.Value.Correct,
+                    Total = kv.Value.Total,
+                    Pct = kv.Value.Total == 0 ? 0 : Math.Round(100.0 * kv.Value.Correct / kv.Value.Total, 1),
+                })
+                .OrderBy(x => x.Pct)
+                .ToList(),
+            PerDepartment = attempts
+                .Where(a => !string.IsNullOrEmpty(a.DeptCode))
+                .GroupBy(a => a.DeptCode!)
+                .Select(g => new QuizDeptStat
+                {
+                    DeptCode = g.Key,
+                    Attempts = g.Count(),
+                    AvgPct = Math.Round(g.Where(a => a.Total > 0).Select(a => 100.0 * a.Score / a.Total).DefaultIfEmpty(0).Average(), 1),
+                })
+                .OrderByDescending(x => x.AvgPct)
+                .ToList(),
+            Recent = attempts.Take(30).ToList(),
+        };
+        return View(vm);
+    }
+
+    // GET /Admin/Quiz/Analytics.csv — export raw attempts.
+    [HttpGet("Analytics.csv")]
+    public async Task<IActionResult> AnalyticsCsv()
+    {
+        var attempts = await _db.QuizAttempts.OrderByDescending(a => a.CompletedAt).ToListAsync();
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("RespondentName,DeptCode,Scope,Score,Total,Percent,CompletedAt");
+        static string Esc(string? s) => "\"" + (s ?? "").Replace("\"", "\"\"") + "\"";
+        foreach (var a in attempts)
+        {
+            var pct = a.Total > 0 ? Math.Round(100.0 * a.Score / a.Total, 1) : 0;
+            sb.AppendLine(string.Join(",", Esc(a.RespondentName), Esc(a.DeptCode), Esc(a.Scope),
+                a.Score, a.Total, pct, a.CompletedAt.ToString("o")));
+        }
+        var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+        return File(bytes, "text/csv", "quiz-analytics.csv");
+    }
+
     // POST /Admin/Quiz/Delete/{id} — soft delete to preserve attempt history.
     [HttpPost("Delete/{id:guid}")]
     [ValidateAntiForgeryToken]
@@ -194,4 +264,36 @@ public class DeptOption
 {
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
+}
+
+public class QuizAnswerDetail
+{
+    public Guid Qid { get; set; }
+    public int Picked { get; set; }
+    public int CorrectIndex { get; set; }
+    public bool Correct { get; set; }
+}
+
+public class QuizAnalyticsViewModel
+{
+    public int TotalAttempts { get; set; }
+    public double AverageScorePct { get; set; }
+    public List<QuizQuestionStat> PerQuestion { get; set; } = new();
+    public List<QuizDeptStat> PerDepartment { get; set; } = new();
+    public List<Domain.Entities.QuizAttempt> Recent { get; set; } = new();
+}
+
+public class QuizQuestionStat
+{
+    public string QuestionAr { get; set; } = "";
+    public int Correct { get; set; }
+    public int Total { get; set; }
+    public double Pct { get; set; }
+}
+
+public class QuizDeptStat
+{
+    public string DeptCode { get; set; } = "";
+    public int Attempts { get; set; }
+    public double AvgPct { get; set; }
 }

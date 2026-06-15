@@ -1,0 +1,95 @@
+@model StrategyHouse.Web.Services.SurveyReportPdfService.ReportModel
+@{
+    ViewData["Title"] = $"تحليلات الاستبيان — {Model.SurveyTitle}";
+    var id = (Guid)ViewBag.SurveyId;
+    var chartQuestions = Model.Questions.Where(q => q.Type != "Text" && q.Distribution.Any()).ToList();
+}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <h1 class="mb-0">تحليلات الاستبيان</h1>
+    <div class="d-flex gap-2">
+        <a href="/Admin/Surveys/@id" class="btn btn--secondary btn-sm">⟶ تحرير الاستبيان</a>
+        <a href="/Admin/Surveys/@id/Analytics.csv" class="btn btn--primary btn-sm">تصدير CSV</a>
+    </div>
+</div>
+<p class="muted">@Model.SurveyTitle</p>
+
+<div class="grid-3 my-3">
+    <div class="card"><h3>@Model.TotalResponses</h3><p class="muted">إجمالي الردود</p></div>
+    <div class="card"><h3>@Model.Questions.Count</h3><p class="muted">عدد الأسئلة</p></div>
+    <div class="card"><h3>@Model.ByDept.Count</h3><p class="muted">إدارات شاركت</p></div>
+</div>
+
+@if (Model.TotalResponses == 0)
+{
+    <div class="card"><p class="muted">لا توجد ردود بعد.</p></div>
+}
+
+@for (var i = 0; i < Model.Questions.Count; i++)
+{
+    var q = Model.Questions[i];
+    <div class="card mb-3">
+        <h2 class="h6">@q.QuestionAr</h2>
+        <p class="muted small">النوع: @q.Type · أجاب: @q.Answered@(q.Average != null ? $" · المتوسط: {q.Average:0.##}" : "")</p>
+        @if (q.Type == "Text")
+        {
+            @if (q.Verbatim.Any())
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var v in q.Verbatim)
+                    {
+                        <li class="list-group-item">@v</li>
+                    }
+                </ul>
+            }
+            else { <p class="muted small">لا توجد إجابات نصية.</p> }
+        }
+        else if (q.Distribution.Any())
+        {
+            <canvas id="qchart-@i" height="90"></canvas>
+        }
+        else { <p class="muted small">لا توجد بيانات.</p> }
+    </div>
+}
+
+@if (Model.ByDept.Any())
+{
+    <div class="card">
+        <h2 class="h5">الردود حسب الإدارة</h2>
+        <div class="table-responsive">
+            <table class="table" style="background:#fff;">
+                <thead><tr><th>الإدارة</th><th>عدد الردود</th></tr></thead>
+                <tbody>
+                    @foreach (var (dept, count) in Model.ByDept)
+                    {
+                        <tr><td>@dept</td><td>@count</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    if (typeof Chart === 'undefined') return;
+    var charts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        Model.Questions.Select((q, idx) => new {
+            idx,
+            type = q.Type,
+            labels = q.Distribution.Select(d => d.Label),
+            data = q.Distribution.Select(d => d.Count)
+        }).Where(x => x.labels.Any())));
+    charts.forEach(function (c) {
+        var el = document.getElementById('qchart-' + c.idx);
+        if (!el) return;
+        new Chart(el, {
+            type: 'bar',
+            data: { labels: c.labels, datasets: [{ label: 'عدد', data: c.data, backgroundColor: '#5F9600' }] },
+            options: { scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: false } } }
+        });
+    });
+})();
+</script>
+}

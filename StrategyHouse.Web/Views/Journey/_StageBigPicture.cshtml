@@ -12,5 +12,8 @@
 <div class="gac-card">
     <h2 class="h4 h-md-2">كيف يرتبط عمل @dept?.NameAr بالرؤية</h2>
     <p class="text-muted">يوضح المخطط أدناه تدفق مؤشرات ومشاريع إدارتك نحو الأهداف والركائز والرؤية.</p>
-    <div id="sankey" data-sankey='@Html.Raw(sankeyJson)' style="width:100%;overflow-x:auto;"></div>
+    <div class="sankey-scroll" style="width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <div id="sankey" data-sankey='@Html.Raw(sankeyJson)' style="min-width:1800px;"></div>
+    </div>
+    <p class="text-muted small mt-2">مرّر أفقياً لعرض المخطط كاملاً.</p>
 </div>

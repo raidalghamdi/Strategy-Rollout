@@ -37,6 +37,9 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
     public DbSet<DepartmentRoster> DepartmentRoster => Set<DepartmentRoster>();
     public DbSet<ChatbotConversation> ChatbotConversations => Set<ChatbotConversation>();
 
+    // Phase 9 — mini CMS for admin-editable page text
+    public DbSet<PageContent> PageContents => Set<PageContent>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);

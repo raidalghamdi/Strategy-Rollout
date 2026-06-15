@@ -56,17 +56,55 @@ public class JourneyController : Controller
         return RedirectToAction(nameof(Run), new { sessionId = session.Id });
     }
 
-    // GET /Journey/Run/{sessionId} — single-page journey (all stages stacked).
+    // GET /Journey/Run/{sessionId} — entry point. Redirects to the multi-page stage flow
+    // at the furthest stage the team has reached.
     [HttpGet("Journey/Run/{sessionId:guid}")]
     public async Task<IActionResult> Run(Guid sessionId)
     {
-        var session = await LoadSessionAsync(sessionId);
+        var session = await _db.StrategySessions.FindAsync(sessionId);
         if (session == null) return NotFound();
+        var stage = Math.Clamp(session.CurrentStage <= 0 ? 1 : session.CurrentStage, 1, 6);
+        return RedirectToAction(nameof(RunStage), new { sessionId, stage });
+    }
+
+    // GET /Journey/Run/{sessionId}/{stage} — Phase 9 multi-page journey: one stage per page.
+    // Anti-skip: a requested stage is clamped to CurrentStage + 1.
+    [HttpGet("Journey/Run/{sessionId:guid}/{stage:int}")]
+    public async Task<IActionResult> RunStage(Guid sessionId, int stage)
+    {
+        var tracked = await _db.StrategySessions.FindAsync(sessionId);
+        if (tracked == null) return NotFound();
+
+        // Clamp the requested stage so users can't jump ahead of where they've reached.
+        var maxAllowed = Math.Clamp((tracked.CurrentStage <= 0 ? 1 : tracked.CurrentStage) + 1, 1, 6);
+        stage = Math.Clamp(stage, 1, 6);
+        if (stage > maxAllowed)
+            return RedirectToAction(nameof(RunStage), new { sessionId, stage = maxAllowed });
+
+        // Record progress: bump the furthest stage reached + activity timestamp.
+        if (stage > tracked.CurrentStage)
+        {
+            tracked.CurrentStage = stage;
+            tracked.LastActivityAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+        }
+
+        var vm = await BuildRunViewModelAsync(sessionId);
+        if (vm == null) return NotFound();
+        ViewBag.Stage = stage;
+        return View("RunStage", vm);
+    }
+
+    // Shared builder for the journey view model (all stage partials read from it).
+    private async Task<JourneyRunViewModel?> BuildRunViewModelAsync(Guid sessionId)
+    {
+        var session = await LoadSessionAsync(sessionId);
+        if (session == null) return null;
 
         var dept = await _db.Departments.FindAsync(session.DeptCode);
         var map = await _db.DepartmentStrategyMaps.FirstOrDefaultAsync(m => m.SessionId == sessionId);
 
-        var vm = new JourneyRunViewModel
+        return new JourneyRunViewModel
         {
             Session = session,
             Dept = dept,
@@ -88,15 +126,14 @@ public class JourneyController : Controller
                 ? new List<MapInkAsset>()
                 : await _db.MapInkAssets.Where(a => a.MapId == map.Id && a.IsActive).ToListAsync(),
         };
-        return View(vm);
     }
 
-    // GET /Journey/Members/{sessionId} — deep-link alias → single page section.
+    // GET /Journey/Members/{sessionId} — deep-link alias → multi-page stage.
     [HttpGet("Journey/Members/{sessionId:guid}")]
     public IActionResult Members(Guid sessionId) => RedirectToRun(sessionId, 1);
 
     private IActionResult RedirectToRun(Guid sessionId, int stage) =>
-        Redirect(Url.Action(nameof(Run), new { sessionId }) + $"#stage-{stage}");
+        RedirectToAction(nameof(RunStage), new { sessionId, stage });
 
     [HttpPost("Journey/AddMembers/{sessionId:guid}")]
     [ValidateAntiForgeryToken]

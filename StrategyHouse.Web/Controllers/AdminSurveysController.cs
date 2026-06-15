@@ -151,6 +151,41 @@ public class AdminSurveysController : Controller
         return View(model);
     }
 
+    // Phase 9 — interactive analytics dashboard with Chart.js distributions.
+    [HttpGet("{id:guid}/Analytics")]
+    public async Task<IActionResult> Analytics(Guid id)
+    {
+        var model = await BuildReportAsync(id);
+        if (model == null) return NotFound();
+        ViewBag.SurveyId = id;
+        return View(model);
+    }
+
+    // Phase 9 — CSV export of per-question distributions + free-text answers.
+    [HttpGet("{id:guid}/Analytics.csv")]
+    public async Task<IActionResult> AnalyticsCsv(Guid id)
+    {
+        var model = await BuildReportAsync(id);
+        if (model == null) return NotFound();
+        var sb = new System.Text.StringBuilder();
+        static string Esc(string? s) => "\"" + (s ?? "").Replace("\"", "\"\"") + "\"";
+        sb.AppendLine("Question,Type,Answered,Bucket,Count,Average");
+        foreach (var q in model.Questions)
+        {
+            if (q.Distribution.Count == 0 && q.Verbatim.Count == 0)
+            {
+                sb.AppendLine(string.Join(",", Esc(q.QuestionAr), Esc(q.Type), q.Answered, Esc(""), 0, q.Average?.ToString("0.##") ?? ""));
+                continue;
+            }
+            foreach (var (label, count) in q.Distribution)
+                sb.AppendLine(string.Join(",", Esc(q.QuestionAr), Esc(q.Type), q.Answered, Esc(label), count, q.Average?.ToString("0.##") ?? ""));
+            foreach (var v in q.Verbatim)
+                sb.AppendLine(string.Join(",", Esc(q.QuestionAr), Esc(q.Type), q.Answered, Esc("نص"), Esc(v), ""));
+        }
+        var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+        return File(bytes, "text/csv", $"survey-analytics-{id}.csv");
+    }
+
     [HttpGet("{id:guid}/Report/Pdf")]
     public async Task<IActionResult> ReportPdf(Guid id)
     {

@@ -15,6 +15,11 @@
 <div class="gac-card">
     <h2 class="h4 h-md-2">أين ترغب إدارتك بالمساهمة؟</h2>
     <p class="text-muted">اسحب العناصر التي ترغب إدارتك بدعمها من العمود الأيمن إلى عمود «أرغب بالمساهمة».</p>
+    <style>
+        #stage-4 .dnd-item { cursor: grab; }
+        #stage-4 .dnd-item.sortable-chosen, #stage-4 .dnd-item:active { cursor: grabbing; }
+        #stage-4 .handle { opacity: .5; }
+    </style>
     <div class="row g-3">
         <div class="col-12 col-md-6">
             <div class="contribute-col-head">
@@ -82,9 +87,9 @@
     function boot() {
         if (booted) return; booted = true;
         counts();
-        new Sortable(available, { group: 'pledges', animation: 150, handle: '.handle' });
+        new Sortable(available, { group: 'pledges', animation: 150, filter: 'input, textarea, button' });
         new Sortable(chosen, {
-            group: 'pledges', animation: 150, handle: '.handle',
+            group: 'pledges', animation: 150, filter: 'input, textarea, button',
             onAdd: function (evt) {
                 var el = evt.item;
                 if (el.dataset.saved) { counts(); return; }

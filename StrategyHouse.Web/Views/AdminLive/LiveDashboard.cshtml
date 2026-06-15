@@ -1,0 +1,43 @@
+@model List<StrategyHouse.Web.Controllers.LiveSessionRow>
+@{
+    ViewData["Title"] = "اللوحة الحية";
+    var status = (string)ViewBag.Status;
+}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <h1 class="mb-0">اللوحة الحية</h1>
+    <div class="d-flex align-items-center gap-2">
+        <span class="muted small">تتحدّث تلقائياً كل ١٠ ثوانٍ</span>
+        <span id="liveDot" style="width:10px;height:10px;border-radius:50%;background:#5F9600;display:inline-block;"></span>
+    </div>
+</div>
+<p class="muted">حالة جلسات الإدارات في الوقت الحالي — المرحلة، النشاط، والمشاركة في الاختبار والاستبيان.</p>
+
+<div class="mb-3 d-flex gap-2 flex-wrap">
+    @foreach (var (key, label) in new[] { ("All", "الكل"), ("InProgress", "قيد التنفيذ"), ("Completed", "مكتملة") })
+    {
+        <a class="btn btn-sm @(status == key ? "btn--primary" : "btn--secondary")" href="/Admin/LiveDashboard?status=@key">@label</a>
+    }
+</div>
+
+<div id="liveTable">
+    @await Html.PartialAsync("_LiveRows", Model)
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    var status = '@status';
+    var host = document.getElementById('liveTable');
+    var dot = document.getElementById('liveDot');
+    async function refresh() {
+        try {
+            dot.style.background = '#FAC126';
+            var res = await fetch('/Admin/LiveDashboard/Rows?status=' + encodeURIComponent(status), { headers: { 'X-Requested-With': 'fetch' } });
+            if (res.ok) { host.innerHTML = await res.text(); dot.style.background = '#5F9600'; }
+            else { dot.style.background = '#c0392b'; }
+        } catch (e) { dot.style.background = '#c0392b'; }
+    }
+    setInterval(refresh, 10000);
+})();
+</script>
+}

@@ -1,0 +1,65 @@
+@model StrategyHouse.Web.Controllers.SessionDetailViewModel
+@{
+    ViewData["Title"] = $"تفاصيل جلسة — {Model.DeptName}";
+}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <h1 class="mb-0">@Model.DeptName</h1>
+    <a href="/Admin/LiveDashboard" class="btn btn--secondary btn-sm">⟶ رجوع للوحة الحية</a>
+</div>
+<p class="muted">
+    الحالة: <strong>@Model.Session.Status</strong> ·
+    المرحلة: <strong>@Math.Clamp(Model.Session.CurrentStage, 1, 6) من 6</strong> ·
+    الرمز: <strong>@Model.Session.AccessCodeUsed</strong>
+</p>
+
+<div class="grid-3 mb-3">
+    <div class="card"><h3>@Model.Members.Count</h3><p class="muted">أعضاء الفريق</p></div>
+    <div class="card"><h3>@Model.Pledges.Count</h3><p class="muted">مساهمات</p></div>
+    <div class="card"><h3>@Model.QuizAttempts.Count</h3><p class="muted">محاولات الاختبار</p></div>
+</div>
+
+<div class="card mb-3">
+    <h2 class="h5">المسار الزمني</h2>
+    <ul class="list-group list-group-flush">
+        @foreach (var (when, label) in Model.Timeline)
+        {
+            <li class="list-group-item d-flex justify-content-between">
+                <span>@label</span>
+                <span class="muted small">@when.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span>
+            </li>
+        }
+    </ul>
+</div>
+
+<div class="card mb-3">
+    <h2 class="h5">أعضاء الفريق</h2>
+    @if (Model.Members.Any())
+    {
+        <ul class="list-group list-group-flush">
+            @foreach (var m in Model.Members)
+            {
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>@m.NameAr</span>
+                    <span class="muted small">@m.Role @(m.SignedAt != null ? "· وقّع ✓" : "")</span>
+                </li>
+            }
+        </ul>
+    }
+    else { <p class="muted">لم يُسجَّل أعضاء بعد.</p> }
+</div>
+
+@if (Model.Pledges.Any())
+{
+    <div class="card">
+        <h2 class="h5">المساهمات</h2>
+        <ul class="list-group list-group-flush">
+            @foreach (var p in Model.Pledges)
+            {
+                <li class="list-group-item d-flex justify-content-between">
+                    <span>@p.ElementType — @p.ElementCode</span>
+                    <span class="muted small">@p.ContributionKind</span>
+                </li>
+            }
+        </ul>
+    </div>
+}
