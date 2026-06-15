@@ -93,6 +93,8 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
 // App services
 builder.Services.Configure<StrategyContentOptions>(builder.Configuration.GetSection("StrategyContent"));
 builder.Services.AddSingleton<StrategyContentService>();
+// Phase 9 — mini CMS (admin-editable page text), cached in memory.
+builder.Services.AddSingleton<PageContentService>();
 builder.Services.AddScoped<QrService>();
 builder.Services.AddScoped<AccessCodeService>();
 builder.Services.AddScoped<StrategyMapPdfService>();

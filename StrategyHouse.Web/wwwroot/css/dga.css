@@ -190,11 +190,12 @@ html, body, * {
     font-style: normal !important;
 }
 
-/* Disable synthetic italic in browsers that support it. */
+/* Disable ALL synthetic faces (Phase 9). Cairo ships every weight 100–900 and no
+   italic, so neither slant nor weight should ever be synthesized. */
 html {
     font-synthesis-style: none;
-    -webkit-font-synthesis: style;
-    font-synthesis: weight;
+    -webkit-font-synthesis: none;
+    font-synthesis: none;
 }
 
 /* Restore emphasis for elements that traditionally use italic,

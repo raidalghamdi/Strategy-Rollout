@@ -16,6 +16,7 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h1 class="h3" style="color:#28334A;">إدارة بنك الأسئلة <span class="badge bg-secondary">الإجمالي: @total</span></h1>
         <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-outline-primary btn-sm" href="/Admin/Quiz/Analytics">📊 التحليلات</a>
             <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createModal">إضافة سؤال يدوياً</button>
             <form method="post" asp-action="Regenerate" class="d-inline">
                 @Html.AntiForgeryToken()

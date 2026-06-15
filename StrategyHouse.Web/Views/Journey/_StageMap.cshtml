@@ -29,6 +29,36 @@
 @{
     var valueColors = new[] { "#299ECE", "#5F9600", "#FAC126", "#5F9600", "#28334A" };
     var values = Model.Content?.Values ?? new List<StrategyHouse.Web.Configuration.LocalizedText>();
+
+    string PledgeName(string type, string code)
+    {
+        if (type == "OBJ") return Model.Objectives.FirstOrDefault(o => o.ObjectiveCode == code)?.ObjectiveName ?? code;
+        if (type == "INIT") return Model.Initiatives.FirstOrDefault(i => i.InitiativeCode == code)?.InitiativeName ?? code;
+        return code;
+    }
+}
+
+@if (pledges.Any())
+{
+    <div class="gac-card mb-3">
+        <h3 class="h5" style="color:#28334A;font-weight:800;border-bottom:4px solid #FAC126;display:inline-block;padding-bottom:6px;">مساهمات الفريق</h3>
+        <p class="text-muted small mt-2">العناصر التي اختارت إدارتك المساهمة فيها في المرحلة السابقة.</p>
+        <ul class="list-group">
+            @foreach (var p in pledges)
+            {
+                <li class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span>
+                        <span class="badge" style="background:@(p.ElementType == "OBJ" ? "#28334A" : "#5F9600");">@(p.ElementType == "OBJ" ? "هدف" : p.ElementType == "INIT" ? "مبادرة" : p.ElementType)</span>
+                        <strong class="ms-2">@PledgeName(p.ElementType, p.ElementCode)</strong>
+                    </span>
+                    @if (!string.IsNullOrWhiteSpace(p.ContributionKind))
+                    {
+                        <span class="badge" style="background:#FAC126;color:#28334A;">@p.ContributionKind</span>
+                    }
+                </li>
+            }
+        </ul>
+    </div>
 }
 <div class="gac-card mb-3">
     <h2 class="h4 h-md-2">خريطة الاستراتيجية الإدارية — @dept?.NameAr</h2>

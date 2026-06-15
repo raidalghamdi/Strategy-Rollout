@@ -18,9 +18,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>@title</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/dga.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/compat.css" asp-append-version="true" />
@@ -46,13 +43,15 @@
 
                 <div class="group-title">الإدارة</div>
                 <a class="@activeIf("Admin")" href="/Admin">لوحة المعلومات</a>
-                <a class="@activeIf("AdminInsights")" href="/AdminInsights">المساهمات</a>
-                <a class="@activeIf("AdminModeration")" href="/AdminModeration">الخريطة والاعتماد</a>
-                <a class="@activeIf("Admin", "Roster")" href="/Admin/Roster">منسوبو الإدارات</a>
-                <a class="@activeIf("AdminQuiz")" href="/AdminQuiz">الاختبار</a>
-                <a class="@activeIf("AdminSurveys")" href="/AdminSurveys">الاستبيان</a>
-                <a class="@activeIf("AdminCodes")" href="/AdminCodes">رموز الدخول</a>
-                <a class="@activeIf("AdminWall")" href="/AdminWall">جدار المشاركات</a>
+                <a class="@activeIf("Admin")" href="/Admin/LiveDashboard">اللوحة الحية</a>
+                <a class="@activeIf("AdminInsights")" href="/Admin/Insights">المساهمات</a>
+                <a class="@activeIf("AdminModeration")" href="/Admin/Moderation">الخريطة والاعتماد</a>
+                <a class="@activeIf("AdminRoster")" href="/Admin/Roster">منسوبو الإدارات</a>
+                <a class="@activeIf("AdminQuiz")" href="/Admin/Quiz">الاختبار</a>
+                <a class="@activeIf("AdminSurveys")" href="/Admin/Surveys">الاستبيان</a>
+                <a class="@activeIf("AdminCodes")" href="/Admin/Codes">رموز الدخول</a>
+                <a class="@activeIf("AdminWall")" href="/Admin/Wall">جدار المشاركات</a>
+                <a class="@activeIf("Admin")" href="/Admin/Content">تحرير النصوص</a>
             </nav>
         </aside>
 
@@ -80,7 +79,7 @@
                 @RenderBody()
             </main>
 
-            <footer class="app-footer">© @DateTime.Now.Year — الهيئة العامة للمنافسة · منصة إطلاق الاستراتيجية</footer>
+            <footer class="app-footer">© @DateTime.Now.Year — @Html.Content("footer.copyright", "الهيئة العامة للمنافسة · منصة إطلاق الاستراتيجية")</footer>
         </div>
     </div>
     <script>
@@ -111,7 +110,7 @@ else
         @RenderBody()
     </main>
     <footer class="cx-public-footer">
-        © @DateTime.Now.Year — الهيئة العامة للمنافسة · منصة إطلاق الاستراتيجية
+        © @DateTime.Now.Year — @Html.Content("footer.copyright", "الهيئة العامة للمنافسة · منصة إطلاق الاستراتيجية")
     </footer>
 }
 

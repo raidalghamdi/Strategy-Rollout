@@ -42,13 +42,30 @@
         }
     </div>
 
-    <div class="row g-2 mt-3 text-center">
-        @foreach (var v in content?.Values ?? new List<StrategyHouse.Web.Configuration.LocalizedText>())
-        {
-            <div class="col-6 col-md"><span class="badge" style="background:#FAC126;">@v.Ar</span></div>
-        }
+    <div class="mt-4">
+        <h3 class="values-heading">القيم</h3>
+        <div class="row g-3 mt-1">
+            @foreach (var v in content?.Values ?? new List<StrategyHouse.Web.Configuration.LocalizedText>())
+            {
+                <div class="col-6 col-md">
+                    <div class="value-card">@v.Ar</div>
+                </div>
+            }
+        </div>
     </div>
 </div>
+
+<style>
+    #stage-3 .values-heading {
+        color: #28334A; font-weight: 800; display: inline-block;
+        border-bottom: 4px solid #FAC126; padding-bottom: 6px; margin-bottom: 4px;
+    }
+    #stage-3 .value-card {
+        padding: 24px 16px; font-size: 1.25rem; font-weight: 700; text-align: center;
+        background: #fff; color: #28334A; border-radius: 10px; height: 100%;
+        border-bottom: 3px solid #FAC126; box-shadow: 0 2px 10px rgba(40,51,74,.08);
+    }
+</style>
 
 <script>
 document.querySelectorAll('#stage-3 .house-obj').forEach(el => {

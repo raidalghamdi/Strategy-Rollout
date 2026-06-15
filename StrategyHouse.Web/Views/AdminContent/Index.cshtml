@@ -1,0 +1,42 @@
+@model List<StrategyHouse.Web.Controllers.ContentItem>
+@{
+    ViewData["Title"] = "تحرير نصوص الصفحات";
+    var labels = new Dictionary<string, string>
+    {
+        ["home.hero.title"] = "العنوان الرئيسي للصفحة الرئيسية",
+        ["home.hero.subtitle"] = "العنوان الفرعي للصفحة الرئيسية",
+        ["journey.landing.intro"] = "مقدمة صفحة الدخول للرحلة",
+        ["journey.stage1.intro"] = "مقدمة المرحلة 1 — الفريق",
+        ["journey.stage2.intro"] = "مقدمة المرحلة 2 — الصورة الكبرى",
+        ["journey.stage3.intro"] = "مقدمة المرحلة 3 — بيت الاستراتيجية",
+        ["journey.stage4.intro"] = "مقدمة المرحلة 4 — المساهمة",
+        ["journey.stage5.intro"] = "مقدمة المرحلة 5 — الخريطة والتوقيع",
+        ["journey.stage6.intro"] = "مقدمة المرحلة 6 — الإتمام",
+        ["quiz.intro"] = "مقدمة الاختبار",
+        ["survey.thank_you"] = "رسالة الشكر بعد الاستبيان",
+        ["footer.copyright"] = "نص حقوق النشر في التذييل",
+    };
+}
+<h1>تحرير نصوص الصفحات</h1>
+<p class="muted">عدّل النصوص الظاهرة للمستخدمين. التغييرات تُحفظ فوراً وتظهر مباشرة على الصفحات.</p>
+
+@if (TempData["Saved"] != null)
+{
+    <div class="alert alert--success">@TempData["Saved"]</div>
+}
+
+<form method="post" action="/Admin/Content/Save">
+    @Html.AntiForgeryToken()
+    @foreach (var item in Model)
+    {
+        <div class="card" style="margin-bottom:14px;">
+            <label class="form-row" style="margin-bottom:0;">
+                <strong>@(labels.TryGetValue(item.Key, out var l) ? l : item.Key)</strong>
+                <span class="hint">@item.Key</span>
+                <input type="hidden" name="keys" value="@item.Key" />
+                <textarea name="values" class="textarea" rows="2">@item.Value</textarea>
+            </label>
+        </div>
+    }
+    <button type="submit" class="btn btn--primary">حفظ جميع التغييرات</button>
+</form>

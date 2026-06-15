@@ -16,6 +16,16 @@ public class QuizController : Controller
 
     public QuizController(ApplicationDbContext db) { _db = db; }
 
+    // GET /Quiz — landing alias so the bare /Quiz URL never 404s. Sends visitors
+    // into the standalone quiz; admins manage the bank at /Admin/Quiz.
+    [HttpGet("Quiz")]
+    public IActionResult Index()
+    {
+        if (User.IsInRole("Admin") || User.IsInRole("Facilitator"))
+            return Redirect("/Admin/Quiz");
+        return RedirectToAction(nameof(Start), new { sessionId = (Guid?)null });
+    }
+
     // GET /Quiz/Start/{sessionId?}
     // Phase 8 — render the quiz questions directly on this page (no intro gate).
     // Anonymous learning tool; works standalone whether or not a session exists.

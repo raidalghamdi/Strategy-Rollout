@@ -1,0 +1,50 @@
+@model List<StrategyHouse.Web.Controllers.LiveSessionRow>
+@{
+    var stageNames = new[] { "", "الفريق", "الصورة", "البيت", "المساهمة", "الخريطة", "الإتمام" };
+}
+@if (!Model.Any())
+{
+    <p class="muted">لا توجد جلسات مطابقة.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle" style="background:#fff;">
+            <thead>
+                <tr>
+                    <th>الإدارة</th>
+                    <th>الرمز</th>
+                    <th style="min-width:170px;">المرحلة</th>
+                    <th>الأعضاء</th>
+                    <th>الخريطة</th>
+                    <th>الاختبار</th>
+                    <th>الاستبيان</th>
+                    <th>آخر نشاط</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model)
+                {
+                    var pct = (int)Math.Round(r.CurrentStage / 6.0 * 100);
+                    <tr style="cursor:pointer;" onclick="location.href='/Admin/SessionDetail/@r.Id'">
+                        <td><strong>@r.DeptName</strong></td>
+                        <td><span class="muted small">@r.AccessCode</span></td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div style="flex:1;background:#e7edf5;border-radius:6px;height:10px;overflow:hidden;min-width:80px;">
+                                    <div style="width:@pct%;background:#299ECE;height:100%;"></div>
+                                </div>
+                                <span class="small">@r.CurrentStage/6 — @stageNames[r.CurrentStage]</span>
+                            </div>
+                        </td>
+                        <td>@r.Members</td>
+                        <td>@(r.MapSigned ? Html.Raw("<span class='badge bg-success'>معتمدة</span>") : Html.Raw("<span class='badge bg-secondary'>—</span>"))</td>
+                        <td>@r.QuizAttempts</td>
+                        <td>@r.SurveyResponses</td>
+                        <td><span class="small">@((r.LastActivityAt ?? r.StartedAt).ToLocalTime().ToString("MM-dd HH:mm"))</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

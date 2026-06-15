@@ -3,11 +3,26 @@
    Clean, corporate, government. Arabic RTL throughout.
    =========================================================== */
 
-/* Phase 8.1 — force Cairo upright site-wide; ends Tajawal weight-synthesis oblique */
-:root { --font: "Cairo", "GE SS Two", "Segoe UI", Tahoma, Arial, sans-serif; }
+/* Phase 9 — self-hosted Cairo, zero external font dependency, no synthesized oblique.
+   The remote Google Fonts link was removed from both layouts; this @font-face is the
+   single source so the font cannot fall back to a synthesized-italic system face. */
+@font-face {
+    font-family: "Cairo";
+    src: url("../fonts/cairo/Cairo-Variable.ttf") format("truetype-variations"),
+         url("../fonts/cairo/Cairo-Variable.ttf") format("truetype");
+    font-weight: 100 900;
+    font-style: normal;        /* explicit normal — there is no italic file to swap to */
+    font-display: swap;
+}
+
+:root { --font: "Cairo", system-ui, "Segoe UI", Tahoma, Arial, sans-serif; }
+
+/* Nuclear option: every element renders upright in Cairo, period.
+   font-synthesis:none stops the browser faux-italicising when a face is missing. */
 html, body, *, *::before, *::after {
-    font-family: "Cairo", "GE SS Two", "Segoe UI", Tahoma, Arial, sans-serif !important;
+    font-family: "Cairo", system-ui, "Segoe UI", Tahoma, Arial, sans-serif !important;
     font-style: normal !important;
+    font-synthesis: none !important;
 }
 /* Keep Bootstrap Icons rendering as glyphs, not text */
 [class^="bi-"], [class*=" bi-"], .bi { font-family: bootstrap-icons !important; }

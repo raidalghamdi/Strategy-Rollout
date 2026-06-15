@@ -36,6 +36,8 @@ public class StrategySession
     public DateTime? CompletedAt { get; set; }
     public DateTime? SignedAt { get; set; }
     [MaxLength(20)] public string Status { get; set; } = "InProgress"; // InProgress / Signed / Locked
+    public int CurrentStage { get; set; } = 1; // Phase 9 — furthest journey stage reached (1..6), for anti-skip + live dashboard
+    public DateTime? LastActivityAt { get; set; } // Phase 9 — bumped on each stage advance, for the live dashboard
     public ICollection<SessionMember> Members { get; set; } = new List<SessionMember>();
 }
 

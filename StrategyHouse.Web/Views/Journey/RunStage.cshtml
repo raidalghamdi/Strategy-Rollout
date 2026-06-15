@@ -1,0 +1,177 @@
+@model StrategyHouse.Web.Controllers.JourneyRunViewModel
+@{
+    Layout = "_JourneyLayout";
+    var stage = (int)ViewBag.Stage;
+    var sessionId = Model.Session.Id;
+    var dept = Model.Dept;
+    var stages = new[]
+    {
+        (1, "الفريق"),
+        (2, "الصورة الكبرى"),
+        (3, "بيت الاستراتيجية"),
+        (4, "المساهمة"),
+        (5, "الخريطة والتوقيع"),
+        (6, "الإتمام"),
+    };
+    var current = stages.First(s => s.Item1 == stage);
+    var introKey = $"journey.stage{stage}.intro";
+    string PartialFor(int s) => s switch
+    {
+        1 => "_StageMembers",
+        2 => "_StageBigPicture",
+        3 => "_StageStrategyHouse",
+        4 => "_StageContribute",
+        5 => "_StageMap",
+        _ => "_StageComplete",
+    };
+    ViewData["Title"] = $"المرحلة {stage} — {current.Item2}";
+    // Stages 1 and 5 advance through their own form submits; the others use the Next button.
+    var nextIsButton = stage != 1 && stage != 5;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/responsive.css" asp-append-version="true" />
+    <style>
+        .journey-stepper {
+            position: sticky; top: 0; z-index: 50; background: #fff;
+            box-shadow: 0 2px 12px rgba(40,51,74,.08);
+            display: flex; gap: 6px; padding: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+        }
+        .journey-stepper .pip {
+            flex: 1 0 auto; min-width: 96px; text-align: center; padding: 8px 10px;
+            border-radius: 10px; background: #e7edf5; color: #5a6b80; font-size: .82rem;
+            text-decoration: none; white-space: nowrap; transition: background .2s;
+        }
+        .journey-stepper .pip.active { background: var(--gac-cyan); color: #04303a; font-weight: 700; }
+        .journey-stepper .pip.done { background: var(--gac-green); color: #fff; }
+        .journey-stepper .pip.locked { opacity: .55; pointer-events: none; }
+        .journey-section .section-title { color: var(--gac-primary); margin-bottom: 6px; }
+        .journey-nav { display:flex; justify-content:space-between; gap:12px; margin-top: 20px; }
+        .journey-progress { font-size:.85rem; color:#5a6b80; text-align:center; margin: 4px 0 14px; }
+        @@media (max-width: 576px) {
+            .journey-stepper .pip { min-width: 76px; font-size: .72rem; padding: 8px 6px; }
+        }
+    </style>
+}
+
+<div class="journey-stepper" id="stepper">
+    @foreach (var (n, label) in stages)
+    {
+        var cls = n == stage ? "active" : (n < stage ? "done" : "locked");
+        var reachable = n <= Math.Min(Model.Session.CurrentStage, 6);
+        if (reachable && n != stage)
+        {
+            <a class="pip @cls" href="/Journey/Run/@sessionId/@n">@n. @label</a>
+        }
+        else
+        {
+            <span class="pip @cls">@n. @label</span>
+        }
+    }
+</div>
+
+<div class="container-fluid px-0 px-md-2 mt-2">
+    <h1 class="h4 text-center my-2">رحلة @dept?.NameAr</h1>
+    <div class="journey-progress">المرحلة @stage من 6 — @current.Item2</div>
+
+    <section id="stage-@stage" class="journey-section is-active" data-stage="@stage">
+        <h2 class="section-title h5">@stage — @current.Item2</h2>
+        <p class="text-muted small">@Html.Content(introKey)</p>
+        @await Html.PartialAsync(PartialFor(stage), Model)
+    </section>
+
+    <div class="journey-nav">
+        <div>
+            @if (stage > 1)
+            {
+                <a class="btn btn-outline-secondary" href="/Journey/Run/@sessionId/@(stage - 1)">⟶ رجوع</a>
+            }
+        </div>
+        <div>
+            @if (stage < 6 && nextIsButton)
+            {
+                <a class="btn gac-btn-primary text-white" href="/Journey/Run/@sessionId/@(stage + 1)">التالي ⟵</a>
+            }
+            else if (stage == 1)
+            {
+                <span class="text-muted small">احفظ الفريق للمتابعة</span>
+            }
+            else if (stage == 5)
+            {
+                <a class="btn btn-outline-secondary" href="/Journey/Run/@sessionId/6">تخطٍّ إلى الإتمام ⟵</a>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    // The stage partials lazily initialise heavy widgets when they receive a
+    // 'stageReady' event (sankey, Konva map, sortable DnD, confetti). On a single-stage
+    // page we fire it once for the rendered stage.
+    var stage = @stage;
+    function fireReady() {
+        if (stage === 5 && window.__stageMapInit) window.__stageMapInit();
+        if (stage === 6 && window.__stageCompleteConfetti) window.__stageCompleteConfetti();
+        document.dispatchEvent(new CustomEvent('stageReady', { detail: { stage: stage } }));
+        if (stage === 2 && typeof initSankey === 'function') initSankey();
+    }
+    document.addEventListener('DOMContentLoaded', fireReady);
+    if (document.readyState !== 'loading') fireReady();
+})();
+</script>
+@if (stage == 2)
+{
+    <script>
+    function initSankey() {
+        const host = document.getElementById('sankey');
+        if (!host || host.__done) return; host.__done = true;
+        let data = {};
+        try { data = JSON.parse(host.getAttribute('data-sankey') || '{}'); } catch (e) {}
+        const NAVY = '#28334A', GREY = '#CECFD2';
+        function render() {
+            host.innerHTML = '';
+            // Wide fixed canvas so long project/KPI names show in full and the
+            // container scrolls horizontally on narrow screens (Phase 9 item 3).
+            const width = Math.max(1800, host.clientWidth);
+            const height = Math.min(700, Math.max(420, (data.nodes ? data.nodes.length : 6) * 30));
+            const svg = d3.select('#sankey').append('svg')
+                .attr('width', width).attr('height', height)
+                .attr('viewBox', '0 0 ' + width + ' ' + height);
+            if (!data.nodes || data.nodes.length === 0) {
+                svg.append('text').attr('x', 20).attr('y', 40)
+                    .text('لا توجد عناصر مرتبطة بهذه الإدارة بعد.').attr('fill', '#5a6b80');
+                return;
+            }
+            const sankey = d3.sankey().nodeWidth(20).nodePadding(16)
+                .extent([[10, 10], [width - 220, height - 10]]);
+            const graph = sankey({
+                nodes: data.nodes.map(d => Object.assign({}, d)),
+                links: data.links.map(d => Object.assign({}, d)),
+            });
+            const link = svg.append('g').attr('fill', 'none').selectAll('path')
+                .data(graph.links).join('path')
+                .attr('d', d3.sankeyLinkHorizontal())
+                .attr('stroke', '#ECECED').attr('stroke-opacity', 0.7)
+                .attr('stroke-width', d => Math.max(1.5, d.width));
+            link.on('mouseenter', function () { d3.select(this).attr('stroke', NAVY).attr('stroke-opacity', 0.3); })
+                .on('mouseleave', function () { d3.select(this).attr('stroke', '#ECECED').attr('stroke-opacity', 0.7); });
+            const node = svg.append('g').selectAll('g').data(graph.nodes).join('g');
+            node.append('rect')
+                .attr('x', d => d.x0).attr('y', d => d.y0)
+                .attr('height', d => Math.max(2, d.y1 - d.y0)).attr('width', d => d.x1 - d.x0)
+                .attr('rx', 3)
+                .attr('fill', d => (d.layer === 'objective' || d.layer === 'vision') ? NAVY : GREY);
+            node.append('text')
+                .attr('y', d => (d.y0 + d.y1) / 2).attr('dy', '0.35em')
+                .attr('font-family', 'Cairo, sans-serif').attr('font-size', '13px').attr('fill', '#1F242F')
+                .attr('x', d => d.x0 < width / 2 ? d.x1 + 8 : d.x0 - 8)
+                .attr('text-anchor', d => d.x0 < width / 2 ? 'start' : 'end')
+                .text(d => d.name);
+        }
+        render();
+    }
+    </script>
+}
+}
