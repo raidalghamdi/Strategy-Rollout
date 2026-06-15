@@ -972,7 +972,10 @@ img { max-width: 100%; height: auto; }
         z-index: 40;
     }
     html[dir="rtl"] .app-sidebar { transform: translateX(100%); }
-    .app-sidebar.open { transform: translateX(0); }
+    .app-sidebar.open,
+    html[dir="rtl"] .app-sidebar.open { transform: translateX(0); box-shadow: -8px 0 24px rgba(0,0,0,.18); }
+    .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 39; display: none; }
+    .sidebar-backdrop.open { display: block; }
     .form-grid { grid-template-columns: 1fr; }
 }
 
