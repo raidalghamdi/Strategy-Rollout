@@ -143,6 +143,19 @@ public class AdminQuizController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    // POST /Admin/Quiz/Reseed — idempotent safety net: if the bank is empty, insert the
+    // 5 demo questions. Never deletes existing questions, so it's safe to click anytime.
+    [HttpPost("Reseed")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Reseed()
+    {
+        var seeded = await AssessmentSeeder.EnsureDemoQuizAsync(_db);
+        TempData["Saved"] = seeded
+            ? "تمت إضافة أسئلة الاختبار التجريبية الخمسة."
+            : "بنك الأسئلة يحتوي على أسئلة بالفعل (لم تتم إضافة أي شيء).";
+        return RedirectToAction(nameof(Index));
+    }
+
     // POST /Admin/Quiz/Create — admin-authored question (pre-approved).
     [HttpPost("Create")]
     [ValidateAntiForgeryToken]

@@ -22,6 +22,10 @@
                 @Html.AntiForgeryToken()
                 <button class="btn btn-outline-success btn-sm">إعادة توليد تلقائياً</button>
             </form>
+            <form method="post" asp-action="Reseed" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button class="btn btn-outline-info btn-sm">استعادة الأسئلة التجريبية</button>
+            </form>
             <a class="btn btn-danger btn-sm" href="/Admin/Quiz/Reset">إعادة تعيين بنك الاختبار</a>
             <a class="btn btn-outline-secondary btn-sm" href="/Admin">رجوع</a>
         </div>

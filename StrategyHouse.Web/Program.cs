@@ -127,6 +127,11 @@ using (var scope = app.Services.CreateScope())
     if (builder.Configuration.GetValue<bool>("Quiz:ResetOnStartup"))
         await AssessmentSeeder.ResetQuizAsync(db);
 
+    // Phase 10.2 — unconditional safety net: if the bank is empty for any reason
+    // (a stale reset flag, a deploy that wiped without reseeding), restore the 5 demo
+    // questions so /Quiz/Start never renders an empty card. Idempotent.
+    await AssessmentSeeder.EnsureDemoQuizAsync(db);
+
     // Phase 6 — predefined department roster (default-checked attendees in stage 1).
     await RosterSeeder.RunAsync(db);
 

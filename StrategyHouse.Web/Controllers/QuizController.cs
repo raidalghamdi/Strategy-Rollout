@@ -29,13 +29,16 @@ public class QuizController : Controller
     // GET /Quiz/Start/{sessionId?}
     // Phase 8 — render the quiz questions directly on this page (no intro gate).
     // Anonymous learning tool; works standalone whether or not a session exists.
-    [HttpGet("Quiz/Start/{sessionId:guid?}")]
-    public async Task<IActionResult> Start(Guid? sessionId)
+    // Phase 10.2 — accept any string segment so a non-GUID id (e.g. /Quiz/Start/1)
+    // still renders the standalone quiz instead of 404ing; parse the GUID best-effort.
+    [HttpGet("Quiz/Start/{sessionId?}")]
+    public async Task<IActionResult> Start(string? sessionId)
     {
+        Guid? sessionGuid = Guid.TryParse(sessionId, out var parsed) ? parsed : null;
         string? deptCode = null;
-        if (sessionId != null)
+        if (sessionGuid != null)
         {
-            var session = await _db.StrategySessions.FindAsync(sessionId.Value);
+            var session = await _db.StrategySessions.FindAsync(sessionGuid.Value);
             if (session != null) deptCode = session.DeptCode;
         }
 
@@ -45,7 +48,7 @@ public class QuizController : Controller
         var rnd = new Random(Random.Shared.Next());
         var picked = all.OrderBy(_ => rnd.Next()).Take(10).ToList();
 
-        ViewBag.SessionId = sessionId;
+        ViewBag.SessionId = sessionGuid;
         ViewBag.Scope = "General";
         ViewBag.DeptCode = deptCode;
         return View(picked);

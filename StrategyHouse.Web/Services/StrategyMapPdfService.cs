@@ -91,7 +91,7 @@ public class StrategyMapPdfService
                     {
                         row.RelativeItem().Column(c =>
                         {
-                            c.Item().Text("خريطة الاستراتيجية الإدارية").FontSize(22).Bold().FontColor(Colors.White);
+                            c.Item().Text("خريطة الاستراتيجية").FontSize(22).Bold().FontColor(Colors.White);
                             c.Item().Text(deptName).FontSize(16).FontColor(Gold);
                         });
                         row.ConstantItem(140).AlignLeft().AlignMiddle().Column(c =>
@@ -156,7 +156,7 @@ public class StrategyMapPdfService
                         {
                             c.Item().Text($"مؤشرات الإدارة ({kpis.Count})").Bold().FontColor(Primary);
                             foreach (var k in kpis.Take(20))
-                                c.Item().Text("• " + (k.KpiName ?? k.KpiCode)).FontSize(9);
+                                c.Item().Text("• " + Controllers.JourneyController.KpiLabel(k)).FontSize(9);
                         });
                         row.RelativeItem().Column(c =>
                         {
