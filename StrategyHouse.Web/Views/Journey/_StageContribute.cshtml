@@ -4,129 +4,100 @@
     var initiatives = Model.Initiatives;
     var pledges = Model.Pledges;
     var pledgedKeys = pledges.Select(p => p.ElementType + ":" + p.ElementCode).ToHashSet();
-
-    string Name(string type, string code)
-    {
-        if (type == "OBJ") return objectives.FirstOrDefault(o => o.ObjectiveCode == code)?.ObjectiveName ?? code;
-        if (type == "INIT") return initiatives.FirstOrDefault(i => i.InitiativeCode == code)?.InitiativeName ?? code;
-        return code;
-    }
 }
 <div class="gac-card">
     <h2 class="h4 h-md-2">أين ترغب إدارتك بالمساهمة؟</h2>
-    <p class="text-muted">اسحب العناصر التي ترغب إدارتك بدعمها من العمود الأيمن إلى عمود «أرغب بالمساهمة».</p>
+    <p class="text-muted">اختر المساهمات التي يلتزم بها فريقك بتحديد المربع «اعتماد» على كل بطاقة. يمكنك إلغاء التحديد لإزالة الاعتماد.</p>
     <style>
-        #stage-4 .dnd-item { cursor: grab; }
-        #stage-4 .dnd-item.sortable-chosen, #stage-4 .dnd-item:active { cursor: grabbing; }
-        #stage-4 .handle { opacity: .5; }
+        #stage-4 .contrib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+        #stage-4 .contrib-card {
+            border: 2px solid #d5dbe4; border-radius: 12px; padding: 14px;
+            background: #fff; transition: border-color .15s, box-shadow .15s;
+        }
+        #stage-4 .contrib-card.is-approved {
+            border-color: #FAC126; box-shadow: 0 2px 10px rgba(250,193,38,.25);
+        }
+        #stage-4 .contrib-card .approve-row {
+            display: flex; align-items: center; gap: 10px; margin-top: 12px;
+            min-height: 44px;
+        }
+        #stage-4 .contrib-card .approve-row input[type=checkbox] {
+            width: 24px; height: 24px; flex: 0 0 auto; cursor: pointer;
+        }
+        #stage-4 .contrib-card .approve-row label { cursor: pointer; font-weight: 700; margin: 0; }
+        #stage-4 .check-badge {
+            display: none; margin-inline-start: auto; background: #FAC126; color: #28334A;
+            font-weight: 800; border-radius: 999px; padding: 2px 12px; font-size: .9rem;
+        }
+        #stage-4 .contrib-card.is-approved .check-badge { display: inline-block; }
+        #stage-4 .type-badge { font-size: .78rem; border-radius: 6px; padding: 2px 8px; color: #fff; }
+        #stage-4 .t-OBJ { background: #28334A; }
+        #stage-4 .t-INIT { background: #5F9600; }
+        #stage-4 .el-name { display: block; margin-top: 8px; font-weight: 600; color: #28334A; }
+        @@media (max-width: 576px) {
+            #stage-4 .contrib-grid { grid-template-columns: 1fr; }
+        }
     </style>
-    <div class="row g-3">
-        <div class="col-12 col-md-6">
-            <div class="contribute-col-head">
-                <h5 class="h6 mb-0">العناصر المتاحة</h5>
-                <span class="count" id="availCount">0</span>
-            </div>
-            <ul id="available" class="dnd-list" data-empty="لا توجد عناصر متاحة">
-                @foreach (var o in objectives)
-                {
-                    if (pledgedKeys.Contains("OBJ:" + o.ObjectiveCode)) { continue; }
-                    <li class="dnd-item" data-type="OBJ" data-code="@o.ObjectiveCode">
-                        <span class="handle">⠿</span>
-                        <span class="type-badge t-OBJ">هدف</span>
-                        <span class="el-name">@o.ObjectiveName</span>
-                    </li>
-                }
-                @foreach (var i in initiatives)
-                {
-                    if (pledgedKeys.Contains("INIT:" + i.InitiativeCode)) { continue; }
-                    <li class="dnd-item" data-type="INIT" data-code="@i.InitiativeCode">
-                        <span class="handle">⠿</span>
-                        <span class="type-badge t-INIT">مبادرة</span>
-                        <span class="el-name">@i.InitiativeName</span>
-                    </li>
-                }
-            </ul>
+
+    @{
+        var cards = objectives
+            .Select(o => (Type: "OBJ", Code: o.ObjectiveCode, Name: o.ObjectiveName, Label: "هدف"))
+            .Concat(initiatives.Select(i => (Type: "INIT", Code: i.InitiativeCode, Name: i.InitiativeName, Label: "مبادرة")))
+            .ToList();
+    }
+    @if (cards.Count == 0)
+    {
+        <div class="alert alert-info">لا توجد عناصر متاحة لهذه الإدارة.</div>
+    }
+    else
+    {
+        <div class="contrib-grid">
+            @foreach (var c in cards)
+            {
+                var approved = pledgedKeys.Contains(c.Type + ":" + c.Code);
+                <div class="contrib-card @(approved ? "is-approved" : "")" data-type="@c.Type" data-code="@c.Code">
+                    <div>
+                        <span class="type-badge t-@c.Type">@c.Label</span>
+                        <span class="check-badge">✓ معتمد</span>
+                    </div>
+                    <span class="el-name">@c.Name</span>
+                    <div class="approve-row">
+                        <input type="checkbox" id="chk-@c.Type-@c.Code" class="contrib-check" @(approved ? "checked" : "") />
+                        <label for="chk-@c.Type-@c.Code">اعتماد</label>
+                    </div>
+                </div>
+            }
         </div>
-        <div class="col-12 col-md-6">
-            <div class="contribute-col-head">
-                <h5 class="h6 mb-0">أرغب بالمساهمة</h5>
-                <span class="count" id="chosenCount">0</span>
-            </div>
-            <ul id="chosen" class="dnd-list" data-empty="اسحب العناصر هنا لإضافتها">
-                @foreach (var p in pledges)
-                {
-                    <li class="dnd-item" data-type="@p.ElementType" data-code="@p.ElementCode" data-saved="1" data-kind="@p.ContributionKind">
-                        <span class="handle">⠿</span>
-                        <span class="type-badge t-@p.ElementType">@(p.ElementType == "OBJ" ? "هدف" : p.ElementType == "INIT" ? "مبادرة" : p.ElementType)</span>
-                        <span class="el-name">@Name(p.ElementType, p.ElementCode)<span class="el-kind"> — @p.ContributionKind</span></span>
-                    </li>
-                }
-            </ul>
-        </div>
-    </div>
+    }
 </div>
 
 <script>
 (function () {
     var sessionId = '@Model.Session.Id';
-    var kinds = ['تنفيذ مباشر', 'دعم فني', 'موارد بشرية', 'بيانات', 'استشاري'];
-    var available = document.getElementById('available');
-    var chosen = document.getElementById('chosen');
-    if (!available || !chosen) return;
 
-    function counts() {
-        document.getElementById('availCount').textContent = available.querySelectorAll('.dnd-item').length;
-        document.getElementById('chosenCount').textContent = chosen.querySelectorAll('.dnd-item').length;
-    }
-
-    function badge(type) {
-        return type === 'OBJ' ? 'هدف' : type === 'INIT' ? 'مبادرة' : type;
-    }
-
-    var booted = false;
-    function boot() {
-        if (booted) return; booted = true;
-        counts();
-        new Sortable(available, { group: 'pledges', animation: 150, filter: 'input, textarea, button' });
-        new Sortable(chosen, {
-            group: 'pledges', animation: 150, filter: 'input, textarea, button',
-            onAdd: function (evt) {
-                var el = evt.item;
-                if (el.dataset.saved) { counts(); return; }
-                var kind = prompt('نوع المساهمة:\n' + kinds.join(' / '), kinds[0]) || kinds[0];
-                el.dataset.saved = '1';
-                el.dataset.kind = kind;
-                var nameEl = el.querySelector('.el-name');
-                var base = nameEl.childNodes[0] ? nameEl.childNodes[0].textContent : nameEl.textContent;
-                nameEl.innerHTML = base + '<span class="el-kind"> — ' + kind + '</span>';
-                fetch('@Url.Action("SavePledge")', {
+    function bind() {
+        document.querySelectorAll('#stage-4 .contrib-check').forEach(function (chk) {
+            if (chk.__bound) return; chk.__bound = true;
+            chk.addEventListener('change', function () {
+                var card = chk.closest('.contrib-card');
+                var type = card.dataset.type, code = card.dataset.code;
+                chk.disabled = true;
+                var url = chk.checked ? '@Url.Action("SavePledge")' : '@Url.Action("RemovePledge")';
+                var body = chk.checked
+                    ? { sessionId: sessionId, elementType: type, elementCode: code, contributionKind: 'التزام' }
+                    : { sessionId: sessionId, elementType: type, elementCode: code };
+                fetch(url, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sessionId: sessionId, elementType: el.dataset.type, elementCode: el.dataset.code, contributionKind: kind })
-                });
-                counts();
-            },
-            onRemove: function (evt) {
-                // Moved back to available → delete the pledge and clear its kind.
-                var el = evt.item;
-                if (el.dataset.saved) {
-                    fetch('@Url.Action("RemovePledge")', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ sessionId: sessionId, elementType: el.dataset.type, elementCode: el.dataset.code })
-                    });
-                    delete el.dataset.saved;
-                    delete el.dataset.kind;
-                    var nameEl = el.querySelector('.el-name');
-                    var base = nameEl.childNodes[0] ? nameEl.childNodes[0].textContent : nameEl.textContent;
-                    nameEl.innerHTML = base;
-                }
-                counts();
-            }
+                    body: JSON.stringify(body)
+                }).then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+                  .then(function () { card.classList.toggle('is-approved', chk.checked); })
+                  .catch(function () { chk.checked = !chk.checked; })
+                  .finally(function () { chk.disabled = false; });
+            });
         });
     }
 
-    // Lazy init: SortableJS only when stage 4 first becomes active (fixes drag bug).
-    document.addEventListener('stageReady', function (e) { if (e.detail && e.detail.stage === 4) boot(); });
-    // Fallback in case stage 4 is the initial deep-link target.
-    if (document.getElementById('stage-4') && document.getElementById('stage-4').classList.contains('is-active')) boot();
+    document.addEventListener('stageReady', function (e) { if (e.detail && e.detail.stage === 4) bind(); });
+    if (document.getElementById('stage-4') && document.getElementById('stage-4').classList.contains('is-active')) bind();
 })();
 </script>

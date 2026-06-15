@@ -123,16 +123,23 @@ public class AdminQuizController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // POST /Admin/Quiz/Reset — destructive: truncate question bank + attempts.
-    [HttpPost("Reset")]
-    [ValidateAntiForgeryToken]
+    // GET /Admin/Quiz/Reset — confirmation page before the destructive reset.
+    [HttpGet("Reset")]
     public async Task<IActionResult> Reset()
     {
-        var attempts = await _db.QuizAttempts.CountAsync();
-        var questions = await _db.QuizQuestions.CountAsync();
-        await _db.QuizAttempts.ExecuteDeleteAsync();
-        await _db.QuizQuestions.ExecuteDeleteAsync();
-        TempData["Saved"] = $"تم حذف {questions} سؤالاً و {attempts} محاولة.";
+        ViewBag.QuestionCount = await _db.QuizQuestions.CountAsync();
+        ViewBag.AttemptCount = await _db.QuizAttempts.CountAsync();
+        return View();
+    }
+
+    // POST /Admin/Quiz/Reset — destructive: truncate attempts + questions, then reseed
+    // the 5 demo questions so analytics start from zero.
+    [HttpPost("Reset")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResetConfirmed()
+    {
+        await AssessmentSeeder.ResetQuizAsync(_db);
+        TempData["Saved"] = "تم إعادة تعيين الاختبار بنجاح";
         return RedirectToAction(nameof(Index));
     }
 

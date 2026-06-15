@@ -8,9 +8,8 @@
 <p class="text-muted">أنشئت: @Model.CreatedAt.ToString("yyyy-MM-dd") — الحالة: @(Model.SignedAt != null ? "موقّعة" : "مسودة")</p>
 
 <div class="row">
-    <div class="col-md-4"><h5>الآراء</h5><p>@Model.OpinionsText</p></div>
-    <div class="col-md-4"><h5>الأمنيات</h5><p>@Model.WishesText</p></div>
-    <div class="col-md-4"><h5>خطوات بسيطة سنبدأ بها</h5><p>@Model.CommitmentsText</p></div>
+    <div class="col-md-6"><h5>الآراء</h5><p>@Model.OpinionsText</p></div>
+    <div class="col-md-6"><h5>خطوات بسيطة سنبدأ بها</h5><p>@Model.CommitmentsText</p></div>
 </div>
 
 <h3 class="mt-4">العناصر المرفقة (@assets.Count)</h3>
