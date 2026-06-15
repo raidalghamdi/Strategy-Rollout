@@ -33,7 +33,7 @@
             var mine = deptObjCodes.Contains(o.ObjectiveCode);
             var bg = mine ? "#28334A" : "#e7edf5";
             var fg = mine ? "#fff" : "#9aa7b8";
-            <div class="col-6 col-md-3">
+            <div class="col-12 col-sm-6 col-md-3">
                 <div class="p-2 text-center house-obj" style="background:@bg;color:@fg;border-radius:8px;cursor:pointer;font-size:.85rem;"
                      data-name="@o.ObjectiveName" data-mine="@mine.ToString().ToLower()">
                     @o.ObjectiveName
@@ -44,12 +44,10 @@
 
     <div class="mt-4">
         <h3 class="values-heading">القيم</h3>
-        <div class="row g-3 mt-1">
+        <div class="values-grid mt-1">
             @foreach (var v in content?.Values ?? new List<StrategyHouse.Web.Configuration.LocalizedText>())
             {
-                <div class="col-6 col-md">
-                    <div class="value-card">@v.Ar</div>
-                </div>
+                <div class="value-card">@v.Ar</div>
             }
         </div>
     </div>

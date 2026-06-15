@@ -24,6 +24,11 @@
         body { font-family: var(--font-ar); background: var(--gac-bg); color: var(--color-gray-900); }
         .gac-topbar { background: var(--gac-navy-dark); color: #fff; padding: 12px 20px; display:flex; align-items:center; gap:14px; box-shadow: var(--shadow-sm); border-bottom: 4px solid var(--gac-gold); }
         .gac-topbar .brand-logo { height: 48px; width: auto; display:block; }
+        .gac-topbar .topbar-title { font-size: clamp(0.9rem, 3vw, 1.1rem); }
+        @@media (max-width: 575.98px) {
+            .gac-topbar { padding: 8px 12px; gap: 8px; }
+            .gac-topbar .brand-logo { height: 32px; }
+        }
         .gac-btn-primary { background: var(--gac-gold); border-color: var(--gac-gold); color: var(--text-on-gold) !important; border-radius: var(--radius-pill); font-weight:700; }
         .gac-btn-primary:hover { background: var(--gac-gold-hover); border-color: var(--gac-gold-hover); color: var(--text-on-gold) !important; }
         .gac-card { background:#fff; border:1px solid var(--border-soft); border-radius: var(--radius-card); box-shadow: var(--shadow-soft); padding:24px; }
@@ -37,7 +42,7 @@
 <body>
     <div class="gac-topbar">
         <img src="~/images/gac-logo-white.png" alt="الهيئة العامة للمنافسة" class="brand-logo" />
-        <span>رحلة الاستراتيجية — الهيئة العامة للمنافسة</span>
+        <span class="topbar-title">رحلة الاستراتيجية — الهيئة العامة للمنافسة</span>
     </div>
     <main class="container py-4">
         @RenderBody()

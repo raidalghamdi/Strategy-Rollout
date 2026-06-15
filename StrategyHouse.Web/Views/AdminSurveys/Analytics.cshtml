@@ -45,7 +45,7 @@
         }
         else if (q.Distribution.Any())
         {
-            <canvas id="qchart-@i" height="90"></canvas>
+            <div class="chart-wrap"><canvas id="qchart-@i"></canvas></div>
         }
         else { <p class="muted small">لا توجد بيانات.</p> }
     </div>
@@ -56,12 +56,12 @@
     <div class="card">
         <h2 class="h5">الردود حسب الإدارة</h2>
         <div class="table-responsive">
-            <table class="table" style="background:#fff;">
+            <table class="table table-responsive-stack" style="background:#fff;">
                 <thead><tr><th>الإدارة</th><th>عدد الردود</th></tr></thead>
                 <tbody>
                     @foreach (var (dept, count) in Model.ByDept)
                     {
-                        <tr><td>@dept</td><td>@count</td></tr>
+                        <tr><td data-label="الإدارة">@dept</td><td data-label="عدد الردود">@count</td></tr>
                     }
                 </tbody>
             </table>
@@ -87,7 +87,7 @@
         new Chart(el, {
             type: 'bar',
             data: { labels: c.labels, datasets: [{ label: 'عدد', data: c.data, backgroundColor: '#5F9600' }] },
-            options: { scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: false } } }
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: false } } }
         });
     });
 })();

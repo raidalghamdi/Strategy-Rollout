@@ -300,10 +300,13 @@ window.__stageMapInit = (function () {
             }));
 
             const sigs = {};
+            const isMobile = window.matchMedia('(max-width: 767.98px)').matches;
+            const sigH = isMobile ? 280 : 200;
             document.querySelectorAll('#stage-5 .sig-wrap').forEach(node => {
                 const mid = node.getAttribute('data-member');
                 const w = node.clientWidth || 600;
-                sigs[mid] = buildPad('sig-' + mid, Math.min(w, 600), 200, '#28334A');
+                // Full container width on mobile; capped on desktop.
+                sigs[mid] = buildPad('sig-' + mid, isMobile ? w : Math.min(w, 600), sigH, '#28334A');
             });
             document.querySelectorAll('#stage-5 .sig-clear').forEach(b => b.addEventListener('click', () => sigs[b.dataset.member]?.clear()));
             document.querySelectorAll('#stage-5 .sig-save').forEach(b => b.addEventListener('click', async () => {

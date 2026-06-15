@@ -45,7 +45,7 @@
                 @switch (q.Type)
                 {
                     case "Likert5":
-                        <div class="d-flex gap-2 flex-wrap">
+                        <div class="survey-likert">
                             @for (int i = 1; i <= 5; i++)
                             {
                                 <div class="form-check">
@@ -79,13 +79,13 @@
                         }
                         break;
                     default:
-                        <textarea name="@name" class="form-control" rows="3" @(q.IsRequired ? "required" : "")></textarea>
+                        <textarea name="@name" class="form-control survey-textarea" rows="3" @(q.IsRequired ? "required" : "")></textarea>
                         break;
                 }
             </div>
         }
 
-        <div class="text-center">
+        <div class="text-center sticky-bottom-cta btn-stack-mobile">
             <button type="submit" class="btn gac-btn-primary text-white btn-lg">إرسال</button>
         </div>
     </form>

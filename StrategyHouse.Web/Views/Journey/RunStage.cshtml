@@ -47,9 +47,17 @@
         .journey-stepper .pip.locked { opacity: .55; pointer-events: none; }
         .journey-section .section-title { color: var(--gac-primary); margin-bottom: 6px; }
         .journey-nav { display:flex; justify-content:space-between; gap:12px; margin-top: 20px; }
+        .journey-nav .nav-side { display: flex; }
         .journey-progress { font-size:.85rem; color:#5a6b80; text-align:center; margin: 4px 0 14px; }
         @@media (max-width: 576px) {
-            .journey-stepper .pip { min-width: 76px; font-size: .72rem; padding: 8px 6px; }
+            .journey-stepper { gap: 4px; padding: 8px; }
+            .journey-stepper .pip { min-width: 0; flex: 1 1 auto; font-size: .68rem; padding: 7px 3px; }
+            /* Stack nav: Next on top, Back below (RTL reads top-down). */
+            .journey-nav { flex-direction: column; gap: 10px; }
+            .journey-nav .nav-side { width: 100%; }
+            .journey-nav .nav-side .btn { width: 100%; }
+            .journey-nav .nav-next { order: 0; }
+            .journey-nav .nav-back { order: 1; }
         }
     </style>
 }
@@ -81,13 +89,13 @@
     </section>
 
     <div class="journey-nav">
-        <div>
+        <div class="nav-side nav-back">
             @if (stage > 1)
             {
                 <a class="btn btn-outline-secondary" href="/Journey/Run/@sessionId/@(stage - 1)">⟶ رجوع</a>
             }
         </div>
-        <div>
+        <div class="nav-side nav-next">
             @if (stage < 6 && nextIsButton)
             {
                 <a class="btn gac-btn-primary text-white" href="/Journey/Run/@sessionId/@(stage + 1)">التالي ⟵</a>
