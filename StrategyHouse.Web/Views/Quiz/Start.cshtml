@@ -99,6 +99,13 @@ async function submit() {
     html += `<div class="quiz-nav quiz-nav--center"><button class="quiz-btn quiz-btn--ghost" onclick="location.reload()">إعادة المحاولة</button></div>`;
     r.innerHTML = html;
 }
+// Expose handlers to global scope so inline onclick handlers can find them
+// (this script runs inside an `if (...) {}` block which creates a block scope)
+window.pick = pick;
+window.next = next;
+window.prev = prev;
+window.submit = submit;
+
 render();
 }
 </script>
