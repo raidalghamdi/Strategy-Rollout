@@ -9,7 +9,7 @@
 else
 {
     <div class="table-responsive">
-        <table class="table table-hover align-middle" style="background:#fff;">
+        <table class="table table-hover align-middle table-responsive-stack" style="background:#fff;">
             <thead>
                 <tr>
                     <th>الإدارة</th>
@@ -27,9 +27,9 @@ else
                 {
                     var pct = (int)Math.Round(r.CurrentStage / 6.0 * 100);
                     <tr style="cursor:pointer;" onclick="location.href='/Admin/SessionDetail/@r.Id'">
-                        <td><strong>@r.DeptName</strong></td>
-                        <td><span class="muted small">@r.AccessCode</span></td>
-                        <td>
+                        <td data-label="الإدارة"><strong>@r.DeptName</strong></td>
+                        <td data-label="الرمز"><span class="muted small">@r.AccessCode</span></td>
+                        <td data-label="المرحلة">
                             <div class="d-flex align-items-center gap-2">
                                 <div style="flex:1;background:#e7edf5;border-radius:6px;height:10px;overflow:hidden;min-width:80px;">
                                     <div style="width:@pct%;background:#299ECE;height:100%;"></div>
@@ -37,11 +37,11 @@ else
                                 <span class="small">@r.CurrentStage/6 — @stageNames[r.CurrentStage]</span>
                             </div>
                         </td>
-                        <td>@r.Members</td>
-                        <td>@(r.MapSigned ? Html.Raw("<span class='badge bg-success'>معتمدة</span>") : Html.Raw("<span class='badge bg-secondary'>—</span>"))</td>
-                        <td>@r.QuizAttempts</td>
-                        <td>@r.SurveyResponses</td>
-                        <td><span class="small">@((r.LastActivityAt ?? r.StartedAt).ToLocalTime().ToString("MM-dd HH:mm"))</span></td>
+                        <td data-label="الأعضاء">@r.Members</td>
+                        <td data-label="الخريطة">@(r.MapSigned ? Html.Raw("<span class='badge bg-success'>معتمدة</span>") : Html.Raw("<span class='badge bg-secondary'>—</span>"))</td>
+                        <td data-label="الاختبار">@r.QuizAttempts</td>
+                        <td data-label="الاستبيان">@r.SurveyResponses</td>
+                        <td data-label="آخر نشاط"><span class="small">@((r.LastActivityAt ?? r.StartedAt).ToLocalTime().ToString("MM-dd HH:mm"))</span></td>
                     </tr>
                 }
             </tbody>

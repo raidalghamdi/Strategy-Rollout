@@ -20,7 +20,7 @@
 {
     <div class="card mb-3">
         <h2 class="h5">متوسط النتيجة لكل إدارة</h2>
-        <canvas id="deptChart" height="120"></canvas>
+        <div class="chart-wrap"><canvas id="deptChart"></canvas></div>
     </div>
 }
 
@@ -33,16 +33,16 @@
     else
     {
         <div class="table-responsive">
-            <table class="table align-middle" style="background:#fff;">
+            <table class="table align-middle table-responsive-stack" style="background:#fff;">
                 <thead><tr><th>السؤال</th><th>صحيحة</th><th>إجمالي</th><th style="min-width:160px;">النسبة</th></tr></thead>
                 <tbody>
                     @foreach (var q in Model.PerQuestion)
                     {
                         <tr>
-                            <td>@q.QuestionAr</td>
-                            <td>@q.Correct</td>
-                            <td>@q.Total</td>
-                            <td>
+                            <td data-label="السؤال">@q.QuestionAr</td>
+                            <td data-label="صحيحة">@q.Correct</td>
+                            <td data-label="إجمالي">@q.Total</td>
+                            <td data-label="النسبة">
                                 <div class="d-flex align-items-center gap-2">
                                     <div style="flex:1;background:#e7edf5;border-radius:6px;height:10px;overflow:hidden;min-width:80px;">
                                         <div style="width:@q.Pct%;background:@(q.Pct < 50 ? "#c0392b" : "#5F9600");height:100%;"></div>
@@ -67,16 +67,16 @@
     else
     {
         <div class="table-responsive">
-            <table class="table" style="background:#fff;">
+            <table class="table table-responsive-stack" style="background:#fff;">
                 <thead><tr><th>المشارك</th><th>الإدارة</th><th>النتيجة</th><th>التاريخ</th></tr></thead>
                 <tbody>
                     @foreach (var a in Model.Recent)
                     {
                         <tr>
-                            <td>@(string.IsNullOrEmpty(a.RespondentName) ? "—" : a.RespondentName)</td>
-                            <td>@a.DeptCode</td>
-                            <td>@a.Score / @a.Total</td>
-                            <td class="small muted">@a.CompletedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td data-label="المشارك">@(string.IsNullOrEmpty(a.RespondentName) ? "—" : a.RespondentName)</td>
+                            <td data-label="الإدارة">@a.DeptCode</td>
+                            <td data-label="النتيجة">@a.Score / @a.Total</td>
+                            <td data-label="التاريخ" class="small muted">@a.CompletedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
                         </tr>
                     }
                 </tbody>
@@ -101,7 +101,7 @@
                 backgroundColor: '#299ECE'
             }]
         },
-        options: { scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
     });
 })();
 </script>

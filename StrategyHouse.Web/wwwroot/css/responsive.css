@@ -49,3 +49,182 @@ img, svg, canvas, table { max-width: 100%; }
 @media (min-width: 769px) {
     .h-md-2 { font-size: 2rem; }
 }
+
+/* ============================================================
+   PHASE 11 — Comprehensive responsive overhaul.
+   Breakpoints: mobile 360-575, tablet 576-991, desktop ≥992.
+   Utility patterns applied across journey, quiz, survey, admin.
+   ============================================================ */
+
+/* Fluid horizontal padding for containers. */
+.gac-container, .container, .container-fluid { padding-inline: clamp(12px, 4vw, 32px); }
+
+/* Card responsive padding. */
+.gac-card { padding: clamp(16px, 4vw, 32px); }
+
+/* Responsive heading scale. */
+h1 { font-size: clamp(1.5rem, 5vw, 2.5rem); line-height: 1.3; }
+h2 { font-size: clamp(1.25rem, 4vw, 2rem); }
+h3 { font-size: clamp(1.1rem, 3vw, 1.5rem); }
+.lead { font-size: clamp(0.95rem, 2vw, 1.15rem); }
+
+/* Primary CTAs in cards go full-width and stack on small screens. */
+@media (max-width: 575.98px) {
+    .btn-stack-mobile { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+    .btn-stack-mobile > .btn,
+    .btn-stack-mobile > a,
+    .btn-stack-mobile > button { width: 100%; display: block; margin: 0; }
+}
+
+/* Tables → cards transformation on mobile (use .table-responsive-stack + data-label). */
+@media (max-width: 767.98px) {
+    .table-responsive-stack { background: transparent; }
+    .table-responsive-stack thead { display: none; }
+    .table-responsive-stack tbody tr {
+        display: block;
+        margin-bottom: 12px;
+        background: #fff;
+        border-radius: 10px;
+        padding: 12px;
+        box-shadow: var(--shadow-soft);
+    }
+    .table-responsive-stack tbody td {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        text-align: start;
+        border: 0;
+        padding: 6px 0;
+    }
+    .table-responsive-stack tbody td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        color: var(--gac-navy);
+        flex: 0 0 auto;
+    }
+    .table-responsive-stack tbody td[data-label]:empty { display: none; }
+}
+
+/* Comfortable tap targets on mobile. */
+@media (max-width: 767.98px) {
+    .form-control, .form-select, .btn { min-height: 44px; }
+    input[type=checkbox], input[type=radio] { min-width: 22px; min-height: 22px; }
+}
+
+/* Sticky bottom CTA on mobile, static on tablet+. */
+.sticky-bottom-cta {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-page);
+    padding: 12px;
+    border-top: 1px solid var(--border-soft);
+    z-index: 20;
+}
+@media (min-width: 768px) {
+    .sticky-bottom-cta { position: static; padding: 0; border: 0; background: transparent; }
+}
+
+/* ---- Global chrome: admin header / sidebar / footer ---- */
+@media (max-width: 767.98px) {
+    .app-header img, .navbar-brand img { max-height: 32px !important; }
+    .gac-topbar .brand-logo, .cx-public-header .brand-logo { max-height: 32px !important; }
+    .app-header strong { font-size: 0.95rem; }
+    .app-footer { text-align: center; }
+}
+@media (min-width: 768px) {
+    .app-header img, .navbar-brand img { max-height: 48px; }
+}
+
+/* Public (unauthenticated) header: stack brand + actions on mobile. */
+@media (max-width: 575.98px) {
+    .cx-public-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .cx-public-header .cx-name { font-size: 0.95rem; }
+    .cx-public-header .cx-tag { font-size: 0.78rem; }
+    .cx-public-actions { width: 100%; justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
+    .cx-public-footer { flex-direction: column; gap: 6px; text-align: center; }
+}
+
+/* ---- Journey navigation: full-width stacked buttons (Next on top) ---- */
+@media (max-width: 575.98px) {
+    .journey-nav { flex-direction: column; gap: 10px; }
+    .journey-nav > .btn,
+    .journey-nav > a { width: 100%; }
+    /* Next (gac-btn-primary) on top, Back below — DOM order keeps Back first,
+       so reverse visually with order. */
+    .journey-nav .journey-next { order: 0; }
+    .journey-nav .journey-back { order: 1; }
+}
+
+/* ---- Journey stage indicator: compact pill row on mobile ---- */
+@media (max-width: 575.98px) {
+    .journey-stepper { gap: 4px; padding: 8px; }
+    .journey-stepper .pip { min-width: 0 !important; flex: 1 1 auto; font-size: 0.7rem; padding: 6px 2px; }
+    .journey-stepper .pip .pip-label { display: none; }
+}
+
+/* ---- Stage 1 (Members) roster → cards on mobile ---- */
+@media (max-width: 767.98px) {
+    .member-row { row-gap: 6px; }
+}
+
+/* ---- Stage 2 (Sankey) scroll hint ---- */
+.sankey-scroll { position: relative; }
+.sankey-hint {
+    display: none;
+    text-align: center;
+    color: var(--gac-blue-accent);
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+@media (max-width: 991.98px) {
+    .sankey-hint { display: block; }
+}
+
+/* ---- Stage 3 (StrategyHouse) values: 1 col mobile / 5 col desktop ---- */
+.values-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 576px) { .values-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 992px) { .values-grid { grid-template-columns: repeat(5, 1fr); } }
+
+/* Stage 4 (Contribute) grid handled in partial's inline <style>:
+   auto-fill minmax(280px,1fr) → 1/2/3 cols, with 44px tap rows. */
+
+/* ---- Stage 5 (Map) signing canvas full-width on mobile ---- */
+@media (max-width: 767.98px) {
+    .sig-wrap, .sig-wrap canvas { width: 100% !important; }
+    .ink-wrap, .ink-wrap canvas { width: 100% !important; }
+    #mapCanvas { width: 100% !important; }
+}
+
+/* ---- Quiz: single column always; large tap targets; sticky submit ---- */
+.quiz-options .quiz-option { min-height: 44px; }
+@media (max-width: 575.98px) {
+    .quiz-nav.sticky-bottom-cta { position: sticky; }
+}
+
+/* ---- Survey: likert wraps on small mobile; responsive textarea height ---- */
+.survey-likert { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 480px) {
+    .survey-likert .form-check { flex: 1 1 40%; }
+}
+.survey-textarea { min-height: 120px; }
+@media (min-width: 768px) { .survey-textarea { min-height: 200px; } }
+
+/* ---- Admin index card grid: 1 / 2 / 3-4 cols ---- */
+@media (max-width: 575.98px) {
+    .grid-3 { grid-template-columns: 1fr; }
+}
+@media (min-width: 576px) and (max-width: 991.98px) {
+    .grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 992px) {
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ---- Chart.js: height-bounded wrapper ---- */
+.chart-wrap { position: relative; height: clamp(220px, 40vh, 380px); width: 100%; }
+
+/* ---- Sticky save bar for CMS / forms on mobile ---- */
+@media (max-width: 767.98px) {
+    .form-control, .textarea, .input, .select { width: 100%; }
+}

@@ -61,7 +61,7 @@ function render() {
             <span>${esc(opt)}</span></label>`;
     });
     html += `</div>`;
-    html += `<div class="quiz-nav">`;
+    html += `<div class="quiz-nav sticky-bottom-cta">`;
     html += cur > 0 ? `<button class="quiz-btn quiz-btn--ghost" onclick="prev()">السابق</button>` : `<span></span>`;
     html += cur < questions.length - 1
         ? `<button class="quiz-btn quiz-btn--primary" onclick="next()">التالي</button>`
