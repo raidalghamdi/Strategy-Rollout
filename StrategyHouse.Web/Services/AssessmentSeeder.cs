@@ -27,7 +27,24 @@ public static class AssessmentSeeder
     private static async Task SeedDemoQuizAsync(ApplicationDbContext db)
     {
         if (await db.QuizQuestions.AnyAsync()) return;
+        db.QuizQuestions.AddRange(BuildDemoQuestions());
+        await db.SaveChangesAsync();
+    }
 
+    // Phase 10 — full reset: wipe all attempts + questions, then reseed the 5 demo
+    // questions so analytics start from zero. Used by the admin reset action and the
+    // optional Quiz:ResetOnStartup flag.
+    public static async Task ResetQuizAsync(ApplicationDbContext db)
+    {
+        await db.QuizAttempts.ExecuteDeleteAsync();
+        await db.QuizQuestions.ExecuteDeleteAsync();
+        db.QuizQuestions.AddRange(BuildDemoQuestions());
+        await db.SaveChangesAsync();
+    }
+
+    // The five hand-crafted demo questions (approved + active).
+    public static List<QuizQuestion> BuildDemoQuestions()
+    {
         QuizQuestion Mcq(string q, string[] opts, int correct) => new()
         {
             Scope = "General",
@@ -75,8 +92,7 @@ public static class AssessmentSeeder
             }, 1),
         };
 
-        db.QuizQuestions.AddRange(demo);
-        await db.SaveChangesAsync();
+        return demo;
     }
 
     private static async Task SeedProgrammeSurveyAsync(ApplicationDbContext db)

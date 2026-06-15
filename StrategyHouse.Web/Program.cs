@@ -122,6 +122,11 @@ using (var scope = app.Services.CreateScope())
     var quiz = scope.ServiceProvider.GetRequiredService<QuizGeneratorService>();
     await AssessmentSeeder.RunAsync(db, quiz);
 
+    // Phase 10 — optional one-time quiz reset on startup (controlled by Quiz:ResetOnStartup).
+    // Wipes all attempts + questions and reseeds the 5 demo questions. Default false.
+    if (builder.Configuration.GetValue<bool>("Quiz:ResetOnStartup"))
+        await AssessmentSeeder.ResetQuizAsync(db);
+
     // Phase 6 — predefined department roster (default-checked attendees in stage 1).
     await RosterSeeder.RunAsync(db);
 

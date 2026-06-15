@@ -180,7 +180,6 @@ public class StrategyMapPdfService
                             });
                         }
                         Section("الآراء", Primary, map.OpinionsText, "opinion");
-                        Section("الأمنيات", Green, map.WishesText, "wish");
                         if (commitmentFilled)
                             Section("خطوات بسيطة سنبدأ بها", Gold, map.CommitmentsText, "commitment");
                     });

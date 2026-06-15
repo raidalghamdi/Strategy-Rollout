@@ -22,7 +22,7 @@
                 @Html.AntiForgeryToken()
                 <button class="btn btn-outline-success btn-sm">إعادة توليد تلقائياً</button>
             </form>
-            <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#resetModal">إعادة تعيين بنك الأسئلة</button>
+            <a class="btn btn-danger btn-sm" href="/Admin/Quiz/Reset">إعادة تعيين بنك الاختبار</a>
             <a class="btn btn-outline-secondary btn-sm" href="/Admin">رجوع</a>
         </div>
     </div>
@@ -141,28 +141,6 @@
             </div></div>
         }
     }
-</div>
-
-<!-- Reset confirmation modal -->
-<div class="modal fade" id="resetModal" tabindex="-1" dir="rtl">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title">تأكيد إعادة التعيين</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                سيؤدي هذا إلى <strong>حذف جميع الأسئلة (@total) وجميع محاولات الاختبار نهائياً</strong>. لا يمكن التراجع.
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
-                <form method="post" asp-action="Reset">
-                    @Html.AntiForgeryToken()
-                    <button class="btn btn-danger">نعم، احذف كل شيء</button>
-                </form>
-            </div>
-        </div>
-    </div>
 </div>
 
 <!-- Manual create modal -->

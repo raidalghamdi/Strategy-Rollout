@@ -1,0 +1,33 @@
+@{
+    ViewData["Title"] = "إعادة تعيين بنك الاختبار";
+    var questionCount = (int)(ViewBag.QuestionCount ?? 0);
+    var attemptCount = (int)(ViewBag.AttemptCount ?? 0);
+}
+
+@section Styles {
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
+}
+
+<div class="container py-4" dir="rtl">
+    <div class="card border-danger mx-auto" style="max-width:640px;">
+        <div class="card-header bg-danger text-white">
+            <h1 class="h4 mb-0">تأكيد إعادة تعيين بنك الاختبار</h1>
+        </div>
+        <div class="card-body">
+            <p>سيؤدي هذا الإجراء إلى:</p>
+            <ul>
+                <li>حذف <strong>جميع محاولات الاختبار (@attemptCount محاولة)</strong> — تبدأ التحليلات من الصفر.</li>
+                <li>حذف <strong>جميع الأسئلة الحالية (@questionCount سؤالاً)</strong>.</li>
+                <li>إعادة إدراج <strong>5 أسئلة تجريبية</strong> نظيفة ومعتمدة.</li>
+            </ul>
+            <div class="alert alert-warning">لا يمكن التراجع عن هذا الإجراء.</div>
+            <div class="d-flex flex-wrap gap-2">
+                <form method="post" asp-action="ResetConfirmed">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-danger">تأكيد إعادة التعيين</button>
+                </form>
+                <a class="btn btn-outline-secondary" href="/Admin/Quiz">إلغاء</a>
+            </div>
+        </div>
+    </div>
+</div>

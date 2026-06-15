@@ -250,7 +250,7 @@ public class JourneyController : Controller
     // POST /Journey/SaveMap — saves layout JSON + texts.
     [HttpPost("Journey/SaveMap/{sessionId:guid}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveMap(Guid sessionId, string? mapLayoutJson, string? opinions, string? wishes, string? commitments)
+    public async Task<IActionResult> SaveMap(Guid sessionId, string? mapLayoutJson, string? opinions, string? commitments)
     {
         var session = await _db.StrategySessions.FindAsync(sessionId);
         if (session == null) return NotFound();
@@ -267,7 +267,6 @@ public class JourneyController : Controller
         }
         map.MapLayoutJson = mapLayoutJson;
         map.OpinionsText = opinions;
-        map.WishesText = wishes;
         map.CommitmentsText = commitments;
         await _db.SaveChangesAsync();
         TempData["Saved"] = "تم حفظ الخريطة.";
@@ -344,7 +343,7 @@ public class JourneyController : Controller
         if (map.SignedAt != null) return BadRequest(new { ok = false, error = "locked" });
 
         var kind = (dto.AssetKind ?? "").Trim().ToLowerInvariant();
-        if (kind is not ("opinion" or "wish" or "commitment"))
+        if (kind is not ("opinion" or "commitment"))
             return BadRequest(new { ok = false, error = "kind" });
 
         var png = DecodePng(dto.PngBase64);

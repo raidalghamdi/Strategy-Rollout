@@ -82,7 +82,6 @@ public class DepartmentStrategyMap
     [Required, MaxLength(15)] public string DeptCode { get; set; } = string.Empty;
     [Column(TypeName = "longtext")] public string? MapLayoutJson { get; set; }
     [Column(TypeName = "longtext")] public string? OpinionsText { get; set; }
-    [Column(TypeName = "longtext")] public string? WishesText { get; set; }
     [Column(TypeName = "longtext")] public string? CommitmentsText { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -99,7 +98,7 @@ public class MapInkAsset
 {
     [Key] public Guid Id { get; set; } = Guid.NewGuid();
     public Guid MapId { get; set; }
-    [Required, MaxLength(30)] public string AssetKind { get; set; } = string.Empty; // opinion / wish / commitment / signature / supporting
+    [Required, MaxLength(30)] public string AssetKind { get; set; } = string.Empty; // opinion / commitment / signature / supporting
     [Column(TypeName = "longblob")] public byte[]? PngBlob { get; set; }
     [Column(TypeName = "longtext")] public string? StrokesJson { get; set; } // Phase 3 raw strokes
     [MaxLength(255)] public string? AuthorName { get; set; }

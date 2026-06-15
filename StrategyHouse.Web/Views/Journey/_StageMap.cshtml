@@ -85,13 +85,12 @@
         @{
             var sections = new[] {
                 ("opinion", "opinions", "الآراء", "#28334A", map?.OpinionsText),
-                ("wish", "wishes", "الأمنيات", "#5F9600", map?.WishesText),
                 ("commitment", "commitments", "خطوات بسيطة سنبدأ بها", "#FAC126", map?.CommitmentsText),
             };
         }
         @foreach (var (kind, field, label, color, text) in sections)
         {
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-6">
                 <label class="form-label fw-bold" style="color:@color;">
                     @label
                     @if (kind == "commitment")
@@ -272,7 +271,7 @@ window.__stageMapInit = (function () {
         {
             <text>
             const pads = {};
-            ['opinion','wish','commitment'].forEach(kind => {
+            ['opinion','commitment'].forEach(kind => {
                 const node = document.getElementById('ink-' + kind);
                 if (!node) return;
                 const color = node.getAttribute('data-color');
