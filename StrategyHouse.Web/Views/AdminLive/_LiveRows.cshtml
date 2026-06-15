@@ -1,6 +1,7 @@
 @model List<StrategyHouse.Web.Controllers.LiveSessionRow>
 @{
-    var stageNames = new[] { "", "الفريق", "الصورة", "البيت", "المساهمة", "الخريطة", "الإتمام" };
+    var stageNames = new[] { "", "الصورة", "البيت", "المساهمة", "الخريطة", "الإتمام" };
+    string StageName(int s) => s >= 1 && s < stageNames.Length ? stageNames[s] : "";
 }
 @if (!Model.Any())
 {
@@ -25,7 +26,7 @@ else
             <tbody>
                 @foreach (var r in Model)
                 {
-                    var pct = (int)Math.Round(r.CurrentStage / 6.0 * 100);
+                    var pct = (int)Math.Round(Math.Clamp(r.CurrentStage, 1, 5) / 5.0 * 100);
                     <tr style="cursor:pointer;" onclick="location.href='/Admin/SessionDetail/@r.Id'">
                         <td data-label="الإدارة"><strong>@r.DeptName</strong></td>
                         <td data-label="الرمز"><span class="muted small">@r.AccessCode</span></td>
@@ -34,7 +35,7 @@ else
                                 <div style="flex:1;background:#e7edf5;border-radius:6px;height:10px;overflow:hidden;min-width:80px;">
                                     <div style="width:@pct%;background:#299ECE;height:100%;"></div>
                                 </div>
-                                <span class="small">@r.CurrentStage/6 — @stageNames[r.CurrentStage]</span>
+                                <span class="small">@Math.Clamp(r.CurrentStage, 1, 5)/5 — @StageName(Math.Clamp(r.CurrentStage, 1, 5))</span>
                             </div>
                         </td>
                         <td data-label="الأعضاء">@r.Members</td>

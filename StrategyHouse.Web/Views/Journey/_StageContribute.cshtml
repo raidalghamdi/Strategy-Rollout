@@ -9,33 +9,33 @@
     <h2 class="h4 h-md-2">أين ترغب إدارتك بالمساهمة؟</h2>
     <p class="text-muted">اختر المساهمات التي يلتزم بها فريقك بتحديد المربع «اعتماد» على كل بطاقة. يمكنك إلغاء التحديد لإزالة الاعتماد.</p>
     <style>
-        #stage-4 .contrib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-        #stage-4 .contrib-card {
+        #stage-3 .contrib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+        #stage-3 .contrib-card {
             border: 2px solid #d5dbe4; border-radius: 12px; padding: 14px;
             background: #fff; transition: border-color .15s, box-shadow .15s;
         }
-        #stage-4 .contrib-card.is-approved {
+        #stage-3 .contrib-card.is-approved {
             border-color: #FAC126; box-shadow: 0 2px 10px rgba(250,193,38,.25);
         }
-        #stage-4 .contrib-card .approve-row {
+        #stage-3 .contrib-card .approve-row {
             display: flex; align-items: center; gap: 10px; margin-top: 12px;
             min-height: 44px;
         }
-        #stage-4 .contrib-card .approve-row input[type=checkbox] {
+        #stage-3 .contrib-card .approve-row input[type=checkbox] {
             width: 24px; height: 24px; flex: 0 0 auto; cursor: pointer;
         }
-        #stage-4 .contrib-card .approve-row label { cursor: pointer; font-weight: 700; margin: 0; }
-        #stage-4 .check-badge {
+        #stage-3 .contrib-card .approve-row label { cursor: pointer; font-weight: 700; margin: 0; }
+        #stage-3 .check-badge {
             display: none; margin-inline-start: auto; background: #FAC126; color: #28334A;
             font-weight: 800; border-radius: 999px; padding: 2px 12px; font-size: .9rem;
         }
-        #stage-4 .contrib-card.is-approved .check-badge { display: inline-block; }
-        #stage-4 .type-badge { font-size: .78rem; border-radius: 6px; padding: 2px 8px; color: #fff; }
-        #stage-4 .t-OBJ { background: #28334A; }
-        #stage-4 .t-INIT { background: #5F9600; }
-        #stage-4 .el-name { display: block; margin-top: 8px; font-weight: 600; color: #28334A; }
+        #stage-3 .contrib-card.is-approved .check-badge { display: inline-block; }
+        #stage-3 .type-badge { font-size: .78rem; border-radius: 6px; padding: 2px 8px; color: #fff; }
+        #stage-3 .t-OBJ { background: #28334A; }
+        #stage-3 .t-INIT { background: #5F9600; }
+        #stage-3 .el-name { display: block; margin-top: 8px; font-weight: 600; color: #28334A; }
         @@media (max-width: 576px) {
-            #stage-4 .contrib-grid { grid-template-columns: 1fr; }
+            #stage-3 .contrib-grid { grid-template-columns: 1fr; }
         }
     </style>
 
@@ -76,7 +76,7 @@
     var sessionId = '@Model.Session.Id';
 
     function bind() {
-        document.querySelectorAll('#stage-4 .contrib-check').forEach(function (chk) {
+        document.querySelectorAll('#stage-3 .contrib-check').forEach(function (chk) {
             if (chk.__bound) return; chk.__bound = true;
             chk.addEventListener('change', function () {
                 var card = chk.closest('.contrib-card');
@@ -97,7 +97,7 @@
         });
     }
 
-    document.addEventListener('stageReady', function (e) { if (e.detail && e.detail.stage === 4) bind(); });
-    if (document.getElementById('stage-4') && document.getElementById('stage-4').classList.contains('is-active')) bind();
+    document.addEventListener('stageReady', function (e) { if (e.detail && e.detail.stage === 3) bind(); });
+    if (document.getElementById('stage-3') && document.getElementById('stage-3').classList.contains('is-active')) bind();
 })();
 </script>

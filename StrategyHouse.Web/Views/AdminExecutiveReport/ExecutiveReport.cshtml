@@ -1,0 +1,188 @@
+@model StrategyHouse.Web.Models.ExecutiveReportViewModel
+@{
+    ViewData["Title"] = "التقرير التنفيذي";
+}
+
+<div class="card mb-3" style="background:linear-gradient(135deg,#00192B 0%,#0E2A47 60%,#0069A7 100%);color:#fff;border:0;">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <h1 class="mb-1" style="color:#fff;">التقرير التنفيذي</h1>
+            <p class="mb-0" style="color:#FAC126;">بناء البيت الاستراتيجي — رحلة الإدارات · الهيئة العامة للمنافسة</p>
+            <p class="mb-0 small" style="color:#cfe2f0;">تم الإنشاء: @Model.GeneratedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/Admin/ExecutiveReport.pdf" class="btn btn--primary btn-sm">تصدير PDF</a>
+            <a href="/Admin/ExecutiveReport.csv" class="btn btn--secondary btn-sm">تصدير CSV</a>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <h2 class="h5">الملخص التنفيذي</h2>
+    <div class="grid-3 my-2">
+        <div class="card"><h3>@Model.Overview.TotalSessions</h3><p class="muted small">إجمالي الجلسات</p></div>
+        <div class="card"><h3>@Model.Overview.TotalCompletedSessions</h3><p class="muted small">الجلسات المكتملة</p></div>
+        <div class="card"><h3>@Model.Overview.TotalDepartmentsEngaged</h3><p class="muted small">الإدارات المشاركة</p></div>
+        <div class="card"><h3>@Model.Overview.TotalAttendees</h3><p class="muted small">إجمالي الحضور</p></div>
+        <div class="card"><h3>@Model.Overview.AvgQuizScore.ToString("0.##") / 5</h3><p class="muted small">متوسط الاختبار</p></div>
+        <div class="card"><h3>@(Model.Overview.AvgSurveyClarity > 0 ? Model.Overview.AvgSurveyClarity.ToString("0.##") + " / 5" : "—")</h3><p class="muted small">وضوح الاستراتيجية</p></div>
+        <div class="card"><h3>@(Model.Overview.AvgContributionCapability > 0 ? Model.Overview.AvgContributionCapability.ToString("0.##") + " / 5" : "—")</h3><p class="muted small">القدرة على المساهمة</p></div>
+        <div class="card"><h3>@Model.MapsCount</h3><p class="muted small">الخرائط الاستراتيجية</p></div>
+        <div class="card"><h3>@Model.GroupSignatures.TotalCount</h3><p class="muted small">تواقيع الفرق</p></div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <h2 class="h5">الحضور حسب الإدارة</h2>
+    @if (Model.DepartmentBreakdown.Any())
+    {
+        <div class="chart-wrap" style="height:280px;"><canvas id="chart-depts"></canvas></div>
+        <div class="table-responsive mt-3">
+            <table class="table table-hover align-middle" style="background:#fff;">
+                <thead>
+                    <tr><th>الإدارة</th><th>الجلسات</th><th>الحضور</th><th>نسبة الإكمال</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in Model.DepartmentBreakdown)
+                    {
+                        <tr>
+                            <td><strong>@d.DeptName</strong></td>
+                            <td>@d.SessionsCount</td>
+                            <td>@d.AttendeesCount</td>
+                            <td>@d.CompletionRate.ToString("0.#")%</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else { <p class="muted">لا توجد بيانات إدارات بعد.</p> }
+</div>
+
+<div class="grid-2 mb-3">
+    <div class="card">
+        <h2 class="h5">توزيع نتائج الاختبار</h2>
+        <p class="muted small">إجمالي المحاولات: @Model.QuizAnalytics.TotalAttempts · المتوسط: @Model.QuizAnalytics.AvgScore.ToString("0.##") / 5</p>
+        @if (Model.QuizAnalytics.TotalAttempts > 0)
+        {
+            <div class="chart-wrap" style="height:240px;"><canvas id="chart-quiz"></canvas></div>
+        }
+        else { <p class="muted">لا توجد محاولات بعد.</p> }
+        @if (Model.QuizAnalytics.Top3MostMissed.Any())
+        {
+            <h3 class="h6 text-warning mt-3">أكثر الأسئلة صعوبة</h3>
+            <ul class="small">
+                @foreach (var q in Model.QuizAnalytics.Top3MostMissed)
+                {
+                    <li>@q.QuestionAr — نسبة الخطأ @q.MissRate.ToString("0.#")% (@q.Attempts محاولة)</li>
+                }
+            </ul>
+        }
+    </div>
+    <div class="card">
+        <h2 class="h5">وضوح الاستراتيجية (السؤال 1)</h2>
+        @{ var clarity = Model.SurveyMetrics.FirstOrDefault(x => x.Order == 1); }
+        @if (clarity != null)
+        {
+            <p class="muted small">@clarity.QuestionAr</p>
+            <div class="chart-wrap" style="height:200px;"><canvas id="chart-clarity"></canvas></div>
+            <p class="small mt-2">@clarity.Headline</p>
+        }
+        else { <p class="muted">لا توجد بيانات استبيان بعد.</p> }
+    </div>
+</div>
+
+@if (Model.SurveyMetrics.Any())
+{
+    <div class="card mb-3">
+        <h2 class="h5">مؤشرات الاستبيان الرسمي</h2>
+        <ul class="list-group list-group-flush">
+            @foreach (var s in Model.SurveyMetrics.OrderBy(x => x.Order))
+            {
+                <li class="list-group-item">
+                    <strong>السؤال @s.Order:</strong> @s.QuestionAr
+                    <div class="muted small">@s.Type · @s.Headline</div>
+                </li>
+            }
+        </ul>
+    </div>
+}
+
+<div class="grid-2 mb-3">
+    <div class="card">
+        <h2 class="h5">أبرز الأهداف</h2>
+        @if (Model.Contributions.TopObjectives.Any())
+        {
+            <ul class="list-group list-group-flush">
+                @foreach (var o in Model.Contributions.TopObjectives)
+                {
+                    <li class="list-group-item d-flex justify-content-between"><span>@o.Name</span><span class="badge bg-primary">@o.Count</span></li>
+                }
+            </ul>
+        }
+        else { <p class="muted">لا توجد مساهمات بعد.</p> }
+    </div>
+    <div class="card">
+        <h2 class="h5">أبرز المبادرات</h2>
+        @if (Model.Contributions.TopInitiatives.Any())
+        {
+            <ul class="list-group list-group-flush">
+                @foreach (var i in Model.Contributions.TopInitiatives)
+                {
+                    <li class="list-group-item d-flex justify-content-between"><span>@i.Name</span><span class="badge bg-info">@i.Count</span></li>
+                }
+            </ul>
+        }
+        else { <p class="muted">لا توجد مساهمات بعد.</p> }
+    </div>
+</div>
+
+<div class="card mb-3">
+    <h2 class="h5">تواقيع الفرق وتعليقاتها</h2>
+    <p class="muted small">إجمالي التواقيع: @Model.GroupSignatures.TotalCount</p>
+    @if (Model.GroupSignatures.RecentComments.Any())
+    {
+        <ul class="list-group list-group-flush">
+            @foreach (var c in Model.GroupSignatures.RecentComments)
+            {
+                <li class="list-group-item">
+                    <div class="d-flex justify-content-between">
+                        <strong>@c.DeptName</strong>
+                        <span class="muted small">@c.CapturedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span>
+                    </div>
+                    <div>@c.Text</div>
+                </li>
+            }
+        </ul>
+    }
+    else { <p class="muted">لا توجد تعليقات بعد.</p> }
+</div>
+
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    if (typeof Chart === 'undefined') return;
+
+    var deptLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DepartmentBreakdown.Select(d => d.DeptName)));
+    var deptAttendees = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DepartmentBreakdown.Select(d => d.AttendeesCount)));
+    var quizBuckets = [@Model.QuizAnalytics.Bucket0to2, @Model.QuizAnalytics.Bucket3to4, @Model.QuizAnalytics.Bucket5];
+    var clarityDist = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Overview.SurveyClarityDistribution));
+
+    var elDepts = document.getElementById('chart-depts');
+    if (elDepts && deptLabels.length) {
+        new Chart(elDepts, { type: 'bar', data: { labels: deptLabels, datasets: [{ label: 'الحضور', data: deptAttendees, backgroundColor: '#0069A7' }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } } });
+    }
+
+    var elQuiz = document.getElementById('chart-quiz');
+    if (elQuiz) {
+        new Chart(elQuiz, { type: 'doughnut', data: { labels: ['منخفض (0-2)', 'متوسط (3-4)', 'ممتاز (5)'], datasets: [{ data: quizBuckets, backgroundColor: ['#E74C3C', '#FAC126', '#009845'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
+    }
+
+    var elClarity = document.getElementById('chart-clarity');
+    if (elClarity) {
+        new Chart(elClarity, { type: 'bar', data: { labels: ['1', '2', '3', '4', '5'], datasets: [{ label: 'التكرار', data: clarityDist, backgroundColor: '#299ECE' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } } });
+    }
+})();
+</script>
+}
