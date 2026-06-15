@@ -18,17 +18,19 @@ public static class AssessmentSeeder
     // Phase 6: seed 5 hand-crafted demo questions so the quiz is never empty.
     public static async Task RunAsync(ApplicationDbContext db, QuizGeneratorService quiz)
     {
-        await SeedDemoQuizAsync(db);
+        await EnsureDemoQuizAsync(db);
         await SeedProgrammeSurveyAsync(db);
     }
 
     // Phase 6 — idempotent: only seeds when the bank is completely empty so admin
     // curation is never overwritten. All five are approved + active demo questions.
-    private static async Task SeedDemoQuizAsync(ApplicationDbContext db)
+    // Phase 10.2 — exposed so startup and the admin reseed endpoint share one safety net.
+    public static async Task<bool> EnsureDemoQuizAsync(ApplicationDbContext db)
     {
-        if (await db.QuizQuestions.AnyAsync()) return;
+        if (await db.QuizQuestions.AnyAsync()) return false;
         db.QuizQuestions.AddRange(BuildDemoQuestions());
         await db.SaveChangesAsync();
+        return true;
     }
 
     // Phase 10 — full reset: wipe all attempts + questions, then reseed the 5 demo

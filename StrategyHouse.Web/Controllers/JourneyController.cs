@@ -458,6 +458,18 @@ public class JourneyController : Controller
         await _db.StrategySessions.AsNoTracking().Include(s => s.Members)
             .FirstOrDefaultAsync(s => s.Id == id);
 
+    // Prefixes a KPI label with its type in Arabic; unknown types render the name as-is.
+    public static string KpiLabel(Kpi k)
+    {
+        var name = k.KpiName ?? k.KpiCode;
+        var type = (k.KpiType ?? string.Empty).Trim();
+        if (type is "استراتيجي" or "Strategic")
+            return "مؤشر استراتيجي: " + name;
+        if (type is "تشغيلي" or "Operational")
+            return "مؤشر تشغيلي: " + name;
+        return name;
+    }
+
     // Builds nodes/links for the dept's contribution chain:
     // KPIs/Projects → Objectives → Pillars → Vision.
     private async Task<object> BuildSankeyAsync(string deptCode)
@@ -493,7 +505,7 @@ public class JourneyController : Controller
         // KPIs → Objective → Pillar
         foreach (var k in kpis.Take(15))
         {
-            var ki = AddNode("K:" + k.KpiCode, k.KpiName ?? k.KpiCode, "kpi");
+            var ki = AddNode("K:" + k.KpiCode, KpiLabel(k), "kpi");
             var obj = objectives.FirstOrDefault(o => o.ObjectiveCode == k.ObjectiveCode);
             if (obj != null)
             {
