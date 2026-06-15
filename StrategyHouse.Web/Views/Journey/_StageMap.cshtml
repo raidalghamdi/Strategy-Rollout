@@ -42,22 +42,18 @@
 {
     <div class="gac-card mb-3">
         <h3 class="h5" style="color:#28334A;font-weight:800;border-bottom:4px solid #FAC126;display:inline-block;padding-bottom:6px;">مساهمات الفريق</h3>
-        <p class="text-muted small mt-2">العناصر التي اختارت إدارتك المساهمة فيها في المرحلة السابقة.</p>
-        <ul class="list-group">
+        <p class="text-muted small mt-2">الالتزامات التي اختارت إدارتك المساهمة فيها في المرحلة السابقة.</p>
+        <div class="d-grid gap-2" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">
             @foreach (var p in pledges)
             {
-                <li class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <span>
-                        <span class="badge" style="background:@(p.ElementType == "OBJ" ? "#28334A" : "#5F9600");">@(p.ElementType == "OBJ" ? "هدف" : p.ElementType == "INIT" ? "مبادرة" : p.ElementType)</span>
-                        <strong class="ms-2">@PledgeName(p.ElementType, p.ElementCode)</strong>
-                    </span>
-                    @if (!string.IsNullOrWhiteSpace(p.ContributionKind))
-                    {
-                        <span class="badge" style="background:#FAC126;color:#28334A;">@p.ContributionKind</span>
-                    }
-                </li>
+                var typeLabel = p.ElementType == "OBJ" ? "هدف" : p.ElementType == "INIT" ? "مبادرة" : p.ElementType;
+                var typeColor = p.ElementType == "OBJ" ? "#28334A" : "#5F9600";
+                <div class="commitment-card" style="border:2px solid #FAC126;border-radius:12px;padding:14px;background:#fff;box-shadow:0 2px 10px rgba(250,193,38,.18);">
+                    <span class="badge" style="background:@typeColor;">@typeLabel</span>
+                    <p class="mb-0 mt-2" style="color:#28334A;font-weight:600;font-size:1.02rem;line-height:1.7;">@PledgeName(p.ElementType, p.ElementCode)</p>
+                </div>
             }
-        </ul>
+        </div>
     </div>
 }
 <div class="gac-card mb-3">
@@ -158,15 +154,25 @@
         @foreach (var m in Model.Session.Members)
         {
             var hasSig = sigByMember.TryGetValue(m.Id, out var sig) && sig != null;
-            <div class="row g-2 mb-3 align-items-center border-bottom pb-2">
+            var hasInk = hasSig && sig!.PngBlob != null;
+            var typed = hasSig ? sig!.TypedText : null;
+            <div class="row g-2 mb-3 align-items-start border-bottom pb-2">
                 <div class="col-12 col-md-3"><strong>@m.NameAr</strong> <div class="text-muted small">@m.Role</div></div>
                 <div class="col-12 col-md-6">
                     <div class="sig-wrap" data-member="@m.Id" style="touch-action:none;border:1px solid #299ECE;border-radius:8px;background:#fff;@(hasSig ? "display:none;" : "")">
                         <div id="sig-@m.Id"></div>
                     </div>
-                    @if (hasSig)
+                    @if (hasInk)
                     {
                         <img id="sigimg-@m.Id" src="/Journey/Ink/@sig!.Id" style="max-width:100%;width:240px;height:80px;object-fit:contain;border:1px solid #eee;border-radius:6px;" />
+                    }
+                    <div class="mt-2 sig-typed-wrap" data-member="@m.Id" style="@(hasSig ? "display:none;" : "")">
+                        <label class="form-label small text-muted mb-1" for="sigtext-@m.Id">أو اكتب اسمك أو ملاحظة</label>
+                        <input type="text" id="sigtext-@m.Id" class="form-control sig-text" data-member="@m.Id" maxlength="500" placeholder="اكتب اسمك أو ملاحظة قصيرة..." />
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(typed))
+                    {
+                        <div class="mt-1 sig-typed-view" style="color:#28334A;font-weight:600;">✍️ @typed</div>
                     }
                 </div>
                 <div class="col-12 col-md-3 d-flex flex-wrap gap-2 align-items-center">
@@ -202,7 +208,7 @@ window.__stageMapInit = (function () {
 
         const kpis = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(kpis.Select(k => k.KpiName ?? k.KpiCode)));
         const projects = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(projects.Select(p => p.ProjectName ?? p.ProjectCode)));
-        const pledges = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(pledges.Select(p => p.ElementCode + " — " + p.ContributionKind)));
+        const pledges = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(pledges.Select(p => PledgeName(p.ElementType, p.ElementCode))));
         const cont = document.getElementById('mapCanvas');
         let width = cont.clientWidth || 900;
         const stage = new Konva.Stage({ container: 'mapCanvas', width, height: 360 });
@@ -303,11 +309,15 @@ window.__stageMapInit = (function () {
             document.querySelectorAll('#stage-5 .sig-save').forEach(b => b.addEventListener('click', async () => {
                 const mid = b.dataset.member, pad = sigs[mid];
                 const status = document.querySelector('#stage-5 .sig-status[data-member="' + mid + '"]');
-                if (!pad || pad.isEmpty()) { status.textContent = 'وقّع أولاً'; status.className = 'sig-status text-danger small'; return; }
+                const textEl = document.querySelector('#stage-5 .sig-text[data-member="' + mid + '"]');
+                const typedText = textEl ? textEl.value.trim() : '';
+                const hasInk = pad && !pad.isEmpty();
+                // A row counts as signed if the canvas has ink OR the member typed text.
+                if (!hasInk && !typedText) { status.textContent = 'وقّع بالقلم أو اكتب اسمك أولاً'; status.className = 'sig-status text-danger small'; return; }
                 status.textContent = 'جارٍ الحفظ...';
                 const res = await fetch('/Journey/SaveSignature', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': csrf },
-                    body: JSON.stringify({ memberId: mid, pngBase64: pad.png(), strokesJson: pad.strokesJson() })
+                    body: JSON.stringify({ memberId: mid, pngBase64: hasInk ? pad.png() : null, strokesJson: hasInk ? pad.strokesJson() : null, typedText: typedText || null })
                 });
                 const data = await res.json().catch(() => ({}));
                 if (data.ok) { status.textContent = 'تم التوقيع ✓'; status.className = 'sig-status text-success small'; setTimeout(() => location.reload(), 700); }

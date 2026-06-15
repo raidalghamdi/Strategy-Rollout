@@ -101,6 +101,7 @@ public class MapInkAsset
     [Required, MaxLength(30)] public string AssetKind { get; set; } = string.Empty; // opinion / commitment / signature / supporting
     [Column(TypeName = "longblob")] public byte[]? PngBlob { get; set; }
     [Column(TypeName = "longtext")] public string? StrokesJson { get; set; } // Phase 3 raw strokes
+    [MaxLength(500)] public string? TypedText { get; set; } // Phase 10.1 — free-text a team member may type alongside (or instead of) the pen signature
     [MaxLength(255)] public string? AuthorName { get; set; }
     public Guid? MemberId { get; set; } // Phase 3 — links a signature asset to a SessionMember
     public DateTime CapturedAt { get; set; } = DateTime.UtcNow;

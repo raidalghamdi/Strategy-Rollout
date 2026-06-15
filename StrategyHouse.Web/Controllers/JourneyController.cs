@@ -312,9 +312,11 @@ public class JourneyController : Controller
         var kpis = await _db.Kpis.Where(k => k.DepartmentCode == session.DeptCode).ToListAsync();
         var projects = await _db.Projects.Where(p => p.DepartmentCode == session.DeptCode).ToListAsync();
         var inkAssets = await _db.MapInkAssets.Where(a => a.MapId == map.Id).ToListAsync();
+        var objectives = await _db.Objectives.ToListAsync();
+        var initiatives = await _db.Initiatives.ToListAsync();
         try
         {
-            map.PdfBlob = _pdf.Generate(map, dept, session.Members.ToList(), pledges, pillars, kpis, projects, inkAssets);
+            map.PdfBlob = _pdf.Generate(map, dept, session.Members.ToList(), pledges, pillars, kpis, projects, inkAssets, objectives, initiatives);
             await _db.SaveChangesAsync();
         }
         catch
@@ -382,7 +384,9 @@ public class JourneyController : Controller
         if (map.SignedAt != null) return BadRequest(new { ok = false, error = "locked" });
 
         var png = DecodePng(dto.PngBase64);
-        if (png == null) return BadRequest(new { ok = false, error = "png" });
+        var typedText = string.IsNullOrWhiteSpace(dto.TypedText) ? null : dto.TypedText.Trim();
+        // A row counts as signed if it has ink OR typed text (Phase 10.1 — dual signing).
+        if (png == null && typedText == null) return BadRequest(new { ok = false, error = "empty" });
 
         var now = DateTime.UtcNow;
         var asset = new MapInkAsset
@@ -391,6 +395,7 @@ public class JourneyController : Controller
             AssetKind = "signature",
             PngBlob = png,
             StrokesJson = dto.StrokesJson,
+            TypedText = typedText,
             AuthorName = member.NameAr,
             MemberId = member.Id,
             // Signatures are the member's own work — auto-approve so they appear in the PDF.
@@ -401,6 +406,7 @@ public class JourneyController : Controller
         };
         _db.MapInkAssets.Add(asset);
         member.SignedAt = now;
+        if (typedText != null) member.TypedSignature = typedText;
         _db.ModerationAuditLogs.Add(new ModerationAuditLog
         {
             TargetType = "MapInkAsset",
@@ -580,4 +586,5 @@ public class SignatureDto
     public Guid MemberId { get; set; }
     public string? PngBase64 { get; set; }
     public string? StrokesJson { get; set; }
+    public string? TypedText { get; set; }
 }
