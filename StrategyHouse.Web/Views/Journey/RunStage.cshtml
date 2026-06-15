@@ -6,27 +6,25 @@
     var dept = Model.Dept;
     var stages = new[]
     {
-        (1, "الفريق"),
-        (2, "الصورة الكبرى"),
-        (3, "بيت الاستراتيجية"),
-        (4, "المساهمة"),
-        (5, "الخريطة والتوقيع"),
-        (6, "الإتمام"),
+        (1, "الصورة الكبرى"),
+        (2, "بيت الاستراتيجية"),
+        (3, "المساهمة"),
+        (4, "الخريطة والتوقيع"),
+        (5, "الإتمام"),
     };
     var current = stages.First(s => s.Item1 == stage);
     var introKey = $"journey.stage{stage}.intro";
     string PartialFor(int s) => s switch
     {
-        1 => "_StageMembers",
-        2 => "_StageBigPicture",
-        3 => "_StageStrategyHouse",
-        4 => "_StageContribute",
-        5 => "_StageMap",
+        1 => "_StageBigPicture",
+        2 => "_StageStrategyHouse",
+        3 => "_StageContribute",
+        4 => "_StageMap",
         _ => "_StageComplete",
     };
     ViewData["Title"] = $"المرحلة {stage} — {current.Item2}";
-    // Stages 1 and 5 advance through their own form submits; the others use the Next button.
-    var nextIsButton = stage != 1 && stage != 5;
+    // The Map stage (4) advances through its own group-signature flow; the others use the Next button.
+    var nextIsButton = stage != 4;
 }
 
 @section Styles {
@@ -66,7 +64,7 @@
     @foreach (var (n, label) in stages)
     {
         var cls = n == stage ? "active" : (n < stage ? "done" : "locked");
-        var reachable = n <= Math.Min(Model.Session.CurrentStage, 6);
+        var reachable = n <= Math.Min(Model.Session.CurrentStage, 5);
         if (reachable && n != stage)
         {
             <a class="pip @cls" href="/Journey/Run/@sessionId/@n">@n. @label</a>
@@ -80,7 +78,7 @@
 
 <div class="container-fluid px-0 px-md-2 mt-2">
     <h1 class="h4 text-center my-2">رحلة @dept?.NameAr</h1>
-    <div class="journey-progress">المرحلة @stage من 6 — @current.Item2</div>
+    <div class="journey-progress">المرحلة @stage من 5 — @current.Item2</div>
 
     <section id="stage-@stage" class="journey-section is-active" data-stage="@stage">
         <h2 class="section-title h5">@stage — @current.Item2</h2>
@@ -96,17 +94,13 @@
             }
         </div>
         <div class="nav-side nav-next">
-            @if (stage < 6 && nextIsButton)
+            @if (stage < 5 && nextIsButton)
             {
                 <a class="btn gac-btn-primary text-white" href="/Journey/Run/@sessionId/@(stage + 1)">التالي ⟵</a>
             }
-            else if (stage == 1)
+            else if (stage == 4)
             {
-                <span class="text-muted small">احفظ الفريق للمتابعة</span>
-            }
-            else if (stage == 5)
-            {
-                <a class="btn btn-outline-secondary" href="/Journey/Run/@sessionId/6">تخطٍّ إلى الإتمام ⟵</a>
+                <a class="btn gac-btn-primary text-white" href="/Journey/Run/@sessionId/5">المتابعة إلى الإتمام ⟵</a>
             }
         </div>
     </div>
@@ -120,16 +114,16 @@
     // page we fire it once for the rendered stage.
     var stage = @stage;
     function fireReady() {
-        if (stage === 5 && window.__stageMapInit) window.__stageMapInit();
-        if (stage === 6 && window.__stageCompleteConfetti) window.__stageCompleteConfetti();
+        if (stage === 4 && window.__stageMapInit) window.__stageMapInit();
+        if (stage === 5 && window.__stageCompleteConfetti) window.__stageCompleteConfetti();
         document.dispatchEvent(new CustomEvent('stageReady', { detail: { stage: stage } }));
-        if (stage === 2 && typeof initSankey === 'function') initSankey();
+        if (stage === 1 && typeof initSankey === 'function') initSankey();
     }
     document.addEventListener('DOMContentLoaded', fireReady);
     if (document.readyState !== 'loading') fireReady();
 })();
 </script>
-@if (stage == 2)
+@if (stage == 1)
 {
     <script>
     function initSankey() {

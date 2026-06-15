@@ -115,6 +115,9 @@ builder.Services.AddScoped<SurveyReportPdfService>();
 // Phase 12 — official survey analytics + final report
 builder.Services.AddScoped<SurveyAnalyticsService>();
 builder.Services.AddScoped<SurveyFinalReportPdfService>();
+// Phase 13 — executive report
+builder.Services.AddScoped<ExecutiveReportService>();
+builder.Services.AddScoped<ExecutiveReportPdfDocument>();
 // Phase 6 — DB-only chatbot
 builder.Services.AddScoped<ChatbotService>();
 

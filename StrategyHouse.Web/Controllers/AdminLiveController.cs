@@ -77,7 +77,7 @@ public class AdminLiveController : Controller
             DeptName = deptNames.TryGetValue(s.DeptCode, out var n) ? n : s.DeptCode,
             AccessCode = s.AccessCodeUsed,
             Status = s.Status,
-            CurrentStage = Math.Clamp(s.CurrentStage, 1, 6),
+            CurrentStage = Math.Clamp(s.CurrentStage, 1, 5),
             StartedAt = s.StartedAt,
             LastActivityAt = s.LastActivityAt,
             Members = memberCounts.TryGetValue(s.Id, out var mc) ? mc : 0,

@@ -11,6 +11,10 @@ namespace StrategyHouse.Web.Controllers;
 [AllowAnonymous]
 public class JourneyController : Controller
 {
+    // Phase 13 — the Members stage was removed; the journey is now 5 stages:
+    // 1 BigPicture · 2 StrategyHouse · 3 Contribute · 4 Map (group signature + attendee count) · 5 Complete.
+    private const int MaxStage = 5;
+
     private readonly ApplicationDbContext _db;
     private readonly StrategyContentService _content;
     private readonly StrategyMapPdfService _pdf;
@@ -63,7 +67,7 @@ public class JourneyController : Controller
     {
         var session = await _db.StrategySessions.FindAsync(sessionId);
         if (session == null) return NotFound();
-        var stage = Math.Clamp(session.CurrentStage <= 0 ? 1 : session.CurrentStage, 1, 6);
+        var stage = Math.Clamp(session.CurrentStage <= 0 ? 1 : session.CurrentStage, 1, MaxStage);
         return RedirectToAction(nameof(RunStage), new { sessionId, stage });
     }
 
@@ -76,10 +80,22 @@ public class JourneyController : Controller
         if (tracked == null) return NotFound();
 
         // Clamp the requested stage so users can't jump ahead of where they've reached.
-        var maxAllowed = Math.Clamp((tracked.CurrentStage <= 0 ? 1 : tracked.CurrentStage) + 1, 1, 6);
-        stage = Math.Clamp(stage, 1, 6);
+        var maxAllowed = Math.Clamp((tracked.CurrentStage <= 0 ? 1 : tracked.CurrentStage) + 1, 1, MaxStage);
+        stage = Math.Clamp(stage, 1, MaxStage);
         if (stage > maxAllowed)
             return RedirectToAction(nameof(RunStage), new { sessionId, stage = maxAllowed });
+
+        // Phase 13 — gate entry to Complete (stage 5): the team must have entered an
+        // attendee count AND saved a group signature (typed comment OR ink) on the Map stage.
+        if (stage == 5)
+        {
+            var ready = await IsMapStageCompleteAsync(tracked);
+            if (!ready)
+            {
+                TempData["Error"] = "قبل الإتمام، يُرجى إدخال عدد الحاضرين وحفظ توقيع الفريق (كتابة أو رسم) في مرحلة الخريطة.";
+                return RedirectToAction(nameof(RunStage), new { sessionId, stage = 4 });
+            }
+        }
 
         // Record progress: bump the furthest stage reached + activity timestamp.
         if (stage > tracked.CurrentStage)
@@ -128,76 +144,36 @@ public class JourneyController : Controller
         };
     }
 
-    // GET /Journey/Members/{sessionId} — deep-link alias → multi-page stage.
+    // GET /Journey/Members/{sessionId} — Phase 13: Members stage removed → redirect to Stage 1 (BigPicture).
     [HttpGet("Journey/Members/{sessionId:guid}")]
     public IActionResult Members(Guid sessionId) => RedirectToRun(sessionId, 1);
 
     private IActionResult RedirectToRun(Guid sessionId, int stage) =>
         RedirectToAction(nameof(RunStage), new { sessionId, stage });
 
+    // POST /Journey/AddMembers/{sessionId} — Phase 13: the Members stage is gone. The route
+    // is kept so stale clients don't 404; it no longer writes members and simply sends the
+    // team to Stage 1 (BigPicture).
     [HttpPost("Journey/AddMembers/{sessionId:guid}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AddMembers(Guid sessionId, string[]? rosterIds, string[]? names, string[]? roles)
-    {
-        var session = await _db.StrategySessions
-            .Include(s => s.Members)
-            .FirstOrDefaultAsync(s => s.Id == sessionId);
-        if (session == null) return NotFound();
+    public IActionResult AddMembers(Guid sessionId) => RedirectToRun(sessionId, 1);
 
-        var existing = session.Members.Select(m => m.NameAr).ToHashSet();
+    // POST /Journey/SkipMembers/{sessionId} — Phase 13: kept for stale clients → Stage 1.
+    [HttpPost("Journey/SkipMembers/{sessionId:guid}")]
+    [ValidateAntiForgeryToken]
+    public IActionResult SkipMembers(Guid sessionId) => RedirectToRun(sessionId, 1);
 
-        // Checked roster members (Phase 6) — resolve names from the roster table.
-        var ids = (rosterIds ?? Array.Empty<string>())
-            .Select(x => Guid.TryParse(x, out var g) ? g : Guid.Empty)
-            .Where(g => g != Guid.Empty).ToList();
-        if (ids.Count > 0)
-        {
-            var roster = await _db.DepartmentRoster
-                .Where(r => ids.Contains(r.MemberId) && r.DeptCode == session.DeptCode)
-                .ToListAsync();
-            foreach (var r in roster)
-            {
-                if (!existing.Add(r.NameAr)) continue;
-                _db.SessionMembers.Add(new SessionMember { SessionId = sessionId, NameAr = r.NameAr, Role = r.Role });
-            }
-        }
-
-        // Manually typed extra members.
-        var nm = names ?? Array.Empty<string>();
-        var rl = roles ?? Array.Empty<string>();
-        for (var i = 0; i < nm.Length; i++)
-        {
-            if (string.IsNullOrWhiteSpace(nm[i])) continue;
-            var name = nm[i].Trim();
-            if (!existing.Add(name)) continue;
-            _db.SessionMembers.Add(new SessionMember
-            {
-                SessionId = sessionId,
-                NameAr = name,
-                Role = i < rl.Length ? rl[i]?.Trim() : null,
-            });
-        }
-
-        // Phase 7 — stamp the first time a team roster is saved so the journey
-        // can surface the quiz launch on Stage 1.
-        if (session.MembersSubmittedAt == null && (session.Members.Count > 0 || existing.Count > 0))
-            session.MembersSubmittedAt = DateTime.UtcNow;
-
-        await _db.SaveChangesAsync();
-        return RedirectToRun(sessionId, 2);
-    }
-
-    // GET /Journey/BigPicture/{sessionId} — deep-link alias → single page section.
+    // GET /Journey/BigPicture/{sessionId} — deep-link alias → Stage 1.
     [HttpGet("Journey/BigPicture/{sessionId:guid}")]
-    public IActionResult BigPicture(Guid sessionId) => RedirectToRun(sessionId, 2);
+    public IActionResult BigPicture(Guid sessionId) => RedirectToRun(sessionId, 1);
 
-    // GET /Journey/StrategyHouse/{sessionId} — deep-link alias → single page section.
+    // GET /Journey/StrategyHouse/{sessionId} — deep-link alias → Stage 2.
     [HttpGet("Journey/StrategyHouse/{sessionId:guid}")]
-    public IActionResult StrategyHouse(Guid sessionId) => RedirectToRun(sessionId, 3);
+    public IActionResult StrategyHouse(Guid sessionId) => RedirectToRun(sessionId, 2);
 
-    // GET /Journey/Contribute/{sessionId} — deep-link alias → single page section.
+    // GET /Journey/Contribute/{sessionId} — deep-link alias → Stage 3.
     [HttpGet("Journey/Contribute/{sessionId:guid}")]
-    public IActionResult Contribute(Guid sessionId) => RedirectToRun(sessionId, 4);
+    public IActionResult Contribute(Guid sessionId) => RedirectToRun(sessionId, 3);
 
     // POST /Journey/SavePledge — JSON endpoint.
     [HttpPost("Journey/SavePledge")]
@@ -234,9 +210,102 @@ public class JourneyController : Controller
         return Json(new { ok = true, removed = matches.Count });
     }
 
-    // GET /Journey/Map/{sessionId} — deep-link alias → single page section.
+    // GET /Journey/Map/{sessionId} — deep-link alias → Stage 4.
     [HttpGet("Journey/Map/{sessionId:guid}")]
-    public IActionResult Map(Guid sessionId) => RedirectToRun(sessionId, 5);
+    public IActionResult Map(Guid sessionId) => RedirectToRun(sessionId, 4);
+
+    // POST /Journey/SaveAttendeeCount — Phase 13: team enters how many department
+    // employees are present. One value per session, editable until the map is signed.
+    [HttpPost("Journey/SaveAttendeeCount/{sessionId:guid}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveAttendeeCount(Guid sessionId, int attendeeCount)
+    {
+        var session = await _db.StrategySessions.FindAsync(sessionId);
+        if (session == null) return NotFound();
+        if (attendeeCount < 1 || attendeeCount > 500)
+        {
+            TempData["Error"] = "أدخل عدداً صحيحاً بين 1 و500.";
+            return RedirectToRun(sessionId, 4);
+        }
+        session.AttendeeCount = attendeeCount;
+        session.LastActivityAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        TempData["Saved"] = "تم حفظ عدد الحاضرين.";
+        return RedirectToRun(sessionId, 4);
+    }
+
+    // POST /Journey/SaveGroupSignature — Phase 13: one group signature per session,
+    // replacing the per-member signature pads. Accepts a hand-drawn PNG and/or a typed
+    // comment (at least one required). Stored as a MapInkAsset with MemberId = NULL.
+    // A previous active group signature for this session's map is deactivated first.
+    [HttpPost("Journey/SaveGroupSignature")]
+    [RequestSizeLimit(25_000_000)]
+    public async Task<IActionResult> SaveGroupSignature([FromBody] GroupSignatureDto dto)
+    {
+        var session = await _db.StrategySessions.FindAsync(dto.SessionId);
+        if (session == null) return NotFound();
+
+        var map = await _db.DepartmentStrategyMaps.FirstOrDefaultAsync(m => m.SessionId == dto.SessionId);
+        if (map == null)
+        {
+            map = new DepartmentStrategyMap { SessionId = dto.SessionId, DeptCode = session.DeptCode };
+            _db.DepartmentStrategyMaps.Add(map);
+            await _db.SaveChangesAsync();
+        }
+        if (map.SignedAt != null) return BadRequest(new { ok = false, error = "locked" });
+
+        var png = DecodePng(dto.PngBase64);
+        var typedText = string.IsNullOrWhiteSpace(dto.TypedText) ? null : dto.TypedText.Trim();
+        if (typedText != null && typedText.Length > 2000) typedText = typedText[..2000];
+        // A group signature counts if it has ink OR a typed comment.
+        if (png == null && typedText == null) return BadRequest(new { ok = false, error = "empty" });
+
+        // Deactivate any prior active group signature (MemberId == null) for this map.
+        var prior = await _db.MapInkAssets
+            .Where(a => a.MapId == map.Id && a.AssetKind == "signature" && a.MemberId == null && a.IsActive)
+            .ToListAsync();
+        foreach (var p in prior) p.IsActive = false;
+
+        var now = DateTime.UtcNow;
+        var asset = new MapInkAsset
+        {
+            MapId = map.Id,
+            AssetKind = "signature",
+            PngBlob = png,
+            StrokesJson = dto.StrokesJson,
+            TypedText = typedText,
+            AuthorName = "الفريق",
+            MemberId = null, // Phase 13 — group signature is not tied to an individual member.
+            ModerationStatus = "Approved",
+            ModeratedAt = now,
+            ModeratedBy = "system:group-sig",
+            IsActive = true,
+        };
+        _db.MapInkAssets.Add(asset);
+        session.LastActivityAt = now;
+        _db.ModerationAuditLogs.Add(new ModerationAuditLog
+        {
+            TargetType = "MapInkAsset",
+            TargetId = asset.Id,
+            Action = "Approve",
+            ActorUserId = "system:group-sig",
+            Note = "auto-approved group signature on capture",
+        });
+        await _db.SaveChangesAsync();
+        return Json(new { ok = true, assetId = asset.Id });
+    }
+
+    // True when the team has both entered an attendee count and saved a group signature
+    // (typed comment OR ink). Gates advancing from Map (4) to Complete (5).
+    private async Task<bool> IsMapStageCompleteAsync(StrategySession session)
+    {
+        if (session.AttendeeCount is not > 0) return false;
+        var map = await _db.DepartmentStrategyMaps.FirstOrDefaultAsync(m => m.SessionId == session.Id);
+        if (map == null) return false;
+        return await _db.MapInkAssets.AnyAsync(a =>
+            a.MapId == map.Id && a.AssetKind == "signature" && a.MemberId == null && a.IsActive
+            && (a.PngBlob != null || a.TypedText != null));
+    }
 
     // GET /Journey/Ink/{assetId} — streams a captured ink/signature PNG (for in-journey preview).
     [HttpGet("Journey/Ink/{assetId:guid}")]
@@ -263,14 +332,14 @@ public class JourneyController : Controller
         if (map.SignedAt != null)
         {
             TempData["Error"] = "الخريطة موقّعة ومقفلة.";
-            return RedirectToRun(sessionId, 5);
+            return RedirectToRun(sessionId, 4);
         }
         map.MapLayoutJson = mapLayoutJson;
         map.OpinionsText = opinions;
         map.CommitmentsText = commitments;
         await _db.SaveChangesAsync();
         TempData["Saved"] = "تم حفظ الخريطة.";
-        return RedirectToRun(sessionId, 5);
+        return RedirectToRun(sessionId, 4);
     }
 
     // POST /Journey/SignMap — lock map, generate PDF.
@@ -596,6 +665,15 @@ public class InkDto
 public class SignatureDto
 {
     public Guid MemberId { get; set; }
+    public string? PngBase64 { get; set; }
+    public string? StrokesJson { get; set; }
+    public string? TypedText { get; set; }
+}
+
+// Phase 13 — one group signature per session (hand drawing and/or typed comment).
+public class GroupSignatureDto
+{
+    public Guid SessionId { get; set; }
     public string? PngBase64 { get; set; }
     public string? StrokesJson { get; set; }
     public string? TypedText { get; set; }

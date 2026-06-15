@@ -36,8 +36,9 @@ public class StrategySession
     public DateTime? CompletedAt { get; set; }
     public DateTime? SignedAt { get; set; }
     [MaxLength(20)] public string Status { get; set; } = "InProgress"; // InProgress / Signed / Locked
-    public int CurrentStage { get; set; } = 1; // Phase 9 — furthest journey stage reached (1..6), for anti-skip + live dashboard
+    public int CurrentStage { get; set; } = 1; // Phase 9 — furthest journey stage reached (1..5 since Phase 13), for anti-skip + live dashboard
     public DateTime? LastActivityAt { get; set; } // Phase 9 — bumped on each stage advance, for the live dashboard
+    public int? AttendeeCount { get; set; } // Phase 13 — number of department employees present, entered by the team on the Map stage
     public ICollection<SessionMember> Members { get; set; } = new List<SessionMember>();
 }
 
@@ -101,7 +102,7 @@ public class MapInkAsset
     [Required, MaxLength(30)] public string AssetKind { get; set; } = string.Empty; // opinion / commitment / signature / supporting
     [Column(TypeName = "longblob")] public byte[]? PngBlob { get; set; }
     [Column(TypeName = "longtext")] public string? StrokesJson { get; set; } // Phase 3 raw strokes
-    [MaxLength(500)] public string? TypedText { get; set; } // Phase 10.1 — free-text a team member may type alongside (or instead of) the pen signature
+    [MaxLength(2000)] public string? TypedText { get; set; } // Phase 10.1 — free-text alongside/instead of pen ink; widened to 2000 in Phase 13 for the group comment
     [MaxLength(255)] public string? AuthorName { get; set; }
     public Guid? MemberId { get; set; } // Phase 3 — links a signature asset to a SessionMember
     public DateTime CapturedAt { get; set; } = DateTime.UtcNow;
