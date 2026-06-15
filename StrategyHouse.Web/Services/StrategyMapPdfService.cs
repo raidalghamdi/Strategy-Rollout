@@ -42,10 +42,23 @@ public class StrategyMapPdfService
         IReadOnlyList<Pillar> pillars,
         IReadOnlyList<Kpi> kpis,
         IReadOnlyList<Project> projects,
-        IReadOnlyList<MapInkAsset>? inkAssets = null)
+        IReadOnlyList<MapInkAsset>? inkAssets = null,
+        IReadOnlyList<Objective>? objectives = null,
+        IReadOnlyList<Initiative>? initiatives = null)
     {
         var deptName = department.NameAr ?? department.DeptCode;
         var date = (map.SignedAt ?? map.CreatedAt).ToString("yyyy-MM-dd");
+
+        objectives ??= new List<Objective>();
+        initiatives ??= new List<Initiative>();
+        // Resolve a pledge to the full Arabic commitment text the team saw in Stage 4,
+        // not its code/value.
+        string PledgeText(ContributionPledge p) => p.ElementType switch
+        {
+            "OBJ" => objectives.FirstOrDefault(o => o.ObjectiveCode == p.ElementCode)?.ObjectiveName ?? p.ElementCode,
+            "INIT" => initiatives.FirstOrDefault(i => i.InitiativeCode == p.ElementCode)?.InitiativeName ?? p.ElementCode,
+            _ => p.ElementCode,
+        };
 
         inkAssets ??= new List<MapInkAsset>();
         // Approved & active ink per section kind, and per signing member.
@@ -56,9 +69,10 @@ public class StrategyMapPdfService
             .Any(a => a.AssetKind == kind && a.ModerationStatus == "Pending");
         var sigByMember = inkAssets
             .Where(a => a.AssetKind == "signature" && a.MemberId != null
-                        && a.ModerationStatus == "Approved" && a.IsActive && a.PngBlob != null)
+                        && a.ModerationStatus == "Approved" && a.IsActive
+                        && (a.PngBlob != null || !string.IsNullOrWhiteSpace(a.TypedText)))
             .GroupBy(a => a.MemberId!.Value)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.CapturedAt).First().PngBlob!);
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.CapturedAt).First());
 
         var doc = Document.Create(container =>
         {
@@ -152,12 +166,19 @@ public class StrategyMapPdfService
                         });
                     });
 
-                    // Pledges
+                    // Pledges — show the full commitment text the team approved, not the code.
                     col.Item().Column(c =>
                     {
-                        c.Item().Text($"المساهمة ({pledges.Count})").Bold().FontColor(Gold);
+                        c.Item().Text($"مساهمات الفريق ({pledges.Count})").Bold().FontColor(Gold);
                         foreach (var pl in pledges)
-                            c.Item().Text($"• [{pl.ElementType}] {pl.ElementCode} — {pl.ContributionKind}").FontSize(9);
+                        {
+                            var label = pl.ElementType == "OBJ" ? "هدف" : pl.ElementType == "INIT" ? "مبادرة" : pl.ElementType;
+                            c.Item().PaddingTop(3).Border(1).BorderColor(Gold).Padding(6).Column(pc =>
+                            {
+                                pc.Item().Text(label).Bold().FontColor(Gold).FontSize(8);
+                                pc.Item().Text(PledgeText(pl)).FontColor(Primary).FontSize(10);
+                            });
+                        }
                     });
 
                     // Text sections — typed text on top, approved ink underneath.
@@ -194,10 +215,20 @@ public class StrategyMapPdfService
                             {
                                 row.RelativeItem().Padding(3).Column(mc =>
                                 {
-                                    if (sigByMember.TryGetValue(m.Id, out var sigPng))
-                                        mc.Item().Height(40).AlignRight().Image(sigPng).FitArea();
+                                    // Show BOTH the pen signature (if any) and the typed text (if any).
+                                    if (sigByMember.TryGetValue(m.Id, out var sigAsset))
+                                    {
+                                        if (sigAsset.PngBlob != null)
+                                            mc.Item().Height(40).AlignRight().Image(sigAsset.PngBlob).FitArea();
+                                        if (!string.IsNullOrWhiteSpace(sigAsset.TypedText))
+                                            mc.Item().Text(sigAsset.TypedText).FontSize(12).Italic();
+                                        if (sigAsset.PngBlob == null && string.IsNullOrWhiteSpace(sigAsset.TypedText))
+                                            mc.Item().Text(m.TypedSignature ?? m.NameAr).FontSize(12).Italic();
+                                    }
                                     else
+                                    {
                                         mc.Item().Text(m.TypedSignature ?? m.NameAr).FontSize(12).Italic();
+                                    }
                                     mc.Item().LineHorizontal(1).LineColor(Colors.Grey.Medium);
                                     mc.Item().Text($"{m.NameAr} — {m.Role}").FontSize(8).FontColor(Colors.Grey.Darken1);
                                 });

@@ -31,10 +31,19 @@
     <hr class="my-4" />
     <div class="mt-2">
         <p class="text-muted mb-3">اختبر معرفتك بالاستراتيجية المؤسسية في اختبار قصير وممتع.</p>
-        <a class="btn btn-lg btn-secondary w-100 w-md-auto"
-           href="/Quiz/Start/@Model.Session.Id" target="_blank" rel="noopener">إعادة فتح الاختبار ⟵</a>
+        <a class="btn btn-lg quiz-pill-gold w-100 w-md-auto"
+           href="/Quiz/Start/@Model.Session.Id" target="_blank" rel="noopener">ابدأ الاختبار التفاعلي ⟵</a>
     </div>
 </div>
+
+<style>
+    .quiz-pill-gold {
+        background: #FAC126; color: #28334A; font-weight: 800;
+        border: none; border-radius: 999px; padding: 12px 28px;
+        box-shadow: 0 4px 14px rgba(250, 193, 38, .35);
+    }
+    .quiz-pill-gold:hover { background: #e7ae12; color: #28334A; }
+</style>
 
 <script>
 window.__stageCompleteConfetti = function () {
