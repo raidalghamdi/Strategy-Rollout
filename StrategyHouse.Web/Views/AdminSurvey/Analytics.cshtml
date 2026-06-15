@@ -1,0 +1,172 @@
+@using StrategyHouse.Domain.Enums
+@model StrategyHouse.Web.Models.SurveyAnalyticsViewModel
+@{
+    ViewData["Title"] = "تحليلات الاستبيان الرسمي";
+    string TypeAr(QuestionType t) => t switch
+    {
+        QuestionType.Likert5 => "مقياس ليكرت",
+        QuestionType.MultipleChoice => "اختيار من متعدد",
+        QuestionType.OpenText => "سؤال مفتوح",
+        _ => ""
+    };
+    string Badge(QuestionType t) => t switch
+    {
+        QuestionType.Likert5 => "bg-primary",
+        QuestionType.MultipleChoice => "bg-success",
+        QuestionType.OpenText => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <h1 class="mb-0">تحليلات الاستبيان الرسمي</h1>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="/Admin/Survey/FinalReport" class="btn btn--secondary btn-sm">التقرير النهائي</a>
+        <a href="/Admin/Survey/Categorize" class="btn btn--secondary btn-sm">تصنيف الإجابات</a>
+        <a href="/s/@Model.PublicToken" target="_blank" class="btn btn--secondary btn-sm">رابط الاستبيان</a>
+        <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#reseedModal">إعادة بذر الاستبيان</button>
+    </div>
+</div>
+<p class="muted">@Model.SurveyTitle</p>
+
+@if (TempData["SurveyMsg"] != null)
+{
+    <div class="alert alert-success">@TempData["SurveyMsg"]</div>
+}
+
+<div class="grid-3 my-3">
+    <div class="card"><h3>@Model.TotalResponses</h3><p class="muted">إجمالي الردود</p></div>
+    <div class="card"><h3>@Model.Cards.Count</h3><p class="muted">عدد الأسئلة</p></div>
+    <div class="card"><h3>@Model.Cards.Count(c => c.Type == QuestionType.OpenText)</h3><p class="muted">أسئلة مفتوحة</p></div>
+</div>
+
+@if (Model.TotalResponses == 0)
+{
+    <div class="card mb-3"><p class="muted">لا توجد ردود بعد. شارك رابط الاستبيان لجمع الإجابات.</p></div>
+}
+
+@foreach (var c in Model.Cards)
+{
+    <div class="card mb-3">
+        <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+            <h2 class="h6 mb-1">@c.Order. @c.QuestionAr</h2>
+            <span class="badge @Badge(c.Type)">@TypeAr(c.Type)</span>
+        </div>
+        <p class="muted small mb-2">المقياس: @c.Metric</p>
+
+        @if (c.Type == QuestionType.Likert5 && c.Likert != null)
+        {
+            <div class="grid-3 mb-2">
+                <div class="card"><h3>@c.Likert.Mean.ToString("0.##")</h3><p class="muted small">المتوسط / 5</p></div>
+                <div class="card"><h3>@c.Likert.PctHigh.ToString("0.#")%</h3><p class="muted small">نسبة العالية (4-5)</p></div>
+                <div class="card"><h3>@c.Likert.Total</h3><p class="muted small">عدد الإجابات</p></div>
+            </div>
+            <div class="chart-wrap" style="height:180px;"><canvas id="chart-@c.Order"></canvas></div>
+        }
+        else if (c.Type == QuestionType.MultipleChoice && c.Choices != null)
+        {
+            <div class="chart-wrap" style="height:220px;"><canvas id="chart-@c.Order"></canvas></div>
+            <div class="table-responsive mt-2">
+                <table class="table table-sm" style="background:#fff;">
+                    <thead><tr><th>الخيار</th><th>العدد</th><th>النسبة</th></tr></thead>
+                    <tbody>
+                        @foreach (var ch in c.Choices)
+                        {
+                            <tr><td>@ch.ChoiceText</td><td>@ch.Count</td><td>@ch.Percent.ToString("0.#")%</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else if (c.Type == QuestionType.OpenText && c.OpenText != null)
+        {
+            <p class="muted small">إجمالي: @c.OpenText.TotalResponses · غير مصنّف: @c.OpenText.UncategorizedCount</p>
+            <div class="row g-3">
+                <div class="col-md-5">
+                    @if (c.OpenText.Categories.Any())
+                    {
+                        <div class="chart-wrap" style="height:220px;"><canvas id="chart-@c.Order"></canvas></div>
+                    }
+                    else { <p class="muted small">لا توجد فئات مصنّفة بعد.</p> }
+                </div>
+                <div class="col-md-7">
+                    <h3 class="h6">أحدث الإجابات</h3>
+                    <ul class="list-group list-group-flush">
+                        @foreach (var v in c.OpenText.RecentVerbatim)
+                        {
+                            <li class="list-group-item small">
+                                @v.Text
+                                @if (!string.IsNullOrEmpty(v.Category)) { <span class="badge bg-light text-dark ms-1">@v.Category</span> }
+                            </li>
+                        }
+                        @if (!c.OpenText.RecentVerbatim.Any()) { <li class="list-group-item small muted">لا توجد إجابات نصية.</li> }
+                    </ul>
+                </div>
+            </div>
+            <a href="/Admin/Survey/Categorize/@c.QuestionId" class="btn btn--primary btn-sm mt-2">تصنيف الإجابات</a>
+        }
+    </div>
+}
+
+<!-- Reseed confirmation modal -->
+<div class="modal fade" id="reseedModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" dir="rtl">
+            <div class="modal-header">
+                <h5 class="modal-title">تأكيد إعادة بذر الاستبيان</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <div class="modal-body">
+                <p>سيؤدي هذا إلى <strong>حذف جميع الردود الحالية</strong> وإعادة إنشاء الأسئلة الثمانية الرسمية. لا يمكن التراجع.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn--secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+                <form method="post" action="/Admin/Survey/Reseed" style="margin:0;">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-danger btn-sm">نعم، أعد البذر</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    if (typeof Chart === 'undefined') return;
+    var cards = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        Model.Cards.Select(c => new {
+            order = c.Order,
+            type = (int)c.Type,
+            likert = c.Likert == null ? null : c.Likert.Distribution,
+            choices = c.Choices == null ? null : c.Choices.Select(x => new { label = x.ChoiceText, count = x.Count }),
+            cats = c.OpenText == null ? null : c.OpenText.Categories.Select(x => new { label = x.Category, count = x.Count })
+        })));
+    var palette = ['#194F90','#46BCCD','#009845','#FAC126','#9B59B6','#E67E22','#1ABC9C','#E74C3C'];
+    cards.forEach(function (c) {
+        var el = document.getElementById('chart-' + c.order);
+        if (!el) return;
+        if (c.type === 1 && c.likert) {
+            new Chart(el, {
+                type: 'bar',
+                data: { labels: ['1','2','3','4','5'], datasets: [{ label: 'عدد', data: c.likert, backgroundColor: '#194F90' }] },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+            });
+        } else if (c.type === 2 && c.choices) {
+            new Chart(el, {
+                type: 'bar',
+                data: { labels: c.choices.map(x => x.label), datasets: [{ label: 'عدد', data: c.choices.map(x => x.count), backgroundColor: '#009845' }] },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+            });
+        } else if (c.type === 3 && c.cats && c.cats.length) {
+            new Chart(el, {
+                type: 'doughnut',
+                data: { labels: c.cats.map(x => x.label), datasets: [{ data: c.cats.map(x => x.count), backgroundColor: palette }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+            });
+        }
+    });
+})();
+</script>
+}

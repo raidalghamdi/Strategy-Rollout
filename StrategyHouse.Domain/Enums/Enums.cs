@@ -45,6 +45,14 @@ public enum SurveyQuestionType
     OpenText = 4
 }
 
+// Phase 12 — the three measurable question types of the official 8-question survey.
+public enum QuestionType
+{
+    Likert5 = 1,
+    MultipleChoice = 2,
+    OpenText = 3
+}
+
 public enum QuizQuestionType
 {
     SingleChoice = 1,

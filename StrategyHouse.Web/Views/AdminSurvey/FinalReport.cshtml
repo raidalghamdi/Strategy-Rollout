@@ -1,0 +1,110 @@
+@using StrategyHouse.Domain.Enums
+@model StrategyHouse.Web.Models.FinalReportViewModel
+@{
+    ViewData["Title"] = "التقرير النهائي للاستبيان";
+    string TypeAr(QuestionType t) => t switch
+    {
+        QuestionType.Likert5 => "مقياس ليكرت",
+        QuestionType.MultipleChoice => "اختيار من متعدد",
+        QuestionType.OpenText => "سؤال مفتوح",
+        _ => ""
+    };
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <h1 class="mb-0">التقرير النهائي للاستبيان</h1>
+    <div class="d-flex gap-2">
+        <a href="/Admin/Survey/FinalReport.pdf" class="btn btn--primary btn-sm">تنزيل PDF</a>
+        <a href="/Admin/Survey/Analytics" class="btn btn--secondary btn-sm">⟶ التحليلات</a>
+    </div>
+</div>
+<p class="muted">@Model.SurveyTitle</p>
+
+<div class="card mb-3">
+    <h2 class="h5">الملخص التنفيذي</h2>
+    <div class="grid-3 my-2">
+        <div class="card"><h3>@Model.TotalResponses</h3><p class="muted small">إجمالي الردود</p></div>
+        <div class="card"><h3>@Model.Cards.Count</h3><p class="muted small">عدد الأسئلة</p></div>
+        <div class="card">
+            <h3 style="font-size:1rem;">@(Model.DateFrom != null ? $"{Model.DateFrom:yyyy-MM-dd} ← {Model.DateTo:yyyy-MM-dd}" : "—")</h3>
+            <p class="muted small">فترة الجمع</p>
+        </div>
+    </div>
+    @if (Model.Takeaways.Any())
+    {
+        <h3 class="h6 text-warning">أبرز النتائج</h3>
+        <ul>
+            @foreach (var t in Model.Takeaways) { <li>@t</li> }
+        </ul>
+    }
+</div>
+
+@foreach (var c in Model.Cards.OrderBy(x => x.Order))
+{
+    <div class="card mb-3">
+        <h2 class="h6">السؤال @c.Order: @c.QuestionAr</h2>
+        <p class="muted small">النوع: @TypeAr(c.Type) · المقياس: @c.Metric</p>
+
+        @if (c.Type == QuestionType.Likert5 && c.Likert != null)
+        {
+            <p class="fw-bold text-success">المتوسط: @c.Likert.Mean.ToString("0.##") / 5 · نسبة العالية (4-5): @c.Likert.PctHigh.ToString("0.#")% · العدد: @c.Likert.Total</p>
+            <div class="chart-wrap" style="height:160px;"><canvas id="rep-@c.Order"></canvas></div>
+        }
+        else if (c.Type == QuestionType.MultipleChoice && c.Choices != null)
+        {
+            <div class="chart-wrap" style="height:200px;"><canvas id="rep-@c.Order"></canvas></div>
+        }
+        else if (c.Type == QuestionType.OpenText && c.OpenText != null)
+        {
+            <p class="fw-bold text-success">إجمالي: @c.OpenText.TotalResponses · غير مصنّف: @c.OpenText.UncategorizedCount</p>
+            @if (c.OpenText.Categories.Any())
+            {
+                <div class="chart-wrap" style="height:200px;"><canvas id="rep-@c.Order"></canvas></div>
+            }
+        }
+
+        @if (Model.Interpretations.TryGetValue(c.QuestionId, out var interp))
+        {
+            <p class="muted small fst-italic">التفسير: @interp</p>
+        }
+    </div>
+}
+
+@if (Model.Insights.Any())
+{
+    <div class="card mb-3">
+        <h2 class="h5">رؤى شاملة</h2>
+        <ul>
+            @foreach (var ins in Model.Insights) { <li>@ins</li> }
+        </ul>
+    </div>
+}
+
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    if (typeof Chart === 'undefined') return;
+    var cards = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        Model.Cards.Select(c => new {
+            order = c.Order,
+            type = (int)c.Type,
+            likert = c.Likert == null ? null : c.Likert.Distribution,
+            choices = c.Choices == null ? null : c.Choices.Select(x => new { label = x.ChoiceText, count = x.Count }),
+            cats = c.OpenText == null ? null : c.OpenText.Categories.Select(x => new { label = x.Category, count = x.Count })
+        })));
+    var palette = ['#194F90','#46BCCD','#009845','#FAC126','#9B59B6','#E67E22','#1ABC9C','#E74C3C'];
+    cards.forEach(function (c) {
+        var el = document.getElementById('rep-' + c.order);
+        if (!el) return;
+        if (c.type === 1 && c.likert) {
+            new Chart(el, { type: 'bar', data: { labels: ['1','2','3','4','5'], datasets: [{ data: c.likert, backgroundColor: '#194F90' }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } } });
+        } else if (c.type === 2 && c.choices) {
+            new Chart(el, { type: 'bar', data: { labels: c.choices.map(x => x.label), datasets: [{ data: c.choices.map(x => x.count), backgroundColor: '#009845' }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } } });
+        } else if (c.type === 3 && c.cats && c.cats.length) {
+            new Chart(el, { type: 'doughnut', data: { labels: c.cats.map(x => x.label), datasets: [{ data: c.cats.map(x => x.count), backgroundColor: palette }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
+        }
+    });
+})();
+</script>
+}

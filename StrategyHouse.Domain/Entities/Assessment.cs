@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using StrategyHouse.Domain.Enums;
 
 namespace StrategyHouse.Domain.Entities;
 
@@ -67,8 +68,48 @@ public class SurveyQuestion
     [Column(TypeName = "longtext")] public string? OptionsJson { get; set; } // for MCQ
     public bool IsRequired { get; set; } = true;
 
+    // Phase 12 — official survey measurement metadata.
+    public QuestionType QuestionType { get; set; } = QuestionType.Likert5;
+    [MaxLength(500)] public string? MeasurementMetric { get; set; }
+    [Column(TypeName = "longtext")] public string? MeasurementFormula { get; set; }
+
     [ForeignKey(nameof(SurveyId))]
     public Survey? Survey { get; set; }
+
+    // Phase 12 — predefined categories for open-text questions.
+    public ICollection<SurveyQuestionCategory> Categories { get; set; } = new List<SurveyQuestionCategory>();
+}
+
+// Phase 12 — predefined categories an analyst can tag open-text answers with.
+[Table("SurveyQuestionCategories")]
+public class SurveyQuestionCategory
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid SurveyQuestionId { get; set; }
+    [MaxLength(120)] public string Name { get; set; } = "";
+    public int Order { get; set; }
+
+    [ForeignKey(nameof(SurveyQuestionId))]
+    public SurveyQuestion? SurveyQuestion { get; set; }
+}
+
+// Phase 12 — an analyst's category tag for one open-text answer cell.
+// Answers are stored denormalised in SurveyResponse.AnswersJson keyed by question id,
+// so an answer cell is uniquely identified by (SurveyResponseId, SurveyQuestionId).
+[Table("OpenTextCategoryAssignments")]
+public class OpenTextCategoryAssignment
+{
+    [Key] public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid SurveyResponseId { get; set; }
+    public Guid SurveyQuestionId { get; set; }
+    [MaxLength(120)] public string Category { get; set; } = "";
+    public DateTime AssignedAt { get; set; } = DateTime.UtcNow;
+    public int? AssignedByUserId { get; set; }
+
+    [ForeignKey(nameof(SurveyResponseId))]
+    public SurveyResponse? SurveyResponse { get; set; }
+    [ForeignKey(nameof(SurveyQuestionId))]
+    public SurveyQuestion? SurveyQuestion { get; set; }
 }
 
 [Table("SurveyResponses")]

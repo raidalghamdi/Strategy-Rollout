@@ -1,0 +1,30 @@
+@model List<StrategyHouse.Web.Models.OpenTextQuestionLink>
+@{
+    ViewData["Title"] = "تصنيف إجابات الاستبيان";
+}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1 class="mb-0">تصنيف إجابات الاستبيان</h1>
+    <a href="/Admin/Survey/Analytics" class="btn btn--secondary btn-sm">⟶ التحليلات</a>
+</div>
+<p class="muted">اختر سؤالاً مفتوحاً لتصنيف إجاباته إلى الفئات المعتمدة.</p>
+
+@if (!Model.Any())
+{
+    <div class="card"><p class="muted">لا توجد أسئلة مفتوحة.</p></div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var q in Model)
+        {
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <h2 class="h6">السؤال @q.Order</h2>
+                    <p>@q.QuestionAr</p>
+                    <p class="muted small">إجمالي الإجابات: @q.Total · غير مصنّف: @q.Uncategorized</p>
+                    <a href="/Admin/Survey/Categorize/@q.QuestionId" class="btn btn--primary btn-sm">فتح التصنيف</a>
+                </div>
+            </div>
+        }
+    </div>
+}
