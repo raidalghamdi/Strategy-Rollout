@@ -1,0 +1,11 @@
+@{
+    ViewData["Title"] = "الاستبيان الرسمي غير موجود";
+}
+<h1>الاستبيان الرسمي غير موجود</h1>
+<div class="card">
+    <p class="muted">لم يُعثر على الاستبيان الرسمي بعد. أعد تشغيل التطبيق ليُبذر تلقائيًا، أو استخدم زر إعادة البذر من صفحة التحليلات.</p>
+    <form method="post" action="/Admin/Survey/Reseed">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn--primary btn-sm">بذر الأسئلة الثمانية الآن</button>
+    </form>
+</div>

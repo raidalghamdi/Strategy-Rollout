@@ -1,0 +1,109 @@
+@model StrategyHouse.Web.Models.CategorizeViewModel
+@{
+    ViewData["Title"] = $"تصنيف إجابات السؤال {Model.QuestionOrder}";
+}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1 class="mb-0">تصنيف الإجابات — السؤال @Model.QuestionOrder</h1>
+    <div class="d-flex gap-2">
+        <a href="/Admin/Survey/Categorize/@Model.QuestionId/Export.csv" class="btn btn--secondary btn-sm">تصدير CSV</a>
+        <a href="/Admin/Survey/Categorize" class="btn btn--secondary btn-sm">⟶ القائمة</a>
+    </div>
+</div>
+<p class="muted">@Model.QuestionAr</p>
+
+@if (!Model.Answers.Any())
+{
+    <div class="card"><p class="muted">لا توجد إجابات نصية لهذا السؤال.</p></div>
+}
+else
+{
+    <form method="post" action="/Admin/Survey/Categorize/@Model.QuestionId/Bulk">
+        @Html.AntiForgeryToken()
+        <div class="card mb-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <strong>تصنيف جماعي:</strong>
+                <select name="category" class="form-select form-select-sm" style="max-width:240px;">
+                    <option value="">— اختر فئة —</option>
+                    @foreach (var cat in Model.Categories)
+                    {
+                        <option value="@cat">@cat</option>
+                    }
+                </select>
+                <button type="submit" class="btn btn--primary btn-sm">تطبيق على المحدد</button>
+                <span class="muted small">حدّد الصفوف ثم اختر الفئة.</span>
+            </div>
+
+            <div class="table-responsive mt-3">
+                <table class="table table-sm align-middle" style="background:#fff;">
+                    <thead>
+                        <tr>
+                            <th style="width:36px;"><input type="checkbox" id="selectAll" /></th>
+                            <th>الإجابة</th>
+                            <th style="width:160px;">الفئة الحالية</th>
+                            <th style="width:120px;">التاريخ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var a in Model.Answers)
+                        {
+                            <tr>
+                                <td><input type="checkbox" name="responseIds" value="@a.ResponseId" class="row-check" /></td>
+                                <td>@a.Text</td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(a.Category))
+                                    {
+                                        <span class="badge bg-success">@a.Category</span>
+                                    }
+                                    else { <span class="muted small">غير مصنّف</span> }
+                                </td>
+                                <td class="muted small">@a.SubmittedAt.ToString("yyyy-MM-dd")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </form>
+
+    <div class="card">
+        <h2 class="h6">تصنيف فردي</h2>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle" style="background:#fff;">
+                <thead><tr><th>الإجابة</th><th style="width:280px;">الفئة</th></tr></thead>
+                <tbody>
+                    @foreach (var a in Model.Answers)
+                    {
+                        <tr>
+                            <td>@a.Text</td>
+                            <td>
+                                <form method="post" action="/Admin/Survey/Categorize/@Model.QuestionId" class="d-flex gap-2">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="responseId" value="@a.ResponseId" />
+                                    <select name="category" class="form-select form-select-sm">
+                                        <option value="">— غير مصنّف —</option>
+                                        @foreach (var cat in Model.Categories)
+                                        {
+                                            <option value="@cat" selected="@(a.Category == cat)">@cat</option>
+                                        }
+                                    </select>
+                                    <button type="submit" class="btn btn--primary btn-sm">حفظ</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@section Scripts {
+<script>
+(function () {
+    var all = document.getElementById('selectAll');
+    if (all) all.addEventListener('change', function () {
+        document.querySelectorAll('.row-check').forEach(function (c) { c.checked = all.checked; });
+    });
+})();
+</script>
+}

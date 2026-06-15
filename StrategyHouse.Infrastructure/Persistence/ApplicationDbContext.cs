@@ -33,6 +33,10 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
     public DbSet<SurveyQuestion> SurveyQuestions => Set<SurveyQuestion>();
     public DbSet<SurveyResponse> SurveyResponses => Set<SurveyResponse>();
 
+    // Phase 12 — open-text categorisation for the official survey
+    public DbSet<SurveyQuestionCategory> SurveyQuestionCategories => Set<SurveyQuestionCategory>();
+    public DbSet<OpenTextCategoryAssignment> OpenTextCategoryAssignments => Set<OpenTextCategoryAssignment>();
+
     // Phase 6 — predefined roster + chatbot conversation log
     public DbSet<DepartmentRoster> DepartmentRoster => Set<DepartmentRoster>();
     public DbSet<ChatbotConversation> ChatbotConversations => Set<ChatbotConversation>();
@@ -110,6 +114,29 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
             .WithMany()
             .HasForeignKey(r => r.SurveyId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Phase 12 — categorisation tables. Cascade from question (definitions) and
+        // response (data) so a reseed/wipe cleans up cleanly.
+        b.Entity<SurveyQuestionCategory>()
+            .HasOne(c => c.SurveyQuestion)
+            .WithMany(q => q.Categories)
+            .HasForeignKey(c => c.SurveyQuestionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<OpenTextCategoryAssignment>()
+            .HasOne(a => a.SurveyResponse)
+            .WithMany()
+            .HasForeignKey(a => a.SurveyResponseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<OpenTextCategoryAssignment>()
+            .HasOne(a => a.SurveyQuestion)
+            .WithMany()
+            .HasForeignKey(a => a.SurveyQuestionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        b.Entity<OpenTextCategoryAssignment>()
+            .HasIndex(a => new { a.SurveyResponseId, a.SurveyQuestionId }).IsUnique();
 
         b.Entity<Survey>().HasIndex(s => s.PublicToken).IsUnique();
         b.Entity<QuizQuestion>().HasIndex(q => new { q.Scope, q.IsApproved, q.IsActive });

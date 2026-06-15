@@ -14,6 +14,13 @@ if (File.Exists(arabicFontPath))
     using var fontStream = File.OpenRead(arabicFontPath);
     QuestPDF.Drawing.FontManager.RegisterFont(fontStream);
 }
+// Phase 12 — register Cairo for the survey final-report PDF (GAC brand typeface).
+var cairoFontPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "fonts", "cairo", "Cairo-Variable.ttf");
+if (File.Exists(cairoFontPath))
+{
+    using var cairoStream = File.OpenRead(cairoFontPath);
+    QuestPDF.Drawing.FontManager.RegisterFont(cairoStream);
+}
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 // Database — SQLite (dev) / MySQL (production), provider-switchable via appsettings.
@@ -105,6 +112,9 @@ builder.Services.AddScoped<ProgrammePosterPdfService>();
 // Phase 4 — assessment
 builder.Services.AddScoped<QuizGeneratorService>();
 builder.Services.AddScoped<SurveyReportPdfService>();
+// Phase 12 — official survey analytics + final report
+builder.Services.AddScoped<SurveyAnalyticsService>();
+builder.Services.AddScoped<SurveyFinalReportPdfService>();
 // Phase 6 — DB-only chatbot
 builder.Services.AddScoped<ChatbotService>();
 
@@ -121,6 +131,9 @@ using (var scope = app.Services.CreateScope())
     // Phase 4 — programme survey (quiz auto-seed removed in Phase 5; admin-controlled).
     var quiz = scope.ServiceProvider.GetRequiredService<QuizGeneratorService>();
     await AssessmentSeeder.RunAsync(db, quiz);
+
+    // Phase 12 — replace the survey bank with the 8 official questions (idempotent via hash).
+    await Phase12SurveySeeder.SeedAsync(db);
 
     // Phase 10 — optional one-time quiz reset on startup (controlled by Quiz:ResetOnStartup).
     // Wipes all attempts + questions and reseeds the 5 demo questions. Default false.
