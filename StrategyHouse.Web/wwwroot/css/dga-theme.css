@@ -1,0 +1,416 @@
+/* ============================================================================
+   dga-theme.css — Phase 15.2
+   ----------------------------------------------------------------------------
+   Saudi DGA (Digital Government Authority) green theme overlay.
+   Palette cloned from https://design.dga.gov.sa/ (Saudi Design System).
+
+   Loaded LAST in the cascade so it re-skins the body/interactive layer with
+   DGA greens. GAC authority branding (navy #00192B/#28334A + gold #FAC126) is
+   deliberately preserved in the top header, sidebar brand/logo region, public
+   header and official export documents — those carry the authority identity.
+
+   Pure CSS theme. No layout, markup, JS, font or content changes.
+   ============================================================================ */
+
+:root {
+    /* ── DGA Primary green ── */
+    --dga-primary:         #067647;
+    --dga-primary-hover:   #085D3A;
+    --dga-primary-active:  #053321;
+    --dga-primary-light:   #DCFAE6;
+    --dga-primary-lighter: #ECFDF3;
+    --dga-primary-lightest:#F6FEF9;
+    --dga-green-500:       #17B26A;
+    --dga-green-400:       #47CD89;
+    --dga-green-300:       #75E0A7;
+    --dga-green-200:       #ABEFC6;
+    --dga-green-100:       #DCFAE6;
+
+    /* ── Gold accent (kept for GAC authority feel) ── */
+    --dga-gold:            #DBA102;
+    --dga-gold-dark:       #945C01;
+    --dga-gold-light:      #F4E996;
+
+    /* ── Neutrals ── */
+    --dga-text:            #0D121C;
+    --dga-text-secondary:  #384250;
+    --dga-text-muted:      #6C737F;
+    --dga-border:          #E5E7EB;
+    --dga-border-strong:   #D2D6DB;
+    --dga-surface:         #FFFFFF;
+    --dga-surface-alt:     #F3F4F6;
+    --dga-surface-tint:    #F6FEF9;
+
+    /* ── Status ── */
+    --dga-error:           #D92D20;
+    --dga-warning:         #F79009;
+    --dga-success:         #17B26A;
+    --dga-info:            #1570EF;
+
+    /* ════════════════════════════════════════════════════════════════════
+       Remap the existing theme's interactive tokens to DGA green so every
+       component that reads them turns green without per-selector overrides.
+       Brand-chrome tokens (--gac-navy*, --gac-gold*) are intentionally left
+       untouched so the header/logo region keeps its authority identity.
+       ════════════════════════════════════════════════════════════════════ */
+
+    /* dga.css "navy primary" alias chain → DGA green */
+    --color-primary:      #067647;
+    --color-primary-700:  #085D3A;
+    --color-primary-800:  #053321;
+    --color-primary-100:  #ABEFC6;
+    --color-primary-050:  #DCFAE6;
+
+    --color-brand-25:  #F6FEF9;
+    --color-brand-50:  #ECFDF3;
+    --color-brand-100: #DCFAE6;
+    --color-brand-200: #ABEFC6;
+    --color-brand-300: #75E0A7;
+    --color-brand-400: #47CD89;
+    --color-brand-500: #17B26A;
+    --color-brand-600: #067647;
+    --color-brand-700: #085D3A;
+    --color-brand-800: #104631;
+    --color-brand-900: #053321;
+    --color-brand-950: #092A1E;
+
+    /* In-content links use institutional blue today; switch to green */
+    --gac-blue:        #067647;
+    --gac-blue-hover:  #085D3A;
+
+    /* site.css teal "primary" chain → DGA green */
+    --primary:        #067647;
+    --primary-dark:   #085D3A;
+    --primary-light:  #DCFAE6;
+    --accent-green:   #17B26A;
+
+    --color-success:  #166A45;
+}
+
+/* ============================================================================
+   Links (body content) — green, underline on hover. Header/nav links excluded.
+   ============================================================================ */
+a:not(.btn):not(.cx-public-actions a):not(.app-sidebar a) {
+    color: var(--dga-primary);
+}
+a:not(.btn):not(.cx-public-actions a):not(.app-sidebar a):hover {
+    color: var(--dga-primary-hover);
+    text-decoration: underline;
+}
+
+/* ============================================================================
+   Primary buttons / CTAs — DGA green fill, white text.
+   ============================================================================ */
+.btn-primary,
+.btn-gac-primary,
+.btn.btn-primary,
+.btn-cta,
+.btn-gold,
+.btn--primary,
+.gac-btn-primary {
+    background: var(--dga-primary) !important;
+    border-color: var(--dga-primary) !important;
+    color: #ffffff !important;
+    box-shadow: var(--shadow-xs);
+}
+.btn-primary:hover,
+.btn-gac-primary:hover,
+.btn.btn-primary:hover,
+.btn-cta:hover,
+.btn-gold:hover,
+.btn--primary:hover,
+.gac-btn-primary:hover {
+    background: var(--dga-primary-hover) !important;
+    border-color: var(--dga-primary-hover) !important;
+    color: #ffffff !important;
+    text-decoration: none;
+}
+.btn-primary:focus,
+.btn-gac-primary:focus,
+.btn-cta:focus,
+.btn-gold:focus,
+.gac-btn-primary:focus {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--dga-green-100) !important;
+}
+
+/* Bootstrap success buttons → DGA green */
+.btn-success,
+.btn.btn-success {
+    background: var(--dga-primary) !important;
+    border-color: var(--dga-primary) !important;
+    color: #ffffff !important;
+}
+.btn-success:hover,
+.btn.btn-success:hover {
+    background: var(--dga-primary-hover) !important;
+    border-color: var(--dga-primary-hover) !important;
+}
+
+/* Secondary / outline buttons — green outline, fill on hover */
+.btn-outline-primary {
+    border: 2px solid var(--dga-primary) !important;
+    color: var(--dga-primary) !important;
+    background: transparent !important;
+}
+.btn-outline-primary:hover {
+    background: var(--dga-primary) !important;
+    color: #ffffff !important;
+}
+.btn--secondary {
+    background: #ffffff;
+    color: var(--dga-primary);
+    border-color: var(--dga-primary);
+}
+.btn--secondary:hover { background: var(--dga-primary-light); }
+
+/* ============================================================================
+   Focus rings — accessible green outline for inputs / buttons / links.
+   ============================================================================ */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible,
+.btn:focus-visible {
+    outline: 2px solid var(--dga-primary);
+    outline-offset: 2px;
+}
+
+/* ============================================================================
+   Form controls focus — green border + soft green halo.
+   ============================================================================ */
+.form-control:focus,
+.form-select:focus,
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus,
+input[type=text]:focus,
+input[type=email]:focus,
+input[type=password]:focus,
+input[type=number]:focus,
+input[type=search]:focus,
+textarea:focus {
+    border-color: var(--dga-primary) !important;
+    box-shadow: 0 0 0 4px var(--dga-green-100) !important;
+    outline: none;
+}
+
+/* Checkboxes / radios checked state */
+input[type=checkbox],
+input[type=radio],
+.form-check-input {
+    accent-color: var(--dga-primary);
+}
+.form-check-input:checked {
+    background-color: var(--dga-primary) !important;
+    border-color: var(--dga-primary) !important;
+}
+.form-check-input:focus {
+    border-color: var(--dga-primary) !important;
+    box-shadow: 0 0 0 4px var(--dga-green-100) !important;
+}
+
+/* ============================================================================
+   Progress bars — green fill, light-green track.
+   ============================================================================ */
+.progress-bar {
+    background: var(--dga-green-100);
+}
+.progress-fill {
+    background: linear-gradient(90deg, var(--dga-primary) 0%, var(--dga-green-500) 100%) !important;
+}
+.progress {
+    background: var(--dga-green-100) !important;
+}
+.progress .progress-bar {
+    background-color: var(--dga-primary) !important;
+    color: #ffffff;
+}
+.quiz-progress {
+    background: var(--dga-green-100) !important;
+}
+.quiz-progress__fill {
+    background: var(--dga-primary) !important;
+}
+
+/* ============================================================================
+   Sidebar active / hover — DGA green accent.
+   NOTE: sidebar BACKGROUND stays GAC navy (authority). Only the active/hover
+   highlight switches from gold to green. Brand/logo block keeps gold.
+   ============================================================================ */
+.app-sidebar nav a:hover {
+    background: rgba(6,118,71,.16);
+    color: var(--dga-green-300);
+}
+.app-sidebar nav a.active {
+    background: rgba(6,118,71,.22);
+    color: var(--dga-green-300);
+    border-inline-start-color: var(--dga-primary);
+}
+
+/* ============================================================================
+   Tables — green header, light-green row hover.
+   ============================================================================ */
+.data-table thead th,
+.table thead th,
+.exec-table th,
+table.table > thead th {
+    background: var(--dga-primary) !important;
+    color: #ffffff !important;
+    border-bottom-color: var(--dga-primary-hover) !important;
+}
+.data-table tbody tr:hover,
+.table-hover tbody tr:hover {
+    background: var(--dga-primary-lightest) !important;
+}
+
+/* ============================================================================
+   Badges / pills — success green, info blue, warning gold, error red.
+   ============================================================================ */
+.badge-success,
+.badge.badge-success,
+.badge--primary,
+.badge.bg-success {
+    background: var(--dga-primary-light) !important;
+    color: var(--dga-primary-active) !important;
+}
+.badge.bg-success { color: #ffffff !important; background: var(--dga-primary) !important; }
+.tag--success {
+    background: var(--dga-primary-lighter) !important;
+    color: var(--dga-primary-active) !important;
+    border-color: var(--dga-green-200) !important;
+}
+.badge-gold {
+    background: var(--dga-gold) !important;
+    color: var(--dga-primary-active) !important;
+}
+
+/* ============================================================================
+   Card accent borders / KPI accents — green.
+   ============================================================================ */
+.kpi::before {
+    background: var(--dga-primary) !important;
+}
+.card--accent {
+    border-right-color: var(--dga-primary) !important;
+}
+.cx-arch-layer {
+    background: var(--dga-primary-lighter);
+    border-inline-start-color: var(--dga-primary);
+}
+[dir="rtl"] .cx-arch-layer { border-inline-end-color: var(--dga-primary); }
+.kpi .delta { color: var(--dga-success); }
+
+/* ============================================================================
+   Section heading accent underline — green.
+   ============================================================================ */
+h2.section-title::after,
+.section-title::after {
+    background: var(--dga-primary) !important;
+    border-color: var(--dga-primary) !important;
+}
+
+/* ============================================================================
+   Quiz — selected option green, progress already handled above.
+   ============================================================================ */
+.quiz-option:hover {
+    border-color: var(--dga-primary) !important;
+    background: var(--dga-primary-light) !important;
+}
+.quiz-option.is-selected {
+    border-color: var(--dga-primary) !important;
+    background: var(--dga-primary-light) !important;
+}
+.quiz-option input { accent-color: var(--dga-primary) !important; }
+.quiz-title,
+.quiz-question { color: var(--dga-primary-active); }
+.quiz-score__value { color: var(--dga-primary) !important; }
+.quiz-btn--primary {
+    background: var(--dga-primary) !important;
+    color: #ffffff !important;
+}
+.quiz-btn--primary:hover { background: var(--dga-primary-hover) !important; }
+.quiz-review.is-correct,
+.quiz-review__correct { border-color: var(--dga-primary); color: var(--dga-primary); }
+
+/* ============================================================================
+   Survey — selected option green (Bootstrap form-check radios).
+   ============================================================================ */
+.form-check-input:checked ~ .form-check-label {
+    color: var(--dga-primary-active);
+    font-weight: 600;
+}
+.survey-option.selected,
+.commitment-card.selected {
+    border-color: var(--dga-primary) !important;
+    background: var(--dga-primary-light) !important;
+}
+
+/* ============================================================================
+   Signature pad — green border on the capture area / canvas.
+   ============================================================================ */
+.signature-area {
+    background: var(--dga-primary-lighter) !important;
+    border-color: var(--dga-primary) !important;
+}
+.signature-area h3 { color: var(--dga-primary-active) !important; }
+.signature-canvas { border-color: var(--dga-primary) !important; }
+.signature-chip { color: var(--dga-primary-active); }
+
+/* ============================================================================
+   Alerts / toasts — success green accent.
+   ============================================================================ */
+.alert-success,
+.alert.alert-success,
+.alert--success {
+    background: var(--dga-primary-lighter) !important;
+    color: var(--dga-primary-active) !important;
+    border-left: 4px solid var(--dga-primary) !important;
+}
+[dir="rtl"] .alert-success,
+[dir="rtl"] .alert.alert-success,
+[dir="rtl"] .alert--success {
+    border-left: none !important;
+    border-right: 4px solid var(--dga-primary) !important;
+}
+
+/* ============================================================================
+   Pagination active — green.
+   ============================================================================ */
+.pagination a.active,
+.pagination .current,
+.page-item.active .page-link {
+    background: var(--dga-primary) !important;
+    border-color: var(--dga-primary) !important;
+    color: #ffffff !important;
+}
+
+/* ============================================================================
+   Misc green accents (stat values, hero links, feature card hover border).
+   ============================================================================ */
+.cx-stat-val { color: var(--dga-primary); }
+.cx-feature-card:hover { border-color: var(--dga-green-200); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   PRESERVE GAC AUTHORITY BRANDING — explicit guards so the green remap above
+   never bleeds into the official header/logo chrome.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Top header bar keeps gold underline accent */
+.app-header { border-bottom-color: var(--gac-gold) !important; }
+
+/* Sidebar surface stays navy; brand block keeps gold */
+.app-sidebar { background: var(--gac-navy-dark) !important; }
+.app-sidebar .brand .logo { background: var(--gac-gold) !important; color: var(--text-on-gold) !important; }
+.app-sidebar .brand .tag  { color: var(--gac-gold) !important; }
+
+/* Public (logged-out) header keeps navy + gold authority chrome */
+.cx-public-header { background: var(--gac-navy-dark) !important; border-bottom-color: var(--gac-gold) !important; }
+.cx-public-brand .logo { background: var(--gac-gold) !important; color: var(--text-on-gold) !important; }
+.cx-public-brand .cx-tag { color: var(--gac-gold) !important; }
+.cx-public-actions a:hover,
+.cx-public-actions a.active { color: var(--gac-gold) !important; }
+
+/* Journey top bar keeps navy + gold authority chrome */
+.gac-topbar { background: var(--gac-navy-dark) !important; border-bottom-color: var(--gac-gold) !important; }
