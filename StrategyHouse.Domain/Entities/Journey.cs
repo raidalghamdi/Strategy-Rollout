@@ -74,6 +74,23 @@ public class ContributionPledge
     public StrategySession? Session { get; set; }
 }
 
+// Phase 16 — the single Big Picture value a team feels best represents them,
+// captured on the Stage 3 (Contribute) screen. One active selection per session.
+[Table("TeamValueSelections")]
+public class TeamValueSelection
+{
+    [Key] public int Id { get; set; }
+    public Guid? SessionId { get; set; }
+    [Required, MaxLength(20)] public string JourneyCode { get; set; } = string.Empty;
+    public int? DepartmentId { get; set; }
+    [Required, MaxLength(80)] public string SelectedValueKey { get; set; } = string.Empty;
+    [Required, MaxLength(255)] public string SelectedValueText { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [ForeignKey(nameof(SessionId))]
+    public StrategySession? Session { get; set; }
+}
+
 // The artifact — one per session. Typed text in Phase 1; ink assets in Phase 3.
 [Table("DepartmentStrategyMaps")]
 public class DepartmentStrategyMap

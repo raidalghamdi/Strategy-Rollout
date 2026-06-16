@@ -85,14 +85,14 @@ public class JourneyController : Controller
         if (stage > maxAllowed)
             return RedirectToAction(nameof(RunStage), new { sessionId, stage = maxAllowed });
 
-        // Phase 13 — gate entry to Complete (stage 5): the team must have entered an
-        // attendee count AND saved a group signature (typed comment OR ink) on the Map stage.
+        // Phase 16 — gate entry to Complete (stage 5) only on the attendee count.
+        // The group signature and comment are optional.
         if (stage == 5)
         {
             var ready = await IsMapStageCompleteAsync(tracked);
             if (!ready)
             {
-                TempData["Error"] = "قبل الإتمام، يُرجى إدخال عدد الحاضرين وحفظ توقيع الفريق (كتابة أو رسم) في مرحلة الخريطة.";
+                TempData["Error"] = "قبل الإتمام، يُرجى إدخال عدد الموظفين الحاضرين في مرحلة الخريطة.";
                 return RedirectToAction(nameof(RunStage), new { sessionId, stage = 4 });
             }
         }
@@ -141,6 +141,11 @@ public class JourneyController : Controller
             InkAssets = map == null
                 ? new List<MapInkAsset>()
                 : await _db.MapInkAssets.Where(a => a.MapId == map.Id && a.IsActive).ToListAsync(),
+            SelectedTeamValue = await _db.TeamValueSelections
+                .Where(t => t.SessionId == sessionId)
+                .OrderByDescending(t => t.CreatedAt)
+                .Select(t => t.SelectedValueText)
+                .FirstOrDefaultAsync(),
         };
     }
 
@@ -208,6 +213,32 @@ public class JourneyController : Controller
         _db.ContributionPledges.RemoveRange(matches);
         await _db.SaveChangesAsync();
         return Json(new { ok = true, removed = matches.Count });
+    }
+
+    // POST /Journey/SaveTeamValue — Phase 16: the team's chosen Big Picture value.
+    // Optional; one active selection per session (latest wins). JSON endpoint.
+    [HttpPost("Journey/SaveTeamValue")]
+    public async Task<IActionResult> SaveTeamValue([FromBody] TeamValueDto dto)
+    {
+        var session = await _db.StrategySessions.FindAsync(dto.SessionId);
+        if (session == null) return NotFound();
+        if (string.IsNullOrWhiteSpace(dto.ValueText)) return BadRequest();
+
+        var existing = await _db.TeamValueSelections
+            .Where(t => t.SessionId == dto.SessionId)
+            .ToListAsync();
+        if (existing.Count > 0) _db.TeamValueSelections.RemoveRange(existing);
+
+        var selection = new TeamValueSelection
+        {
+            SessionId = dto.SessionId,
+            JourneyCode = session.DeptCode,
+            SelectedValueKey = string.IsNullOrWhiteSpace(dto.ValueKey) ? dto.ValueText.Trim() : dto.ValueKey.Trim(),
+            SelectedValueText = dto.ValueText.Trim(),
+        };
+        _db.TeamValueSelections.Add(selection);
+        await _db.SaveChangesAsync();
+        return Json(new { ok = true });
     }
 
     // GET /Journey/Map/{sessionId} — deep-link alias → Stage 4.
@@ -297,15 +328,10 @@ public class JourneyController : Controller
 
     // True when the team has both entered an attendee count and saved a group signature
     // (typed comment OR ink). Gates advancing from Map (4) to Complete (5).
-    private async Task<bool> IsMapStageCompleteAsync(StrategySession session)
-    {
-        if (session.AttendeeCount is not > 0) return false;
-        var map = await _db.DepartmentStrategyMaps.FirstOrDefaultAsync(m => m.SessionId == session.Id);
-        if (map == null) return false;
-        return await _db.MapInkAssets.AnyAsync(a =>
-            a.MapId == map.Id && a.AssetKind == "signature" && a.MemberId == null && a.IsActive
-            && (a.PngBlob != null || a.TypedText != null));
-    }
+    // Phase 16 — only the attendee count is required to advance from the Map stage.
+    // The group signature and comment are optional; saved if present, never required.
+    private Task<bool> IsMapStageCompleteAsync(StrategySession session)
+        => Task.FromResult(session.AttendeeCount is > 0);
 
     // GET /Journey/Ink/{assetId} — streams a captured ink/signature PNG (for in-journey preview).
     [HttpGet("Journey/Ink/{assetId:guid}")]
@@ -634,6 +660,7 @@ public class JourneyRunViewModel
     public List<Project> Projects { get; set; } = new();
     public DepartmentStrategyMap? Map { get; set; }
     public List<MapInkAsset> InkAssets { get; set; } = new();
+    public string? SelectedTeamValue { get; set; } // Phase 16 — the team's chosen Big Picture value (Ar text)
 }
 
 public class PledgeDto
@@ -651,6 +678,13 @@ public class RemovePledgeDto
     public Guid? Id { get; set; }
     public string? ElementType { get; set; }
     public string? ElementCode { get; set; }
+}
+
+public class TeamValueDto
+{
+    public Guid SessionId { get; set; }
+    public string? ValueKey { get; set; }
+    public string ValueText { get; set; } = string.Empty;
 }
 
 public class InkDto

@@ -220,6 +220,20 @@
         else { <p class="muted">لا توجد مساهمات بعد.</p> }
     </div>
 </div>
+<div class="card mb-3">
+    <h2 class="h5">القيمة التي تعبّر عن الفرق</h2>
+    <p class="muted small">إجمالي الاختيارات: @Model.TeamValues.TotalSelections</p>
+    @if (Model.TeamValues.ByValue.Any())
+    {
+        <ul class="list-group list-group-flush">
+            @foreach (var v in Model.TeamValues.ByValue)
+            {
+                <li class="list-group-item d-flex justify-content-between"><span>@v.Name</span><span class="badge bg-success">@v.Count</span></li>
+            }
+        </ul>
+    }
+    else { <p class="muted">لم تختر الفرق قيمة بعد.</p> }
+</div>
 }
 
 @if (Model.Sections.Has(ExecReportSections.Signatures))

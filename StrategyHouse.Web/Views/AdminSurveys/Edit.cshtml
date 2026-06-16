@@ -50,20 +50,26 @@
     <ol class="list-group list-group-numbered mb-3">
         @foreach (var q in Model.Questions)
         {
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                    <span class="badge bg-info text-dark">@TypeAr(q.Type)</span>
-                    @q.QuestionAr
-                    @if (!string.IsNullOrEmpty(q.OptionsJson))
-                    {
-                        var opts = System.Text.Json.JsonSerializer.Deserialize<List<string>>(q.OptionsJson) ?? new();
-                        <div class="small text-muted">@string.Join(" · ", opts)</div>
-                    }
+            <li class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div class="flex-grow-1">
+                        <span class="badge bg-info text-dark">@TypeAr(q.Type)</span>
+                        <form method="post" asp-action="EditQuestion" asp-route-id="@Model.Id" asp-route-qid="@q.Id" class="d-flex gap-2 mt-2">
+                            @Html.AntiForgeryToken()
+                            <input name="questionAr" class="form-control form-control-sm" value="@q.QuestionAr" required />
+                            <button class="btn btn-sm btn-outline-primary" type="submit">حفظ النص</button>
+                        </form>
+                        @if (!string.IsNullOrEmpty(q.OptionsJson))
+                        {
+                            var opts = System.Text.Json.JsonSerializer.Deserialize<List<string>>(q.OptionsJson) ?? new();
+                            <div class="small text-muted mt-1">@string.Join(" · ", opts)</div>
+                        }
+                    </div>
+                    <form method="post" asp-action="DeleteQuestion" asp-route-id="@Model.Id" asp-route-qid="@q.Id">
+                        @Html.AntiForgeryToken()
+                        <button class="btn btn-sm btn-outline-danger">حذف</button>
+                    </form>
                 </div>
-                <form method="post" asp-action="DeleteQuestion" asp-route-id="@Model.Id" asp-route-qid="@q.Id">
-                    @Html.AntiForgeryToken()
-                    <button class="btn btn-sm btn-outline-danger">حذف</button>
-                </form>
             </li>
         }
     </ol>

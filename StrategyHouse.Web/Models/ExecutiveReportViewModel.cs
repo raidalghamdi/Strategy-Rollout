@@ -18,6 +18,9 @@ public class ExecutiveReportViewModel
     public ExecGroupSignaturesSummary GroupSignatures { get; set; } = new();
     public int MapsCount { get; set; }
 
+    // Phase 16 — team value selections (stage 3 "اختر القيمة التي تعبّر عن فريقكم").
+    public ExecTeamValuesSummary TeamValues { get; set; } = new();
+
     // Phase 14 — leadership analytics
     public ExecLeadershipAlignment LeadershipAlignment { get; set; } = new();
     public ExecLeadershipCulture LeadershipCulture { get; set; } = new();
@@ -110,6 +113,13 @@ public class ExecNameCount
 {
     public string Name { get; set; } = "";
     public int Count { get; set; }
+}
+
+// Phase 16 — distribution of the "team value" each department chose in stage 3.
+public class ExecTeamValuesSummary
+{
+    public int TotalSelections { get; set; }
+    public List<ExecNameCount> ByValue { get; set; } = new();   // value text → how many teams chose it
 }
 
 public class ExecGroupSignaturesSummary

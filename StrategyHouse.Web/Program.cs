@@ -40,6 +40,17 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     }
 });
 
+// Phase 16 — optional external MSSQL (Option A schema). Registered only when the
+// UseExternalDb feature flag is true AND a connection string is supplied. When off
+// (default), the app runs entirely on the local SQLite context as before.
+var useExternalDb = builder.Configuration.GetValue<bool>("Features:UseExternalDb");
+var externalConn = builder.Configuration.GetConnectionString("ExternalMssql");
+if (useExternalDb && !string.IsNullOrWhiteSpace(externalConn))
+{
+    builder.Services.AddDbContext<ExternalDbContext>(options => options.UseSqlServer(externalConn));
+}
+builder.Services.AddScoped<DepartmentDirectoryService>();
+
 // Identity — three roles: Admin, Facilitator, Viewer.
 builder.Services
     .AddIdentity<AppUser, IdentityRole<int>>(options =>

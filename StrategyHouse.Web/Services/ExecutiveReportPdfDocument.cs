@@ -203,6 +203,12 @@ public class ExecutiveReportPdfDocument
                                     ic.Item().Text($"• {i.Name} ({i.Count})").FontSize(9);
                             });
                         });
+
+                        col.Item().PaddingTop(4).Text($"القيمة التي تعبّر عن الفرق · إجمالي الاختيارات: {m.TeamValues.TotalSelections}").FontSize(11).Bold().FontColor(Gold);
+                        if (m.TeamValues.ByValue.Count == 0)
+                            col.Item().Text("لم تختر الفرق قيمة بعد.").FontSize(9).FontColor(Colors.Grey.Medium);
+                        foreach (var v in m.TeamValues.ByValue)
+                            col.Item().Text($"• {v.Name} ({v.Count})").FontSize(9);
                     }
 
                     // ----- Group signatures -----

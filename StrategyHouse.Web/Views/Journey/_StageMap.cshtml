@@ -36,7 +36,7 @@
 @* Phase 13 — attendee count entered by the team (top of the Map stage). *@
 <div class="gac-card mb-3">
     <h3 class="h5" style="color:#28334A;font-weight:800;border-bottom:4px solid #FAC126;display:inline-block;padding-bottom:6px;">عدد الموظفين الحاضرين من هذه الإدارة</h3>
-    <p class="text-muted small mt-2 mb-2">أدخل عدد منسوبي الإدارة المشاركين في هذه الجلسة.</p>
+    <p class="text-muted small mt-2 mb-2">عدد الموظفين الحاضرين مطلوب للمتابعة. التوقيع والتعليقات اختياريان.</p>
     <form method="post" asp-action="SaveAttendeeCount" asp-route-sessionId="@Model.Session.Id" class="d-flex flex-wrap gap-2 align-items-center">
         @Html.AntiForgeryToken()
         <input type="number" id="attendeeCount" name="attendeeCount" class="form-control" style="max-width:160px;min-height:44px;"
@@ -103,7 +103,7 @@
     }
     else
     {
-        <p class="text-muted small mt-2">وقّع باسم الفريق — يمكنك الرسم بالقلم و/أو كتابة تعليق. يكفي أحدهما.</p>
+        <p class="text-muted small mt-2">اختياري — يمكنك الرسم بالقلم و/أو كتابة تعليق باسم الفريق. هذه الخطوة غير مطلوبة للمتابعة.</p>
         <div class="mb-2">
             <label class="form-label fw-bold" style="color:#28334A;">توقيع/رسم الفريق</label>
             <div id="groupCanvasWrap" style="touch-action:none;border:1px solid #299ECE;border-radius:8px;background:#fff;max-width:100%;">
