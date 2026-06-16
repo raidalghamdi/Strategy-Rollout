@@ -73,6 +73,7 @@ public class ExecutiveReportService
         await BuildSurveyAsync(vm);
         await BuildContributionsAsync(vm, deptNames);
         await BuildGroupSignaturesAsync(vm, deptNames);
+        await BuildTeamValuesAsync(vm);
 
         vm.MapsCount = await _db.DepartmentStrategyMaps.CountAsync();
 
@@ -255,6 +256,18 @@ public class ExecutiveReportService
         vm.GroupSignatures.TopKeywords = TopKeywords(comments.Select(c => c.TypedText!), 10);
 
         vm.Overview.AvgQuizScore = vm.QuizAnalytics.AvgScore;
+    }
+
+    // ----- Phase 16 team value selections -----
+    private async Task BuildTeamValuesAsync(ExecutiveReportViewModel vm)
+    {
+        var selections = await _db.TeamValueSelections.AsNoTracking().ToListAsync();
+        vm.TeamValues.TotalSelections = selections.Count;
+        vm.TeamValues.ByValue = selections
+            .GroupBy(s => s.SelectedValueText)
+            .Select(g => new ExecNameCount { Name = g.Key, Count = g.Count() })
+            .OrderByDescending(x => x.Count).ThenBy(x => x.Name)
+            .ToList();
     }
 
     // ----- Phase 14 leadership: alignment -----

@@ -4,9 +4,24 @@
     var content = Model.Content;
     var sankeyJson = System.Text.Json.JsonSerializer.Serialize(Model.Sankey);
 }
-<div class="gac-vision mb-3 text-center">
-    <div class="label">الرؤية</div>
-    <div>@content?.Vision.Ar</div>
+@{
+    var missionText = string.IsNullOrWhiteSpace(content?.Mission.Ar)
+        ? "تعزيز المنافسة العادلة في السوق السعودي من خلال تطبيق نظام المنافسة ومنع الممارسات الاحتكارية، بما يحقق رفاه المستهلك ويدعم النمو الاقتصادي"
+        : content!.Mission.Ar;
+}
+<div class="row g-3 mb-3">
+    <div class="col-12 col-md-6">
+        <div class="gac-vision text-center h-100">
+            <div class="label">الرؤية</div>
+            <div>@content?.Vision.Ar</div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="gac-vision text-center h-100">
+            <div class="label">الرسالة</div>
+            <div>@missionText</div>
+        </div>
+    </div>
 </div>
 
 <div class="gac-card">

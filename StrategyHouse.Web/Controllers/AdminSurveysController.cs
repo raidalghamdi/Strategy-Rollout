@@ -114,6 +114,21 @@ public class AdminSurveysController : Controller
         return RedirectToAction(nameof(Edit), new { id });
     }
 
+    // Phase 16 — edit the text of an existing question without changing its
+    // type/order/count. Used to fix wording on the official survey from the admin UI.
+    [HttpPost("{id:guid}/EditQuestion/{qid:guid}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditQuestion(Guid id, Guid qid, string questionAr)
+    {
+        var q = await _db.SurveyQuestions.FirstOrDefaultAsync(x => x.Id == qid && x.SurveyId == id);
+        if (q != null && !string.IsNullOrWhiteSpace(questionAr))
+        {
+            q.QuestionAr = questionAr.Trim();
+            await _db.SaveChangesAsync();
+        }
+        return RedirectToAction(nameof(Edit), new { id });
+    }
+
     [HttpPost("{id:guid}/DeleteQuestion/{qid:guid}")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteQuestion(Guid id, Guid qid)

@@ -31,8 +31,11 @@
             .gac-topbar { padding: 8px 12px; gap: 8px; }
             .gac-topbar .brand-logo { height: 32px; }
         }
-        .gac-btn-primary { background: var(--gac-gold); border-color: var(--gac-gold); color: var(--text-on-gold) !important; border-radius: var(--radius-pill); font-weight:700; }
-        .gac-btn-primary:hover { background: var(--gac-gold-hover); border-color: var(--gac-gold-hover); color: var(--text-on-gold) !important; }
+        /* Phase 16 — align journey primary buttons (incl. Next) with the DGA green
+           theme: green background, white text. Previously this inline rule shadowed
+           dga-theme.css and forced gold/black, leaving "التالي" with dark text. */
+        .gac-btn-primary { background: var(--dga-primary, #067647); border-color: var(--dga-primary, #067647); color: #FFFFFF !important; border-radius: var(--radius-pill); font-weight:700; }
+        .gac-btn-primary:hover { background: var(--dga-primary-hover, #085D3A); border-color: var(--dga-primary-hover, #085D3A); color: #FFFFFF !important; }
         .gac-card { background:#fff; border:1px solid var(--border-soft); border-radius: var(--radius-card); box-shadow: var(--shadow-soft); padding:24px; }
         .gac-card + .gac-card { margin-top: 16px; }
         h1,h2,h3 { color: var(--gac-navy); }

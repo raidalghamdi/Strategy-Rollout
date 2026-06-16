@@ -4,11 +4,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StrategyHouse.Domain.Entities;
 using StrategyHouse.Infrastructure.Persistence;
+using StrategyHouse.Web.Services;
 
 namespace StrategyHouse.Web.Controllers;
 
-// Phase 4 — public-facing quiz. Anonymous; questions drawn server-side from the
-// approved pool only. 10 random questions, one-per-screen on the client.
+// Phase 4 — public-facing quiz. Anonymous; one-per-screen on the client.
+// Phase 16 — questions come from the hard-coded QuizQuestionsProvider instead of
+// the database, so the page is never blank waiting on an admin to approve a bank.
 [AllowAnonymous]
 public class QuizController : Controller
 {
@@ -42,11 +44,7 @@ public class QuizController : Controller
             if (session != null) deptCode = session.DeptCode;
         }
 
-        var all = await _db.QuizQuestions
-            .Where(q => q.IsApproved && q.IsActive && q.Scope == "General")
-            .ToListAsync();
-        var rnd = new Random(Random.Shared.Next());
-        var picked = all.OrderBy(_ => rnd.Next()).Take(10).ToList();
+        var picked = QuizQuestionsProvider.GetRandom(10);
 
         ViewBag.SessionId = sessionGuid;
         ViewBag.Scope = "General";
@@ -64,8 +62,8 @@ public class QuizController : Controller
     public async Task<IActionResult> Submit([FromBody] QuizSubmitDto dto)
     {
         if (dto.Answers == null || dto.Answers.Count == 0) return BadRequest();
-        var ids = dto.Answers.Select(a => a.Qid).ToList();
-        var questions = await _db.QuizQuestions.Where(q => ids.Contains(q.Id)).ToListAsync();
+        var ids = dto.Answers.Select(a => a.Qid).ToHashSet();
+        var questions = QuizQuestionsProvider.All.Where(q => ids.Contains(q.Id)).ToList();
 
         int score = 0;
         var detail = new List<object>();

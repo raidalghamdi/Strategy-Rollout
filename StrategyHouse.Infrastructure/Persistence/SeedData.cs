@@ -137,6 +137,11 @@ public static class SeedData
         await db.SaveChangesAsync();
 
         // ---- 5.3 Departments (17, GAC Level-2) ----
+        // Phase 16 — TODO: when Features:UseExternalDb is permanently enabled and the
+        // external MSSQL "Departments" table is confirmed as the source of truth, delete
+        // this local seed block. It is kept (conditional via DepartmentDirectoryService at
+        // read time, not at seed time) because pillar→department assignments below still
+        // reference these rows on the local SQLite context.
         var deptDefs = new (string Code, string Ar, string En, string Parent)[]
         {
             ("DEPT-01", "مكتب الرئيس التنفيذي", "CEO Office", "CEO"),

@@ -22,6 +22,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
     public DbSet<StrategySession> StrategySessions => Set<StrategySession>();
     public DbSet<SessionMember> SessionMembers => Set<SessionMember>();
     public DbSet<ContributionPledge> ContributionPledges => Set<ContributionPledge>();
+    public DbSet<TeamValueSelection> TeamValueSelections => Set<TeamValueSelection>(); // Phase 16
     public DbSet<DepartmentStrategyMap> DepartmentStrategyMaps => Set<DepartmentStrategyMap>();
     public DbSet<MapInkAsset> MapInkAssets => Set<MapInkAsset>();
     public DbSet<ModerationAuditLog> ModerationAuditLogs => Set<ModerationAuditLog>();
@@ -92,6 +93,14 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
             .WithMany()
             .HasForeignKey(m => m.SessionId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Phase 16 — team value selection. No cascade; keep history like other journey rows.
+        b.Entity<TeamValueSelection>()
+            .HasOne(t => t.Session)
+            .WithMany()
+            .HasForeignKey(t => t.SessionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        b.Entity<TeamValueSelection>().HasIndex(t => t.SessionId);
 
         b.Entity<MapInkAsset>()
             .HasOne(a => a.Map)
