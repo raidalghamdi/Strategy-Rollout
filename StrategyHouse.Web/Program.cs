@@ -118,6 +118,12 @@ builder.Services.AddScoped<SurveyFinalReportPdfService>();
 // Phase 13 — executive report
 builder.Services.AddScoped<ExecutiveReportService>();
 builder.Services.AddScoped<ExecutiveReportPdfDocument>();
+// Phase 13.1 — multi-format export (PowerPoint + Excel) and email delivery
+builder.Services.AddScoped<ExecutiveReportExcelBuilder>();
+builder.Services.AddScoped<ExecutiveReportPowerPointBuilder>();
+builder.Services.AddScoped<SurveyReportExcelBuilder>();
+builder.Services.AddScoped<SurveyReportPowerPointBuilder>();
+builder.Services.AddScoped<ReportEmailService>();
 // Phase 6 — DB-only chatbot
 builder.Services.AddScoped<ChatbotService>();
 

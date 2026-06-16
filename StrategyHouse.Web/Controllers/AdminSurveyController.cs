@@ -17,16 +17,34 @@ namespace StrategyHouse.Web.Controllers;
 [Route("Admin/Survey")]
 public class AdminSurveyController : Controller
 {
+    private const string PdfMime = "application/pdf";
+    private const string PptxMime = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    private const string XlsxMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
     private readonly ApplicationDbContext _db;
     private readonly SurveyAnalyticsService _analytics;
     private readonly SurveyFinalReportPdfService _pdf;
+    private readonly SurveyReportExcelBuilder _excel;
+    private readonly SurveyReportPowerPointBuilder _pptx;
+    private readonly ReportEmailService _email;
 
-    public AdminSurveyController(ApplicationDbContext db, SurveyAnalyticsService analytics, SurveyFinalReportPdfService pdf)
+    public AdminSurveyController(
+        ApplicationDbContext db,
+        SurveyAnalyticsService analytics,
+        SurveyFinalReportPdfService pdf,
+        SurveyReportExcelBuilder excel,
+        SurveyReportPowerPointBuilder pptx,
+        ReportEmailService email)
     {
         _db = db;
         _analytics = analytics;
         _pdf = pdf;
+        _excel = excel;
+        _pptx = pptx;
+        _email = email;
     }
+
+    private static string FileBase => $"Survey_Final_Report_{DateTime.UtcNow:yyyy-MM-dd}";
 
     [HttpGet("Analytics")]
     public async Task<IActionResult> Analytics()
@@ -150,8 +168,48 @@ public class AdminSurveyController : Controller
     {
         var model = await BuildFinalReportAsync();
         if (model == null) return NotFound();
-        var bytes = _pdf.Generate(model);
-        return File(bytes, "application/pdf", "survey-final-report.pdf");
+        return File(_pdf.Generate(model), PdfMime, $"{FileBase}.pdf");
+    }
+
+    [HttpGet("FinalReport.pptx")]
+    public async Task<IActionResult> FinalReportPptx()
+    {
+        var model = await BuildFinalReportAsync();
+        if (model == null) return NotFound();
+        return File(_pptx.Build(model), PptxMime, $"{FileBase}.pptx");
+    }
+
+    [HttpGet("FinalReport.xlsx")]
+    public async Task<IActionResult> FinalReportXlsx()
+    {
+        var model = await BuildFinalReportAsync();
+        if (model == null) return NotFound();
+        return File(_excel.Build(model), XlsxMime, $"{FileBase}.xlsx");
+    }
+
+    [HttpPost("FinalReport/Email")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EmailReport(string email, string format)
+    {
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+            return Json(new { success = false, message = "يرجى إدخال بريد إلكتروني صحيح." });
+
+        var model = await BuildFinalReportAsync();
+        if (model == null)
+            return Json(new { success = false, message = "لا يوجد استبيان رسمي لإصدار تقريره." });
+
+        byte[] bytes; string mime, ext;
+        switch ((format ?? "pdf").ToLowerInvariant())
+        {
+            case "pptx": bytes = _pptx.Build(model); mime = PptxMime; ext = "pptx"; break;
+            case "xlsx": bytes = _excel.Build(model); mime = XlsxMime; ext = "xlsx"; break;
+            default: bytes = _pdf.Generate(model); mime = PdfMime; ext = "pdf"; break;
+        }
+
+        var fileName = $"{FileBase}.{ext}";
+        var body = "<p style=\"font-family:sans-serif;direction:rtl\">مرفق التقرير النهائي للاستبيان الرسمي من الهيئة العامة للمنافسة.</p>";
+        var result = await _email.SendReportAsync(email, "التقرير النهائي للاستبيان — الهيئة العامة للمنافسة", body, fileName, bytes, mime);
+        return Json(new { success = result.Sent, message = result.Reason });
     }
 
     // ---------- builders ----------
