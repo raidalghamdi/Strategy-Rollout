@@ -6,19 +6,38 @@ using StrategyHouse.Web.Services;
 
 namespace StrategyHouse.Web.Controllers;
 
-// Phase 13 — the comprehensive executive report: HTML dashboard, branded PDF and CSV exports.
+// Phase 13 — the comprehensive executive report: HTML dashboard plus branded PDF, CSV,
+// PowerPoint and Excel exports (Phase 13.1), with optional email delivery.
 [Authorize(Roles = "Admin,Facilitator")]
 [Route("Admin")]
 public class AdminExecutiveReportController : Controller
 {
+    private const string PdfMime = "application/pdf";
+    private const string CsvMime = "text/csv";
+    private const string PptxMime = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    private const string XlsxMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
     private readonly ExecutiveReportService _service;
     private readonly ExecutiveReportPdfDocument _pdf;
+    private readonly ExecutiveReportExcelBuilder _excel;
+    private readonly ExecutiveReportPowerPointBuilder _pptx;
+    private readonly ReportEmailService _email;
 
-    public AdminExecutiveReportController(ExecutiveReportService service, ExecutiveReportPdfDocument pdf)
+    public AdminExecutiveReportController(
+        ExecutiveReportService service,
+        ExecutiveReportPdfDocument pdf,
+        ExecutiveReportExcelBuilder excel,
+        ExecutiveReportPowerPointBuilder pptx,
+        ReportEmailService email)
     {
         _service = service;
         _pdf = pdf;
+        _excel = excel;
+        _pptx = pptx;
+        _email = email;
     }
+
+    private static string FileBase => $"Executive_Report_{DateTime.UtcNow:yyyy-MM-dd}";
 
     [HttpGet("ExecutiveReport")]
     public async Task<IActionResult> ExecutiveReport()
@@ -31,14 +50,55 @@ public class AdminExecutiveReportController : Controller
     public async Task<IActionResult> ExecutiveReportPdf()
     {
         var vm = await _service.BuildAsync();
-        var bytes = _pdf.Generate(vm);
-        return File(bytes, "application/pdf", "executive-report.pdf");
+        return File(_pdf.Generate(vm), PdfMime, $"{FileBase}.pdf");
+    }
+
+    [HttpGet("ExecutiveReport.pptx")]
+    public async Task<IActionResult> ExecutiveReportPptx()
+    {
+        var vm = await _service.BuildAsync();
+        return File(_pptx.Build(vm), PptxMime, $"{FileBase}.pptx");
+    }
+
+    [HttpGet("ExecutiveReport.xlsx")]
+    public async Task<IActionResult> ExecutiveReportXlsx()
+    {
+        var vm = await _service.BuildAsync();
+        return File(_excel.Build(vm), XlsxMime, $"{FileBase}.xlsx");
     }
 
     [HttpGet("ExecutiveReport.csv")]
     public async Task<IActionResult> ExecutiveReportCsv()
     {
         var vm = await _service.BuildAsync();
+        return File(BuildCsv(vm), CsvMime, $"{FileBase}.csv");
+    }
+
+    [HttpPost("ExecutiveReport/Email")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EmailReport(string email, string format)
+    {
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+            return Json(new { success = false, message = "يرجى إدخال بريد إلكتروني صحيح." });
+
+        var vm = await _service.BuildAsync();
+        byte[] bytes; string mime, ext;
+        switch ((format ?? "pdf").ToLowerInvariant())
+        {
+            case "pptx": bytes = _pptx.Build(vm); mime = PptxMime; ext = "pptx"; break;
+            case "xlsx": bytes = _excel.Build(vm); mime = XlsxMime; ext = "xlsx"; break;
+            case "csv": bytes = BuildCsv(vm); mime = CsvMime; ext = "csv"; break;
+            default: bytes = _pdf.Generate(vm); mime = PdfMime; ext = "pdf"; break;
+        }
+
+        var fileName = $"{FileBase}.{ext}";
+        var body = "<p style=\"font-family:sans-serif;direction:rtl\">مرفق التقرير التنفيذي الشامل من الهيئة العامة للمنافسة.</p>";
+        var result = await _email.SendReportAsync(email, "التقرير التنفيذي الشامل — الهيئة العامة للمنافسة", body, fileName, bytes, mime);
+        return Json(new { success = result.Sent, message = result.Reason });
+    }
+
+    private static byte[] BuildCsv(Models.ExecutiveReportViewModel vm)
+    {
         var sb = new StringBuilder();
         sb.Append('﻿'); // UTF-8 BOM so Excel renders Arabic correctly.
 
@@ -64,8 +124,7 @@ public class AdminExecutiveReportController : Controller
               .Append('\n');
         }
 
-        var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-        return File(bytes, "text/csv", "executive-report.csv");
+        return Encoding.UTF8.GetBytes(sb.ToString());
     }
 
     private static void AppendRow(StringBuilder sb, string section, string metric, string value)

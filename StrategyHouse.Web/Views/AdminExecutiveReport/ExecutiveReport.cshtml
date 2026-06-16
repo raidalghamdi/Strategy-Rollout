@@ -10,9 +10,34 @@
             <p class="mb-0" style="color:#FAC126;">بناء البيت الاستراتيجي — رحلة الإدارات · الهيئة العامة للمنافسة</p>
             <p class="mb-0 small" style="color:#cfe2f0;">تم الإنشاء: @Model.GeneratedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</p>
         </div>
-        <div class="d-flex gap-2">
-            <a href="/Admin/ExecutiveReport.pdf" class="btn btn--primary btn-sm">تصدير PDF</a>
-            <a href="/Admin/ExecutiveReport.csv" class="btn btn--secondary btn-sm">تصدير CSV</a>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="/Admin/ExecutiveReport.pdf" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">تحميل PDF</a>
+            <a href="/Admin/ExecutiveReport.pptx" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">تحميل PowerPoint</a>
+            <a href="/Admin/ExecutiveReport.xlsx" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">تحميل Excel</a>
+            <a href="/Admin/ExecutiveReport.csv" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">تحميل CSV</a>
+            <button type="button" id="btn-email-report" class="btn btn-sm" style="background:#fff;color:#00192B;font-weight:700;border-radius:999px;">إرسال بالبريد</button>
+        </div>
+    </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+<div id="email-report-modal" style="display:none;position:fixed;inset:0;z-index:1080;background:rgba(0,25,43,0.55);">
+    <div style="max-width:420px;margin:8% auto;background:#fff;border-radius:14px;padding:20px;direction:rtl;box-shadow:0 12px 40px rgba(0,0,0,0.3);">
+        <h2 class="h5" style="color:#00192B;">إرسال التقرير بالبريد الإلكتروني</h2>
+        <label class="form-label small" for="email-report-to">البريد الإلكتروني</label>
+        <input type="email" id="email-report-to" class="form-control" placeholder="name@gac.gov.sa" />
+        <label class="form-label small mt-2" for="email-report-format">صيغة الملف</label>
+        <select id="email-report-format" class="form-select">
+            <option value="pdf">PDF</option>
+            <option value="pptx">PowerPoint</option>
+            <option value="xlsx">Excel</option>
+            <option value="csv">CSV</option>
+        </select>
+        <div id="email-report-msg" class="small mt-2" style="display:none;"></div>
+        <div class="d-flex gap-2 mt-3 justify-content-end">
+            <button type="button" id="email-report-cancel" class="btn btn--secondary btn-sm">إلغاء</button>
+            <button type="button" id="email-report-submit" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;">إرسال</button>
         </div>
     </div>
 </div>
@@ -160,6 +185,58 @@
 
 @section Scripts {
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    var openBtn = document.getElementById('btn-email-report');
+    var modal = document.getElementById('email-report-modal');
+    var cancelBtn = document.getElementById('email-report-cancel');
+    var submitBtn = document.getElementById('email-report-submit');
+    var msg = document.getElementById('email-report-msg');
+    if (!openBtn || !modal) { return; }
+
+    function showMsg(text, ok) {
+        msg.style.display = 'block';
+        msg.textContent = text;
+        msg.style.color = ok ? '#009845' : '#C0392B';
+    }
+    function openModal() { modal.style.display = 'block'; msg.style.display = 'none'; }
+    function closeModal() { modal.style.display = 'none'; }
+
+    openBtn.onclick = openModal;
+    cancelBtn.onclick = closeModal;
+    modal.onclick = function (e) { if (e.target === modal) { closeModal(); } };
+
+    submitBtn.onclick = function () {
+        var email = document.getElementById('email-report-to').value;
+        var format = document.getElementById('email-report-format').value;
+        if (!email || email.indexOf('@@') === -1) {
+            showMsg('يرجى إدخال بريد إلكتروني صحيح.', false);
+            return;
+        }
+        var tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+        var token = tokenEl ? tokenEl.value : '';
+        submitBtn.disabled = true;
+        showMsg('جارٍ الإرسال...', true);
+        var data = 'email=' + encodeURIComponent(email) + '&format=' + encodeURIComponent(format);
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/Admin/ExecutiveReport/Email', true);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.setRequestHeader('RequestVerificationToken', token);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== 4) { return; }
+            submitBtn.disabled = false;
+            var ok = false, message = 'تعذّر الإرسال.';
+            try {
+                var res = JSON.parse(xhr.responseText);
+                ok = !!res.success;
+                message = res.message || message;
+            } catch (err) { message = 'تعذّر الاتصال بالخادم.'; }
+            showMsg(message, ok);
+        };
+        xhr.send(data);
+    };
+})();
+</script>
 <script>
 (function () {
     if (typeof Chart === 'undefined') return;
