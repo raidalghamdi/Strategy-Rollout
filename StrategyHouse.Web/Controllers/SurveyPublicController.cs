@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StrategyHouse.Domain.Entities;
 using StrategyHouse.Infrastructure.Persistence;
+using StrategyHouse.Web.Services;
 
 namespace StrategyHouse.Web.Controllers;
 
@@ -14,8 +15,13 @@ namespace StrategyHouse.Web.Controllers;
 public class SurveyPublicController : Controller
 {
     private readonly ApplicationDbContext _db;
+    private readonly DepartmentDirectoryService _depts;
 
-    public SurveyPublicController(ApplicationDbContext db) { _db = db; }
+    public SurveyPublicController(ApplicationDbContext db, DepartmentDirectoryService depts)
+    {
+        _db = db;
+        _depts = depts;
+    }
 
     // GET /s/{token}
     [HttpGet("s/{token}")]
@@ -31,9 +37,8 @@ public class SurveyPublicController : Controller
             return View("Closed");
 
         survey.Questions = survey.Questions.OrderBy(q => q.Order).ToList();
-        ViewBag.Departments = await _db.Departments.Where(d => d.IsActive)
-            .OrderBy(d => d.DeptCode)
-            .ToListAsync();
+        var depts = await _depts.GetDepartmentsAsync();
+        ViewBag.Departments = depts.Where(d => d.IsActive).OrderBy(d => d.DeptCode).ToList();
         return View(survey);
     }
 
