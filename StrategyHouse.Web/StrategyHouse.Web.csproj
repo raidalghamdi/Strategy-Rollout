@@ -17,6 +17,7 @@
     </PackageReference>
     <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="QuestPDF" Version="2026.6.0" />
+    <PackageReference Include="ShapeCrawler" Version="0.79.3" />
   </ItemGroup>
 
   <PropertyGroup>

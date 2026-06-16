@@ -40,22 +40,31 @@
             </div>
             <nav>
                 <a class="@activeIf("Home")" href="/">الرئيسية</a>
-                <a class="@activeIf("Journey")" href="/Journey">الرحلة</a>
 
-                <div class="group-title">الإدارة</div>
-                <a class="@activeIf("Admin")" href="/Admin">لوحة المعلومات</a>
+                <div class="group-title">المراقبة</div>
                 <a class="@activeIf("Admin")" href="/Admin/LiveDashboard">اللوحة الحية</a>
-                <a class="@activeIf("AdminExecutiveReport")" href="/Admin/ExecutiveReport">التقرير التنفيذي</a>
+                <a class="@activeIf("Admin")" href="/Admin">لوحة المعلومات</a>
+
+                <div class="group-title">الرحلة الاستراتيجية</div>
+                <a class="@activeIf("Journey")" href="/Journey">الرحلة</a>
                 <a class="@activeIf("AdminInsights")" href="/Admin/Insights">المساهمات</a>
                 <a class="@activeIf("AdminModeration")" href="/Admin/Moderation">الخريطة والاعتماد</a>
-                <a class="@activeIf("AdminRoster")" href="/Admin/Roster">منسوبو الإدارات</a>
-                <a class="@activeIf("AdminQuiz")" href="/Admin/Quiz">الاختبار</a>
+                <a class="@activeIf("AdminWall")" href="/Admin/Wall">جدار المشاركات</a>
+
+                <div class="group-title">الاختبار</div>
+                <a class="@activeIf("AdminQuiz")" href="/Admin/Quiz">إدارة الاختبار</a>
+
+                <div class="group-title">الاستبيان</div>
                 <a class="@activeIf("AdminSurveys")" href="/Admin/Surveys">الاستبيان</a>
                 <a class="@activeIf("AdminSurvey")" href="/Admin/Survey/Analytics">تحليلات الاستبيان الرسمي</a>
-                <a href="/Admin/Survey/FinalReport">تقرير الاستبيان النهائي</a>
                 <a href="/Admin/Survey/Categorize">تصنيف إجابات الاستبيان</a>
+
+                <div class="group-title">التقارير</div>
+                <a class="@activeIf("AdminExecutiveReport")" href="/Admin/ExecutiveReport">التقرير التنفيذي</a>
+                <a href="/Admin/Survey/FinalReport">تقرير الاستبيان النهائي</a>
+
+                <div class="group-title">الإعدادات</div>
                 <a class="@activeIf("AdminCodes")" href="/Admin/Codes">رموز الدخول</a>
-                <a class="@activeIf("AdminWall")" href="/Admin/Wall">جدار المشاركات</a>
                 <a class="@activeIf("Admin")" href="/Admin/Content">تحرير النصوص</a>
             </nav>
         </aside>

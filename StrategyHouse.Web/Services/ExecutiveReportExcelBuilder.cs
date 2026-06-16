@@ -4,21 +4,31 @@ using static StrategyHouse.Web.Services.XlsxReportStyle;
 
 namespace StrategyHouse.Web.Services;
 
-// Phase 13.1 — branded .xlsx export of the comprehensive executive report. Six sheets
-// (overview, departments, quiz, survey, contributions, signatures). Shared GAC styling
-// via XlsxReportStyle.
+// Phase 13.1 / 14 — branded .xlsx export of the comprehensive executive report. One sheet
+// per selected section (overview, departments, quiz, survey, contributions, signatures, plus
+// the Phase 14 leadership sheets). Shared GAC styling via XlsxReportStyle.
 public class ExecutiveReportExcelBuilder
 {
     public byte[] Build(ExecutiveReportViewModel m)
     {
         using var wb = new XLWorkbook();
+        var s = m.Sections;
 
-        BuildOverview(wb, m);
-        BuildDepartments(wb, m);
-        BuildQuiz(wb, m);
-        BuildSurvey(wb, m);
-        BuildContributions(wb, m);
-        BuildSignatures(wb, m);
+        if (s.Has(ExecReportSections.Overview)) BuildOverview(wb, m);
+        if (s.Has(ExecReportSections.Departments)) BuildDepartments(wb, m);
+        if (s.Has(ExecReportSections.Quiz)) BuildQuiz(wb, m);
+        if (s.Has(ExecReportSections.Survey)) BuildSurvey(wb, m);
+        if (s.Has(ExecReportSections.Contributions)) BuildContributions(wb, m);
+        if (s.Has(ExecReportSections.Signatures)) BuildSignatures(wb, m);
+        if (s.Has(ExecReportSections.LeadershipAlignment)) BuildAlignment(wb, m);
+        if (s.Has(ExecReportSections.LeadershipCulture)) BuildCulture(wb, m);
+        if (s.Has(ExecReportSections.LeadershipRisks)) BuildRisks(wb, m);
+        if (s.Has(ExecReportSections.LeadershipMaturity)) BuildMaturity(wb, m);
+        if (s.Has(ExecReportSections.LeadershipRecommendations)) BuildRecommendations(wb, m);
+
+        // ClosedXML refuses to save a workbook with no worksheets; guarantee at least one.
+        if (!wb.Worksheets.Any())
+            NewSheet(wb, "التقرير").Cell(1, 1).SetValue("لم يتم اختيار أي قسم.");
 
         using var ms = new MemoryStream();
         wb.SaveAs(ms);
@@ -49,23 +59,25 @@ public class ExecutiveReportExcelBuilder
     {
         var ws = NewSheet(wb, "الإدارات");
         Title(ws, 1, "الحضور والإكمال حسب الإدارة");
-        HeaderRow(ws, 3, "الإدارة", "الجلسات", "الحضور", "نسبة الإكمال %");
+        HeaderRow(ws, 3, "الترتيب", "الإدارة", "الجلسات", "الحضور", "نسبة الإكمال %");
         int r = 4;
         foreach (var d in m.DepartmentBreakdown)
         {
-            ws.Cell(r, 1).Value = d.DeptName;
-            ws.Cell(r, 2).Value = d.SessionsCount;
-            ws.Cell(r, 3).Value = d.AttendeesCount;
-            ws.Cell(r, 4).Value = d.CompletionRate;
+            ws.Cell(r, 1).Value = d.Rank;
+            ws.Cell(r, 2).Value = d.DeptName;
+            ws.Cell(r, 3).Value = d.SessionsCount;
+            ws.Cell(r, 4).Value = d.AttendeesCount;
+            ws.Cell(r, 5).Value = d.CompletionRate;
             r++;
         }
         if (m.DepartmentBreakdown.Count > 0)
         {
-            ws.Cell(r, 1).Value = "الإجمالي";
-            ws.Cell(r, 2).Value = m.DepartmentBreakdown.Sum(d => d.SessionsCount);
-            ws.Cell(r, 3).Value = m.DepartmentBreakdown.Sum(d => d.AttendeesCount);
-            ws.Cell(r, 4).Value = "—";
-            StyleTotal(ws.Range(r, 1, r, 4));
+            ws.Cell(r, 1).Value = "";
+            ws.Cell(r, 2).Value = "الإجمالي";
+            ws.Cell(r, 3).Value = m.DepartmentBreakdown.Sum(d => d.SessionsCount);
+            ws.Cell(r, 4).Value = m.DepartmentBreakdown.Sum(d => d.AttendeesCount);
+            ws.Cell(r, 5).Value = "—";
+            StyleTotal(ws.Range(r, 1, r, 5));
         }
         Finish(ws);
     }
@@ -179,6 +191,113 @@ public class ExecutiveReportExcelBuilder
                 ws.Cell(r, 3).Value = c.CapturedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
                 r++;
             }
+        }
+        Finish(ws);
+    }
+
+    private void BuildAlignment(XLWorkbook wb, ExecutiveReportViewModel m)
+    {
+        var ws = NewSheet(wb, "الاتساق الاستراتيجي");
+        Title(ws, 1, "توزيع المساهمات على الركائز الاستراتيجية");
+        ws.Cell(2, 1).Value = $"إجمالي المساهمات المرتبطة بالركائز: {m.LeadershipAlignment.TotalContributions}";
+        HeaderRow(ws, 4, "الركيزة", "عدد المساهمات", "النسبة %");
+        int r = 5;
+        if (m.LeadershipAlignment.PillarShares.Count == 0) ws.Cell(r++, 1).Value = "—";
+        foreach (var ps in m.LeadershipAlignment.PillarShares)
+        {
+            ws.Cell(r, 1).Value = ps.PillarName;
+            ws.Cell(r, 2).Value = ps.Count;
+            ws.Cell(r, 3).Value = ps.Percent;
+            r++;
+        }
+        if (m.LeadershipAlignment.Gaps.Count > 0)
+        {
+            r++;
+            ws.Cell(r++, 1).Value = "فجوات الاتساق:";
+            foreach (var g in m.LeadershipAlignment.Gaps)
+                ws.Cell(r++, 1).Value = g;
+        }
+        Finish(ws);
+    }
+
+    private void BuildCulture(XLWorkbook wb, ExecutiveReportViewModel m)
+    {
+        var ws = NewSheet(wb, "الثقافة والمشاركة");
+        Title(ws, 1, "الثقافة والمشاركة");
+        var cu = m.LeadershipCulture;
+        ws.Cell(2, 1).Value = $"مؤشر روح الفريق: {cu.TeamSpiritScore:0.#}/100 ({cu.TeamSpiritLabel})";
+        ws.Cell(3, 1).Value = $"التعليقات — إيجابية: {cu.PositiveComments} · محايدة: {cu.NeutralComments} · سلبية: {cu.NegativeComments}";
+        HeaderRow(ws, 5, "الإدارة", "الحضور");
+        int r = 6;
+        if (cu.DepartmentParticipation.Count == 0) ws.Cell(r++, 1).Value = "—";
+        foreach (var d in cu.DepartmentParticipation)
+        {
+            ws.Cell(r, 1).Value = d.DeptName;
+            ws.Cell(r, 2).Value = d.Attendees;
+            r++;
+        }
+        Finish(ws);
+    }
+
+    private void BuildRisks(XLWorkbook wb, ExecutiveReportViewModel m)
+    {
+        var ws = NewSheet(wb, "المخاطر والفرص");
+        Title(ws, 1, "المخاطر والفرص");
+        HeaderRow(ws, 3, "أبرز التحديات (س4)", "العدد", "النسبة %");
+        int r = 4;
+        if (m.LeadershipRisks.TopChallenges.Count == 0) ws.Cell(r++, 1).Value = "—";
+        foreach (var c in m.LeadershipRisks.TopChallenges)
+        {
+            ws.Cell(r, 1).Value = c.Category;
+            ws.Cell(r, 2).Value = c.Count;
+            ws.Cell(r, 3).Value = c.Percent;
+            r++;
+        }
+        r++;
+        HeaderRow(ws, r++, "أبرز الفرص (س7)", "العدد", "النسبة %");
+        if (m.LeadershipRisks.TopOpportunities.Count == 0) ws.Cell(r++, 1).Value = "—";
+        foreach (var o in m.LeadershipRisks.TopOpportunities)
+        {
+            ws.Cell(r, 1).Value = o.Category;
+            ws.Cell(r, 2).Value = o.Count;
+            ws.Cell(r, 3).Value = o.Percent;
+            r++;
+        }
+        Finish(ws);
+    }
+
+    private void BuildMaturity(XLWorkbook wb, ExecutiveReportViewModel m)
+    {
+        var ws = NewSheet(wb, "النضج التنظيمي");
+        Title(ws, 1, "النضج التنظيمي حسب الإدارة");
+        var ma = m.LeadershipMaturity;
+        ws.Cell(2, 1).Value = $"ناضجة: {ma.MatureCount} · متطورة: {ma.DevelopingCount} · بحاجة دعم: {ma.NeedsSupportCount}";
+        HeaderRow(ws, 4, "الإدارة", "المؤشر (من 5)", "التصنيف");
+        int r = 5;
+        if (ma.Departments.Count == 0) ws.Cell(r++, 1).Value = "—";
+        foreach (var d in ma.Departments)
+        {
+            ws.Cell(r, 1).Value = d.DeptName;
+            ws.Cell(r, 2).Value = Math.Round(d.Score, 2);
+            ws.Cell(r, 3).Value = d.Tier;
+            r++;
+        }
+        Finish(ws);
+    }
+
+    private void BuildRecommendations(XLWorkbook wb, ExecutiveReportViewModel m)
+    {
+        var ws = NewSheet(wb, "توصيات القيادة");
+        Title(ws, 1, "توصيات القيادة");
+        HeaderRow(ws, 3, "#", "التوصية");
+        int r = 4;
+        if (m.LeadershipRecommendations.Count == 0) ws.Cell(r++, 2).Value = "لا توجد توصيات كافية بعد.";
+        int n = 1;
+        foreach (var rec in m.LeadershipRecommendations)
+        {
+            ws.Cell(r, 1).Value = n++;
+            ws.Cell(r, 2).Value = rec;
+            r++;
         }
         Finish(ws);
     }

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using StrategyHouse.Web.Models;
 using StrategyHouse.Web.Services;
 
 namespace StrategyHouse.Web.Controllers;
@@ -39,49 +40,76 @@ public class AdminExecutiveReportController : Controller
 
     private static string FileBase => $"Executive_Report_{DateTime.UtcNow:yyyy-MM-dd}";
 
-    [HttpGet("ExecutiveReport")]
-    public async Task<IActionResult> ExecutiveReport()
+    // Resolve the section selection for a request: explicit ?sections= wins, else the saved
+    // cookie, else all sections. Used by the HTML view and every export.
+    private ExecReportSections ResolveSections(string? sections)
     {
-        var vm = await _service.BuildAsync();
+        if (!string.IsNullOrWhiteSpace(sections))
+            return ExecReportSections.Parse(sections);
+        if (Request.Cookies.TryGetValue(ExecReportSections.CookieName, out var cookie) && !string.IsNullOrWhiteSpace(cookie))
+            return ExecReportSections.Parse(cookie);
+        return ExecReportSections.AllSelected();
+    }
+
+    [HttpGet("ExecutiveReport")]
+    public async Task<IActionResult> ExecutiveReport(string? sections = null)
+    {
+        var vm = await _service.BuildAsync(ResolveSections(sections));
         return View(vm);
     }
 
-    [HttpGet("ExecutiveReport.pdf")]
-    public async Task<IActionResult> ExecutiveReportPdf()
+    // "حفظ كافتراضي" — persist the current selection in a cookie for future visits.
+    [HttpPost("ExecutiveReport/SaveDefault")]
+    [ValidateAntiForgeryToken]
+    public IActionResult SaveDefault(string? sections)
     {
-        var vm = await _service.BuildAsync();
+        var resolved = ExecReportSections.Parse(sections);
+        Response.Cookies.Append(ExecReportSections.CookieName, resolved.ToQueryValue(), new CookieOptions
+        {
+            Expires = DateTimeOffset.UtcNow.AddYears(1),
+            HttpOnly = false,
+            IsEssential = true,
+            SameSite = SameSiteMode.Lax,
+        });
+        return Json(new { success = true, message = "تم حفظ الأقسام المختارة كافتراضي." });
+    }
+
+    [HttpGet("ExecutiveReport.pdf")]
+    public async Task<IActionResult> ExecutiveReportPdf(string? sections = null)
+    {
+        var vm = await _service.BuildAsync(ResolveSections(sections));
         return File(_pdf.Generate(vm), PdfMime, $"{FileBase}.pdf");
     }
 
     [HttpGet("ExecutiveReport.pptx")]
-    public async Task<IActionResult> ExecutiveReportPptx()
+    public async Task<IActionResult> ExecutiveReportPptx(string? sections = null)
     {
-        var vm = await _service.BuildAsync();
+        var vm = await _service.BuildAsync(ResolveSections(sections));
         return File(_pptx.Build(vm), PptxMime, $"{FileBase}.pptx");
     }
 
     [HttpGet("ExecutiveReport.xlsx")]
-    public async Task<IActionResult> ExecutiveReportXlsx()
+    public async Task<IActionResult> ExecutiveReportXlsx(string? sections = null)
     {
-        var vm = await _service.BuildAsync();
+        var vm = await _service.BuildAsync(ResolveSections(sections));
         return File(_excel.Build(vm), XlsxMime, $"{FileBase}.xlsx");
     }
 
     [HttpGet("ExecutiveReport.csv")]
-    public async Task<IActionResult> ExecutiveReportCsv()
+    public async Task<IActionResult> ExecutiveReportCsv(string? sections = null)
     {
-        var vm = await _service.BuildAsync();
+        var vm = await _service.BuildAsync(ResolveSections(sections));
         return File(BuildCsv(vm), CsvMime, $"{FileBase}.csv");
     }
 
     [HttpPost("ExecutiveReport/Email")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> EmailReport(string email, string format)
+    public async Task<IActionResult> EmailReport(string email, string format, string? sections = null)
     {
         if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
             return Json(new { success = false, message = "يرجى إدخال بريد إلكتروني صحيح." });
 
-        var vm = await _service.BuildAsync();
+        var vm = await _service.BuildAsync(ResolveSections(sections));
         byte[] bytes; string mime, ext;
         switch ((format ?? "pdf").ToLowerInvariant())
         {
@@ -103,25 +131,31 @@ public class AdminExecutiveReportController : Controller
         sb.Append('﻿'); // UTF-8 BOM so Excel renders Arabic correctly.
 
         sb.AppendLine("القسم,المؤشر,القيمة");
-        AppendRow(sb, "نظرة عامة", "إجمالي الجلسات", vm.Overview.TotalSessions.ToString(CultureInfo.InvariantCulture));
-        AppendRow(sb, "نظرة عامة", "الجلسات المكتملة", vm.Overview.TotalCompletedSessions.ToString(CultureInfo.InvariantCulture));
-        AppendRow(sb, "نظرة عامة", "إجمالي الحضور", vm.Overview.TotalAttendees.ToString(CultureInfo.InvariantCulture));
-        AppendRow(sb, "نظرة عامة", "الإدارات المشاركة", vm.Overview.TotalDepartmentsEngaged.ToString(CultureInfo.InvariantCulture));
-        AppendRow(sb, "نظرة عامة", "متوسط الاختبار (من 5)", vm.Overview.AvgQuizScore.ToString("0.##", CultureInfo.InvariantCulture));
-        AppendRow(sb, "نظرة عامة", "وضوح الاستراتيجية (من 5)", vm.Overview.AvgSurveyClarity.ToString("0.##", CultureInfo.InvariantCulture));
-        AppendRow(sb, "نظرة عامة", "القدرة على المساهمة (من 5)", vm.Overview.AvgContributionCapability.ToString("0.##", CultureInfo.InvariantCulture));
-        AppendRow(sb, "نظرة عامة", "الخرائط الاستراتيجية", vm.MapsCount.ToString(CultureInfo.InvariantCulture));
-        AppendRow(sb, "نظرة عامة", "تواقيع الفرق", vm.GroupSignatures.TotalCount.ToString(CultureInfo.InvariantCulture));
-
-        sb.AppendLine();
-        sb.AppendLine("الإدارة,الجلسات,الحضور,نسبة الإكمال %");
-        foreach (var d in vm.DepartmentBreakdown)
+        if (vm.Sections.Has(ExecReportSections.Overview))
         {
-            sb.Append(Csv(d.DeptName)).Append(',')
-              .Append(d.SessionsCount.ToString(CultureInfo.InvariantCulture)).Append(',')
-              .Append(d.AttendeesCount.ToString(CultureInfo.InvariantCulture)).Append(',')
-              .Append(d.CompletionRate.ToString("0.#", CultureInfo.InvariantCulture))
-              .Append('\n');
+            AppendRow(sb, "نظرة عامة", "إجمالي الجلسات", vm.Overview.TotalSessions.ToString(CultureInfo.InvariantCulture));
+            AppendRow(sb, "نظرة عامة", "الجلسات المكتملة", vm.Overview.TotalCompletedSessions.ToString(CultureInfo.InvariantCulture));
+            AppendRow(sb, "نظرة عامة", "إجمالي الحضور", vm.Overview.TotalAttendees.ToString(CultureInfo.InvariantCulture));
+            AppendRow(sb, "نظرة عامة", "الإدارات المشاركة", vm.Overview.TotalDepartmentsEngaged.ToString(CultureInfo.InvariantCulture));
+            AppendRow(sb, "نظرة عامة", "متوسط الاختبار (من 5)", vm.Overview.AvgQuizScore.ToString("0.##", CultureInfo.InvariantCulture));
+            AppendRow(sb, "نظرة عامة", "وضوح الاستراتيجية (من 5)", vm.Overview.AvgSurveyClarity.ToString("0.##", CultureInfo.InvariantCulture));
+            AppendRow(sb, "نظرة عامة", "القدرة على المساهمة (من 5)", vm.Overview.AvgContributionCapability.ToString("0.##", CultureInfo.InvariantCulture));
+            AppendRow(sb, "نظرة عامة", "الخرائط الاستراتيجية", vm.MapsCount.ToString(CultureInfo.InvariantCulture));
+            AppendRow(sb, "نظرة عامة", "تواقيع الفرق", vm.GroupSignatures.TotalCount.ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (vm.Sections.Has(ExecReportSections.Departments))
+        {
+            sb.AppendLine();
+            sb.AppendLine("الإدارة,الجلسات,الحضور,نسبة الإكمال %");
+            foreach (var d in vm.DepartmentBreakdown)
+            {
+                sb.Append(Csv(d.DeptName)).Append(',')
+                  .Append(d.SessionsCount.ToString(CultureInfo.InvariantCulture)).Append(',')
+                  .Append(d.AttendeesCount.ToString(CultureInfo.InvariantCulture)).Append(',')
+                  .Append(d.CompletionRate.ToString("0.#", CultureInfo.InvariantCulture))
+                  .Append('\n');
+            }
         }
 
         return Encoding.UTF8.GetBytes(sb.ToString());

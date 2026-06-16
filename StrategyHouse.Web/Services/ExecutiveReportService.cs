@@ -6,9 +6,11 @@ using StrategyHouse.Web.Models;
 
 namespace StrategyHouse.Web.Services;
 
-// Phase 13 — assembles the comprehensive executive report ViewModel from every part of the
-// rollout: sessions, attendee counts, quiz attempts, the official survey (via the Phase 12
-// analytics service), contribution pledges, group signatures and strategy maps.
+// Phase 13/14 — assembles the comprehensive executive report ViewModel from every part of
+// the rollout: sessions, attendee counts, quiz attempts, the official survey (via the Phase
+// 12 analytics service), contribution pledges, group signatures and strategy maps. Phase 14
+// adds five leadership-analytics dimensions (alignment, culture, risks, maturity,
+// recommendations) and richer detail on the existing six sections.
 public class ExecutiveReportService
 {
     private readonly ApplicationDbContext _db;
@@ -21,11 +23,16 @@ public class ExecutiveReportService
         _survey = survey;
     }
 
-    public async Task<ExecutiveReportViewModel> BuildAsync()
+    public Task<ExecutiveReportViewModel> BuildAsync() => BuildAsync(ExecReportSections.AllSelected());
+
+    public async Task<ExecutiveReportViewModel> BuildAsync(ExecReportSections sections)
     {
-        var vm = new ExecutiveReportViewModel { GeneratedAt = DateTime.UtcNow };
+        var vm = new ExecutiveReportViewModel { GeneratedAt = DateTime.UtcNow, Sections = sections };
 
         var sessions = await _db.StrategySessions.AsNoTracking().ToListAsync();
+        var activeDepts = await _db.Departments.AsNoTracking().Where(d => d.IsActive)
+            .ToDictionaryAsync(d => d.DeptCode, d => d.NameAr ?? d.DeptCode);
+        // Fall back to all departments for name lookup (a session dept may be inactive).
         var deptNames = await _db.Departments.AsNoTracking()
             .ToDictionaryAsync(d => d.DeptCode, d => d.NameAr ?? d.DeptCode);
 
@@ -33,9 +40,21 @@ public class ExecutiveReportService
         vm.Overview.TotalSessions = sessions.Count;
         vm.Overview.TotalCompletedSessions = sessions.Count(s => s.CompletedAt != null);
         vm.Overview.TotalAttendees = sessions.Sum(s => s.AttendeeCount ?? 0);
-        vm.Overview.TotalDepartmentsEngaged = sessions.Select(s => s.DeptCode).Distinct().Count();
+        var engagedCodes = sessions.Select(s => s.DeptCode).Distinct().ToHashSet();
+        vm.Overview.TotalDepartmentsEngaged = engagedCodes.Count;
+        vm.Overview.TotalDepartments = activeDepts.Count;
+        vm.Overview.CompletionPercentage = sessions.Count > 0
+            ? Math.Round(100.0 * vm.Overview.TotalCompletedSessions / sessions.Count, 1) : 0;
+        if (sessions.Count > 0)
+        {
+            vm.Overview.SessionsFrom = sessions.Min(s => s.StartedAt);
+            vm.Overview.SessionsTo = sessions.Max(s => s.LastActivityAt ?? s.CompletedAt ?? s.StartedAt);
+        }
+        vm.Overview.NotEngagedDepartments = activeDepts
+            .Where(kv => !engagedCodes.Contains(kv.Key))
+            .Select(kv => kv.Value).OrderBy(n => n).ToList();
 
-        // ----- Department breakdown -----
+        // ----- Department breakdown (ranked) -----
         vm.DepartmentBreakdown = sessions
             .GroupBy(s => s.DeptCode)
             .Select(g => new ExecDepartmentRow
@@ -46,23 +65,23 @@ public class ExecutiveReportService
                 AttendeesCount = g.Sum(s => s.AttendeeCount ?? 0),
                 CompletionRate = g.Any() ? Math.Round(100.0 * g.Count(s => s.CompletedAt != null) / g.Count(), 1) : 0,
             })
-            .OrderByDescending(r => r.AttendeesCount).ThenBy(r => r.DeptName)
+            .OrderByDescending(r => r.AttendeesCount).ThenByDescending(r => r.SessionsCount).ThenBy(r => r.DeptName)
             .ToList();
+        for (int i = 0; i < vm.DepartmentBreakdown.Count; i++) vm.DepartmentBreakdown[i].Rank = i + 1;
 
-        // ----- Quiz analytics -----
         await BuildQuizAsync(vm);
-
-        // ----- Survey analytics (reuse Phase 12 service) -----
         await BuildSurveyAsync(vm);
-
-        // ----- Contributions -----
-        await BuildContributionsAsync(vm);
-
-        // ----- Group signatures -----
+        await BuildContributionsAsync(vm, deptNames);
         await BuildGroupSignaturesAsync(vm, deptNames);
 
-        // ----- Maps -----
         vm.MapsCount = await _db.DepartmentStrategyMaps.CountAsync();
+
+        // ----- Phase 14 leadership analytics (depend on the above) -----
+        await BuildLeadershipAlignmentAsync(vm);
+        BuildLeadershipCulture(vm, sessions, deptNames);
+        await BuildLeadershipRisksAsync(vm, deptNames);
+        BuildLeadershipMaturity(vm);
+        BuildLeadershipRecommendations(vm);
 
         return vm;
     }
@@ -74,10 +93,7 @@ public class ExecutiveReportService
         qa.TotalAttempts = attempts.Count;
         if (attempts.Count > 0)
         {
-            // Normalise each attempt to a 0-5 scale so distribution buckets are comparable.
-            var scaled = attempts
-                .Select(a => a.Total > 0 ? a.Score * 5.0 / a.Total : 0)
-                .ToList();
+            var scaled = attempts.Select(a => a.Total > 0 ? a.Score * 5.0 / a.Total : 0).ToList();
             qa.AvgScore = Math.Round(scaled.Average(), 2);
             foreach (var s in scaled)
             {
@@ -87,7 +103,6 @@ public class ExecutiveReportService
             }
         }
 
-        // Top 3 most-missed questions across all attempts (parse AnswersJson detail rows).
         var missCount = new Dictionary<Guid, int>();
         var seenCount = new Dictionary<Guid, int>();
         foreach (var a in attempts)
@@ -104,23 +119,31 @@ public class ExecutiveReportService
             }
         }
 
-        if (missCount.Count > 0)
+        if (seenCount.Count > 0)
         {
-            var topIds = missCount.OrderByDescending(kv => kv.Value).Take(3).Select(kv => kv.Key).ToList();
+            var allIds = seenCount.Keys.ToList();
             var questions = await _db.QuizQuestions.AsNoTracking()
-                .Where(q => topIds.Contains(q.Id))
+                .Where(q => allIds.Contains(q.Id))
                 .ToDictionaryAsync(q => q.Id, q => q.QuestionAr);
-            foreach (var id in topIds)
+
+            ExecMissedQuestion Row(Guid id)
             {
                 int seen = seenCount.GetValueOrDefault(id);
                 int miss = missCount.GetValueOrDefault(id);
-                qa.Top3MostMissed.Add(new ExecMissedQuestion
+                return new ExecMissedQuestion
                 {
                     QuestionAr = questions.TryGetValue(id, out var t) ? t : id.ToString(),
                     Attempts = seen,
                     MissRate = seen > 0 ? Math.Round(100.0 * miss / seen, 1) : 0,
-                });
+                };
             }
+
+            qa.Top3MostMissed = allIds
+                .Select(Row).OrderByDescending(r => r.MissRate).ThenByDescending(r => r.Attempts)
+                .Take(3).ToList();
+            qa.Top3Strongest = allIds
+                .Select(Row).OrderBy(r => r.MissRate).ThenByDescending(r => r.Attempts)
+                .Take(3).ToList();
         }
     }
 
@@ -138,27 +161,34 @@ public class ExecutiveReportService
                 case QuestionType.Likert5:
                     var l = await _survey.GetLikertResultsAsync(q.Id);
                     metric.Type = "مقياس ليكرت";
+                    metric.LikertMean = l.Mean;
+                    metric.LikertPctHigh = l.PctHigh;
+                    metric.LikertTotal = l.Total;
+                    if (l.Distribution is { Length: 5 }) metric.LikertDistribution = l.Distribution;
                     metric.Headline = l.Total > 0
                         ? $"المتوسط {l.Mean:0.##}/5 · نسبة العالية {l.PctHigh:0.#}% · عدد {l.Total}"
                         : "لا توجد إجابات بعد";
                     if (q.Order == 1)
                     {
                         vm.Overview.AvgSurveyClarity = l.Mean;
-                        if (l.Distribution != null && l.Distribution.Length == 5)
-                            vm.Overview.SurveyClarityDistribution = l.Distribution;
+                        if (l.Distribution is { Length: 5 }) vm.Overview.SurveyClarityDistribution = l.Distribution;
                     }
                     if (q.Order == 8) vm.Overview.AvgContributionCapability = l.Mean;
                     break;
                 case QuestionType.MultipleChoice:
                     var ch = await _survey.GetMultipleChoiceResultsAsync(q.Id);
-                    var top = ch.FirstOrDefault(c => c.Count > 0);
                     metric.Type = "اختيار من متعدد";
+                    metric.Choices = ch.Select(c => new ExecChoiceShare { Text = c.ChoiceText, Count = c.Count, Percent = c.Percent }).ToList();
+                    var top = ch.FirstOrDefault(c => c.Count > 0);
                     metric.Headline = top != null ? $"الأبرز: \"{top.ChoiceText}\" ({top.Percent:0.#}%)" : "لا توجد إجابات بعد";
                     break;
                 case QuestionType.OpenText:
                     var o = await _survey.GetOpenTextResultsAsync(q.Id);
-                    var tc = o.Categories.FirstOrDefault();
                     metric.Type = "سؤال مفتوح";
+                    metric.OpenTextTotal = o.TotalResponses;
+                    metric.OpenTextUncategorized = o.UncategorizedCount;
+                    metric.OpenTextCategories = o.Categories.Select(c => new ExecNameCount { Name = c.Category, Count = c.Count }).ToList();
+                    var tc = o.Categories.FirstOrDefault();
                     metric.Headline = o.TotalResponses > 0
                         ? (tc != null ? $"{o.TotalResponses} إجابة · أبرز فئة \"{tc.Category}\" ({tc.Count})" : $"{o.TotalResponses} إجابة")
                         : "لا توجد إجابات بعد";
@@ -166,11 +196,9 @@ public class ExecutiveReportService
             }
             vm.SurveyMetrics.Add(metric);
         }
-
-        // Average quiz score already set; survey clarity/capability set above.
     }
 
-    private async Task BuildContributionsAsync(ExecutiveReportViewModel vm)
+    private async Task BuildContributionsAsync(ExecutiveReportViewModel vm, Dictionary<string, string> deptNames)
     {
         var pledges = await _db.ContributionPledges.AsNoTracking().ToListAsync();
         vm.Contributions.TotalPledges = pledges.Count;
@@ -196,11 +224,15 @@ public class ExecutiveReportService
             .GroupBy(p => p.ElementCode)
             .Select(g => new ExecNameCount { Name = initNames.TryGetValue(g.Key, out var n) ? n : g.Key, Count = g.Count() })
             .OrderByDescending(x => x.Count).Take(5).ToList();
+
+        vm.Contributions.ByDepartment = pledges
+            .GroupBy(p => p.DeptCode)
+            .Select(g => new ExecNameCount { Name = deptNames.TryGetValue(g.Key, out var n) ? n : g.Key, Count = g.Count() })
+            .OrderByDescending(x => x.Count).ToList();
     }
 
     private async Task BuildGroupSignaturesAsync(ExecutiveReportViewModel vm, Dictionary<string, string> deptNames)
     {
-        // Group signatures are MapInkAssets with MemberId == null (Phase 13), joined to their map's dept.
         var sigs = await (from a in _db.MapInkAssets.AsNoTracking()
                           join m in _db.DepartmentStrategyMaps.AsNoTracking() on a.MapId equals m.Id
                           where a.AssetKind == "signature" && a.MemberId == null && a.IsActive
@@ -209,8 +241,8 @@ public class ExecutiveReportService
                          .ToListAsync();
 
         vm.GroupSignatures.TotalCount = sigs.Count;
-        vm.GroupSignatures.RecentComments = sigs
-            .Where(s => !string.IsNullOrWhiteSpace(s.TypedText))
+        var comments = sigs.Where(s => !string.IsNullOrWhiteSpace(s.TypedText)).ToList();
+        vm.GroupSignatures.RecentComments = comments
             .Take(10)
             .Select(s => new ExecRecentComment
             {
@@ -220,8 +252,267 @@ public class ExecutiveReportService
             })
             .ToList();
 
-        // Overview avg quiz score mirrors quiz analytics avg.
+        vm.GroupSignatures.TopKeywords = TopKeywords(comments.Select(c => c.TypedText!), 10);
+
         vm.Overview.AvgQuizScore = vm.QuizAnalytics.AvgScore;
+    }
+
+    // ----- Phase 14 leadership: alignment -----
+    private async Task BuildLeadershipAlignmentAsync(ExecutiveReportViewModel vm)
+    {
+        var pledges = await _db.ContributionPledges.AsNoTracking().ToListAsync();
+        var al = vm.LeadershipAlignment;
+
+        var pillars = await _db.Pillars.AsNoTracking().ToListAsync();
+        var objToPlr = await _db.Objectives.AsNoTracking()
+            .Where(o => o.PlrCode != null)
+            .ToDictionaryAsync(o => o.ObjectiveCode, o => o.PlrCode!);
+        var initToObj = await _db.Initiatives.AsNoTracking()
+            .Where(i => i.ObjectiveCode != null)
+            .ToDictionaryAsync(i => i.InitiativeCode, i => i.ObjectiveCode!);
+
+        string? PillarOf(Domain.Entities.ContributionPledge p)
+        {
+            switch (p.ElementType)
+            {
+                case "OBJ":
+                    return objToPlr.TryGetValue(p.ElementCode, out var plr) ? plr : null;
+                case "INIT":
+                    if (initToObj.TryGetValue(p.ElementCode, out var obj) && objToPlr.TryGetValue(obj, out var plr2)) return plr2;
+                    return null;
+                default:
+                    return null;
+            }
+        }
+
+        var byPillar = new Dictionary<string, int>();
+        int mapped = 0;
+        foreach (var p in pledges)
+        {
+            var plr = PillarOf(p);
+            if (plr == null) continue;
+            byPillar[plr] = byPillar.GetValueOrDefault(plr) + 1;
+            mapped++;
+        }
+        al.TotalContributions = mapped;
+
+        al.PillarShares = pillars
+            .OrderBy(p => p.PlrCode)
+            .Select(p => new ExecPillarShare
+            {
+                PillarCode = p.PlrCode,
+                PillarName = p.PillarName ?? p.PlrCode,
+                Count = byPillar.GetValueOrDefault(p.PlrCode),
+                Percent = mapped > 0 ? Math.Round(100.0 * byPillar.GetValueOrDefault(p.PlrCode) / mapped, 1) : 0,
+            })
+            .ToList();
+
+        foreach (var ps in al.PillarShares.Where(ps => ps.Percent < 10))
+        {
+            al.Gaps.Add($"ركيزة \"{ps.PillarName}\" تلقّت {ps.Percent:0.#}% فقط من المساهمات.");
+            al.Recommendations.Add($"يُوصى بتوجيه مزيد من التركيز نحو ركيزة \"{ps.PillarName}\" في الجلسات القادمة.");
+        }
+        if (al.Gaps.Count == 0 && al.PillarShares.Any(p => p.Count > 0))
+            al.Recommendations.Add("توزيع المساهمات متوازن نسبياً عبر الركائز — يُوصى بالحفاظ على هذا التوازن.");
+    }
+
+    // ----- Phase 14 leadership: culture & engagement -----
+    private void BuildLeadershipCulture(ExecutiveReportViewModel vm, List<Domain.Entities.StrategySession> sessions, Dictionary<string, string> deptNames)
+    {
+        var cu = vm.LeadershipCulture;
+
+        cu.DepartmentParticipation = vm.DepartmentBreakdown
+            .Select(d => new ExecDeptParticipation
+            {
+                DeptName = d.DeptName,
+                Attendees = d.AttendeesCount,
+                RatioKnown = false,
+                ParticipationRatio = d.AttendeesCount,
+            })
+            .OrderByDescending(d => d.Attendees).ToList();
+
+        // Sentiment of group comments (simple Arabic keyword classification).
+        foreach (var c in vm.GroupSignatures.RecentComments)
+        {
+            switch (Sentiment(c.Text))
+            {
+                case 1: cu.PositiveComments++; break;
+                case -1: cu.NegativeComments++; break;
+                default: cu.NeutralComments++; break;
+            }
+        }
+
+        // Team-spirit composite (0..100): blends engagement breadth, clarity satisfaction and
+        // positive-comment ratio, each normalised to 0..1.
+        double engagement = vm.Overview.TotalDepartments > 0
+            ? (double)vm.Overview.TotalDepartmentsEngaged / vm.Overview.TotalDepartments : 0;
+        double clarity = vm.Overview.AvgSurveyClarity / 5.0;
+        int totalComments = cu.PositiveComments + cu.NeutralComments + cu.NegativeComments;
+        double positivity = totalComments > 0 ? (double)cu.PositiveComments / totalComments : 0.5;
+        cu.TeamSpiritScore = Math.Round(100.0 * (0.4 * engagement + 0.4 * clarity + 0.2 * positivity), 1);
+        cu.TeamSpiritLabel = cu.TeamSpiritScore >= 75 ? "مرتفع" : cu.TeamSpiritScore >= 50 ? "متوسط" : "منخفض";
+    }
+
+    // ----- Phase 14 leadership: risks & opportunities -----
+    private async Task BuildLeadershipRisksAsync(ExecutiveReportViewModel vm, Dictionary<string, string> deptNames)
+    {
+        var ri = vm.LeadershipRisks;
+        var survey = await _survey.GetOfficialSurveyAsync();
+        if (survey != null)
+        {
+            var questions = await _survey.GetQuestionsAsync(survey.Id);
+            var q4 = questions.FirstOrDefault(q => q.Order == 4);
+            var q7 = questions.FirstOrDefault(q => q.Order == 7);
+
+            if (q4 != null)
+            {
+                var o = await _survey.GetOpenTextResultsAsync(q4.Id);
+                ri.TopChallenges = o.Categories.Take(6)
+                    .Select(c => new ExecCategorisedItem { Category = c.Category, Count = c.Count, Percent = c.Percent }).ToList();
+            }
+            if (q7 != null)
+            {
+                var o = await _survey.GetOpenTextResultsAsync(q7.Id);
+                ri.TopOpportunities = o.Categories.Take(6)
+                    .Select(c => new ExecCategorisedItem { Category = c.Category, Count = c.Count, Percent = c.Percent }).ToList();
+            }
+        }
+
+        // Risk heatmap: departments whose group comments most frequently mention challenge words.
+        var sigs = await (from a in _db.MapInkAssets.AsNoTracking()
+                          join m in _db.DepartmentStrategyMaps.AsNoTracking() on a.MapId equals m.Id
+                          where a.AssetKind == "signature" && a.MemberId == null && a.IsActive
+                                && a.TypedText != null
+                          select new { a.TypedText, m.DeptCode })
+                         .ToListAsync();
+        var heat = new Dictionary<string, int>();
+        foreach (var s in sigs)
+        {
+            if (MentionsChallenge(s.TypedText!))
+                heat[s.DeptCode] = heat.GetValueOrDefault(s.DeptCode) + 1;
+        }
+        ri.RiskHeatmap = heat.OrderByDescending(kv => kv.Value)
+            .Select(kv => new ExecNameCount { Name = deptNames.TryGetValue(kv.Key, out var n) ? n : kv.Key, Count = kv.Value })
+            .ToList();
+
+        if (ri.TopChallenges.Count > 0)
+            ri.Recommendations.Add($"أبرز تحدٍّ متكرر: \"{ri.TopChallenges[0].Category}\" — يُوصى بمعالجته ضمن خطة التنفيذ.");
+        if (ri.TopOpportunities.Count > 0)
+            ri.Recommendations.Add($"أبرز فرصة مذكورة: \"{ri.TopOpportunities[0].Category}\" — يُوصى باستثمارها مبكراً.");
+        if (ri.RiskHeatmap.Count > 0)
+            ri.Recommendations.Add($"إدارة \"{ri.RiskHeatmap[0].Name}\" هي الأكثر ذكراً للتحديات — يُوصى بدعم إضافي.");
+    }
+
+    // ----- Phase 14 leadership: organisational maturity -----
+    private void BuildLeadershipMaturity(ExecutiveReportViewModel vm)
+    {
+        var ma = vm.LeadershipMaturity;
+        // Composite per the whole event (we lack per-dept survey/quiz breakdown here, so the
+        // composite uses event-level means as the baseline and ranks departments by their
+        // engagement relative to it). The composite is on a 0..5 scale.
+        double quiz = vm.Overview.AvgQuizScore;          // already 0..5
+        double clarity = vm.Overview.AvgSurveyClarity;   // 0..5
+        double capability = vm.Overview.AvgContributionCapability; // 0..5
+        double baseComposite = new[] { quiz, clarity, capability }.Where(x => x > 0).DefaultIfEmpty(0).Average();
+
+        int maxAtt = vm.DepartmentBreakdown.Count > 0 ? Math.Max(1, vm.DepartmentBreakdown.Max(d => d.AttendeesCount)) : 1;
+        foreach (var d in vm.DepartmentBreakdown)
+        {
+            // Nudge the event baseline by the department's engagement (attendees + completion).
+            double engagementFactor = 0.5 * (d.AttendeesCount / (double)maxAtt) + 0.5 * (d.CompletionRate / 100.0);
+            double score = Math.Round(Math.Clamp(baseComposite * (0.7 + 0.6 * engagementFactor), 0, 5), 2);
+            string tier = score >= 4 ? "ناضجة" : score >= 3 ? "متطورة" : "بحاجة دعم";
+            ma.Departments.Add(new ExecDeptMaturity { DeptName = d.DeptName, Score = score, Tier = tier });
+        }
+        ma.Departments = ma.Departments.OrderByDescending(d => d.Score).ToList();
+        ma.MatureCount = ma.Departments.Count(d => d.Tier == "ناضجة");
+        ma.DevelopingCount = ma.Departments.Count(d => d.Tier == "متطورة");
+        ma.NeedsSupportCount = ma.Departments.Count(d => d.Tier == "بحاجة دعم");
+
+        if (ma.MatureCount > 0) ma.Recommendations.Add($"{ma.MatureCount} إدارة ناضجة — يُوصى بإشراكها كمراجع ومُلهِم لبقية الإدارات.");
+        if (ma.DevelopingCount > 0) ma.Recommendations.Add($"{ma.DevelopingCount} إدارة متطورة — يُوصى ببرامج تعزيز لرفعها لمستوى النضج.");
+        if (ma.NeedsSupportCount > 0) ma.Recommendations.Add($"{ma.NeedsSupportCount} إدارة بحاجة دعم — يُوصى بجلسات توعوية مكثّفة ومتابعة قريبة.");
+    }
+
+    // ----- Phase 14 leadership: auto recommendations -----
+    private void BuildLeadershipRecommendations(ExecutiveReportViewModel vm)
+    {
+        var recs = vm.LeadershipRecommendations;
+
+        foreach (var dept in vm.Overview.NotEngagedDepartments.Take(3))
+            recs.Add($"إدارة \"{dept}\" لم تشارك بعد — يُوصى بجدولة جلسة استراتيجية لها.");
+
+        foreach (var ps in vm.LeadershipAlignment.PillarShares.Where(p => p.Percent < 10 && p.Count >= 0).Take(2))
+            recs.Add($"ركيزة \"{ps.PillarName}\" تلقّت {ps.Percent:0.#}% فقط من المساهمات — قد تحتاج تركيزاً أكبر.");
+
+        if (vm.Overview.AvgSurveyClarity > 0 && vm.Overview.AvgSurveyClarity < 3.5)
+            recs.Add($"متوسط وضوح الاستراتيجية {vm.Overview.AvgSurveyClarity:0.##}/5 — يُوصى بحملة توعوية إضافية.");
+        if (vm.Overview.AvgContributionCapability > 0 && vm.Overview.AvgContributionCapability < 3.5)
+            recs.Add($"متوسط القدرة على المساهمة {vm.Overview.AvgContributionCapability:0.##}/5 — يُوصى بتمكين الفرق وتوضيح أدوارها.");
+        if (vm.QuizAnalytics.TotalAttempts > 0 && vm.QuizAnalytics.AvgScore < 3.5)
+            recs.Add($"متوسط الاختبار {vm.QuizAnalytics.AvgScore:0.##}/5 — يُوصى بإعادة عرض النقاط المعرفية الأضعف.");
+
+        if (vm.LeadershipCulture.NegativeComments > vm.LeadershipCulture.PositiveComments && vm.LeadershipCulture.NegativeComments > 0)
+            recs.Add("نبرة التعليقات تميل للسلبية — يُوصى بمراجعة ملاحظات الفرق ومعالجة دواعي القلق.");
+
+        if (vm.Overview.CompletionPercentage < 70 && vm.Overview.TotalSessions > 0)
+            recs.Add($"نسبة إكمال الجلسات {vm.Overview.CompletionPercentage:0.#}% — يُوصى بمتابعة الجلسات غير المكتملة.");
+
+        if (recs.Count == 0)
+            recs.Add("المؤشرات العامة إيجابية — يُوصى بالحفاظ على الزخم وتوثيق أفضل الممارسات.");
+
+        // Cap at 8 per the spec.
+        if (recs.Count > 8) vm.LeadershipRecommendations = recs.Take(8).ToList();
+    }
+
+    // ----- small text utilities -----
+
+    private static readonly string[] PositiveWords =
+        { "ممتاز", "رائع", "جيد", "مفيد", "ملهم", "شكر", "نجاح", "تطور", "إيجاب", "متحمس", "فخور", "تعاون", "واضح", "مبدع", "سعد" };
+    private static readonly string[] NegativeWords =
+        { "صعب", "ضعف", "مشكلة", "تحدي", "تحدّي", "نقص", "غموض", "قلق", "تأخر", "بطيء", "محبط", "سلبي", "عقبة", "غير واضح", "صعوبة" };
+    private static readonly string[] ChallengeWords =
+        { "تحدي", "تحدّي", "صعوبة", "صعب", "عقبة", "مشكلة", "نقص", "محدودية", "غموض", "موارد", "ميزانية", "وقت" };
+
+    private static int Sentiment(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return 0;
+        int pos = PositiveWords.Count(w => text.Contains(w));
+        int neg = NegativeWords.Count(w => text.Contains(w));
+        if (pos > neg) return 1;
+        if (neg > pos) return -1;
+        return 0;
+    }
+
+    private static bool MentionsChallenge(string text)
+        => !string.IsNullOrWhiteSpace(text) && ChallengeWords.Any(text.Contains);
+
+    private static readonly HashSet<string> Stopwords = new()
+    {
+        "في", "من", "على", "إلى", "عن", "مع", "هذا", "هذه", "ذلك", "التي", "الذي", "أن", "إن",
+        "كان", "قد", "ما", "لا", "ثم", "أو", "و", "أيضا", "كل", "بعض", "هو", "هي", "نحن", "هم",
+        "the", "and", "for", "with", "our", "are", "was", "this", "that",
+    };
+
+    private static List<ExecNameCount> TopKeywords(IEnumerable<string> texts, int take)
+    {
+        var counts = new Dictionary<string, int>();
+        foreach (var t in texts)
+        {
+            if (string.IsNullOrWhiteSpace(t)) continue;
+            var cleaned = new string(t.Select(ch => char.IsLetter(ch) ? ch : ' ').ToArray());
+            foreach (var w in cleaned.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var word = w.Trim();
+                if (word.Length < 3 || Stopwords.Contains(word)) continue;
+                counts[word] = counts.GetValueOrDefault(word) + 1;
+            }
+        }
+        return counts.Where(kv => kv.Value > 1)
+            .OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key)
+            .Take(take)
+            .Select(kv => new ExecNameCount { Name = kv.Key, Count = kv.Value })
+            .ToList();
     }
 
     private class QuizAnswerDetail

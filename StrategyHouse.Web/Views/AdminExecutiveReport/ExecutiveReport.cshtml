@@ -1,6 +1,9 @@
 @model StrategyHouse.Web.Models.ExecutiveReportViewModel
+@using StrategyHouse.Web.Models
 @{
     ViewData["Title"] = "التقرير التنفيذي";
+    var sectionsQuery = Model.Sections.ToQueryValue();
+    var qs = "?sections=" + Uri.EscapeDataString(sectionsQuery);
 }
 
 <div class="card mb-3" style="background:linear-gradient(135deg,#00192B 0%,#0E2A47 60%,#0069A7 100%);color:#fff;border:0;">
@@ -11,10 +14,10 @@
             <p class="mb-0 small" style="color:#cfe2f0;">تم الإنشاء: @Model.GeneratedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
-            <a href="/Admin/ExecutiveReport.pdf" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">تحميل PDF</a>
-            <a href="/Admin/ExecutiveReport.pptx" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">تحميل PowerPoint</a>
-            <a href="/Admin/ExecutiveReport.xlsx" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">تحميل Excel</a>
-            <a href="/Admin/ExecutiveReport.csv" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">تحميل CSV</a>
+            <a href="/Admin/ExecutiveReport.pdf@qs" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">تحميل PDF</a>
+            <a href="/Admin/ExecutiveReport.pptx@qs" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">تحميل PowerPoint</a>
+            <a href="/Admin/ExecutiveReport.xlsx@qs" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">تحميل Excel</a>
+            <a href="/Admin/ExecutiveReport.csv@qs" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">تحميل CSV</a>
             <button type="button" id="btn-email-report" class="btn btn-sm" style="background:#fff;color:#00192B;font-weight:700;border-radius:999px;">إرسال بالبريد</button>
         </div>
     </div>
@@ -43,20 +46,53 @@
 </div>
 
 <div class="card mb-3">
+    <div class="d-flex justify-content-between align-items-center" style="cursor:pointer;" id="customize-toggle">
+        <h2 class="h5 mb-0">خصص التقرير</h2>
+        <span class="badge bg-secondary" id="customize-caret">▼</span>
+    </div>
+    <div id="customize-body" style="display:none;margin-top:12px;">
+        <p class="muted small">اختر الأقسام التي ترغب بعرضها وتصديرها. التحديد الافتراضي يشمل جميع الأقسام.</p>
+        <div class="grid-3">
+            @foreach (var sec in ExecReportSections.All)
+            {
+                <label class="d-flex align-items-center gap-2" style="padding:4px 0;">
+                    <input type="checkbox" class="exec-section-cb" value="@sec.Key" @(Model.Sections.Has(sec.Key) ? "checked" : "") />
+                    <span>@sec.Title</span>
+                </label>
+            }
+        </div>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            <button type="button" id="sections-apply" class="btn btn-sm" style="background:#0069A7;color:#fff;font-weight:700;border-radius:999px;">تطبيق على العرض</button>
+            <button type="button" id="sections-save" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">حفظ كافتراضي</button>
+            <span id="sections-msg" class="small align-self-center" style="display:none;"></span>
+        </div>
+    </div>
+</div>
+
+@if (Model.Sections.Has(ExecReportSections.Overview))
+{
+<div class="card mb-3">
     <h2 class="h5">الملخص التنفيذي</h2>
     <div class="grid-3 my-2">
         <div class="card"><h3>@Model.Overview.TotalSessions</h3><p class="muted small">إجمالي الجلسات</p></div>
         <div class="card"><h3>@Model.Overview.TotalCompletedSessions</h3><p class="muted small">الجلسات المكتملة</p></div>
-        <div class="card"><h3>@Model.Overview.TotalDepartmentsEngaged</h3><p class="muted small">الإدارات المشاركة</p></div>
+        <div class="card"><h3>@Model.Overview.TotalDepartmentsEngaged/@Model.Overview.TotalDepartments</h3><p class="muted small">الإدارات المشاركة</p></div>
         <div class="card"><h3>@Model.Overview.TotalAttendees</h3><p class="muted small">إجمالي الحضور</p></div>
+        <div class="card"><h3>@Model.Overview.CompletionPercentage.ToString("0.#")%</h3><p class="muted small">نسبة الإكمال</p></div>
         <div class="card"><h3>@Model.Overview.AvgQuizScore.ToString("0.##") / 5</h3><p class="muted small">متوسط الاختبار</p></div>
         <div class="card"><h3>@(Model.Overview.AvgSurveyClarity > 0 ? Model.Overview.AvgSurveyClarity.ToString("0.##") + " / 5" : "—")</h3><p class="muted small">وضوح الاستراتيجية</p></div>
         <div class="card"><h3>@(Model.Overview.AvgContributionCapability > 0 ? Model.Overview.AvgContributionCapability.ToString("0.##") + " / 5" : "—")</h3><p class="muted small">القدرة على المساهمة</p></div>
-        <div class="card"><h3>@Model.MapsCount</h3><p class="muted small">الخرائط الاستراتيجية</p></div>
         <div class="card"><h3>@Model.GroupSignatures.TotalCount</h3><p class="muted small">تواقيع الفرق</p></div>
     </div>
+    @if (Model.Overview.NotEngagedDepartments.Any())
+    {
+        <p class="muted small mb-0">لم تشارك بعد: @string.Join("، ", Model.Overview.NotEngagedDepartments)</p>
+    }
 </div>
+}
 
+@if (Model.Sections.Has(ExecReportSections.Departments))
+{
 <div class="card mb-3">
     <h2 class="h5">الحضور حسب الإدارة</h2>
     @if (Model.DepartmentBreakdown.Any())
@@ -65,12 +101,13 @@
         <div class="table-responsive mt-3">
             <table class="table table-hover align-middle" style="background:#fff;">
                 <thead>
-                    <tr><th>الإدارة</th><th>الجلسات</th><th>الحضور</th><th>نسبة الإكمال</th></tr>
+                    <tr><th>الترتيب</th><th>الإدارة</th><th>الجلسات</th><th>الحضور</th><th>نسبة الإكمال</th></tr>
                 </thead>
                 <tbody>
                     @foreach (var d in Model.DepartmentBreakdown)
                     {
                         <tr>
+                            <td>@d.Rank</td>
                             <td><strong>@d.DeptName</strong></td>
                             <td>@d.SessionsCount</td>
                             <td>@d.AttendeesCount</td>
@@ -83,8 +120,13 @@
     }
     else { <p class="muted">لا توجد بيانات إدارات بعد.</p> }
 </div>
+}
 
+@if (Model.Sections.Has(ExecReportSections.Quiz) || Model.Sections.Has(ExecReportSections.Survey))
+{
 <div class="grid-2 mb-3">
+    @if (Model.Sections.Has(ExecReportSections.Quiz))
+    {
     <div class="card">
         <h2 class="h5">توزيع نتائج الاختبار</h2>
         <p class="muted small">إجمالي المحاولات: @Model.QuizAnalytics.TotalAttempts · المتوسط: @Model.QuizAnalytics.AvgScore.ToString("0.##") / 5</p>
@@ -103,7 +145,20 @@
                 }
             </ul>
         }
+        @if (Model.QuizAnalytics.Top3Strongest.Any())
+        {
+            <h3 class="h6 text-success mt-3">نقاط القوة المعرفية</h3>
+            <ul class="small">
+                @foreach (var q in Model.QuizAnalytics.Top3Strongest)
+                {
+                    <li>@q.QuestionAr — نسبة الصواب @((100 - q.MissRate).ToString("0.#"))%</li>
+                }
+            </ul>
+        }
     </div>
+    }
+    @if (Model.Sections.Has(ExecReportSections.Survey))
+    {
     <div class="card">
         <h2 class="h5">وضوح الاستراتيجية (السؤال 1)</h2>
         @{ var clarity = Model.SurveyMetrics.FirstOrDefault(x => x.Order == 1); }
@@ -115,9 +170,11 @@
         }
         else { <p class="muted">لا توجد بيانات استبيان بعد.</p> }
     </div>
+    }
 </div>
+}
 
-@if (Model.SurveyMetrics.Any())
+@if (Model.Sections.Has(ExecReportSections.Survey) && Model.SurveyMetrics.Any())
 {
     <div class="card mb-3">
         <h2 class="h5">مؤشرات الاستبيان الرسمي</h2>
@@ -133,6 +190,8 @@
     </div>
 }
 
+@if (Model.Sections.Has(ExecReportSections.Contributions))
+{
 <div class="grid-2 mb-3">
     <div class="card">
         <h2 class="h5">أبرز الأهداف</h2>
@@ -161,10 +220,17 @@
         else { <p class="muted">لا توجد مساهمات بعد.</p> }
     </div>
 </div>
+}
 
+@if (Model.Sections.Has(ExecReportSections.Signatures))
+{
 <div class="card mb-3">
     <h2 class="h5">تواقيع الفرق وتعليقاتها</h2>
-    <p class="muted small">إجمالي التواقيع: @Model.GroupSignatures.TotalCount</p>
+    <p class="muted small">إجمالي التواقيع: @Model.GroupSignatures.TotalCount · الخرائط الاستراتيجية: @Model.MapsCount</p>
+    @if (Model.GroupSignatures.TopKeywords.Any())
+    {
+        <p class="small">موضوعات شائعة: @string.Join("، ", Model.GroupSignatures.TopKeywords.Take(8).Select(k => $"{k.Name} ({k.Count})"))</p>
+    }
     @if (Model.GroupSignatures.RecentComments.Any())
     {
         <ul class="list-group list-group-flush">
@@ -182,6 +248,124 @@
     }
     else { <p class="muted">لا توجد تعليقات بعد.</p> }
 </div>
+}
+
+@if (Model.Sections.Has(ExecReportSections.LeadershipAlignment))
+{
+<div class="card mb-3">
+    <h2 class="h5">الاتساق الاستراتيجي</h2>
+    <p class="muted small">إجمالي المساهمات المرتبطة بالركائز: @Model.LeadershipAlignment.TotalContributions</p>
+    @if (Model.LeadershipAlignment.PillarShares.Any())
+    {
+        <ul class="list-group list-group-flush">
+            @foreach (var ps in Model.LeadershipAlignment.PillarShares)
+            {
+                <li class="list-group-item d-flex justify-content-between"><span>@ps.PillarName</span><span class="badge bg-primary">@ps.Count (@ps.Percent.ToString("0.#")%)</span></li>
+            }
+        </ul>
+    }
+    else { <p class="muted">لا توجد مساهمات مرتبطة بالركائز بعد.</p> }
+    @if (Model.LeadershipAlignment.Gaps.Any())
+    {
+        <div class="alert alert-warning small mt-2 mb-0">
+            @foreach (var g in Model.LeadershipAlignment.Gaps)
+            {
+                <div>⚠ @g</div>
+            }
+        </div>
+    }
+</div>
+}
+
+@if (Model.Sections.Has(ExecReportSections.LeadershipCulture))
+{
+<div class="card mb-3">
+    <h2 class="h5">الثقافة والمشاركة</h2>
+    <p class="small"><strong>مؤشر روح الفريق:</strong> @Model.LeadershipCulture.TeamSpiritScore.ToString("0.#")/100 (@Model.LeadershipCulture.TeamSpiritLabel)</p>
+    <p class="muted small">التعليقات — إيجابية: @Model.LeadershipCulture.PositiveComments · محايدة: @Model.LeadershipCulture.NeutralComments · سلبية: @Model.LeadershipCulture.NegativeComments</p>
+    @if (Model.LeadershipCulture.DepartmentParticipation.Any())
+    {
+        <ul class="list-group list-group-flush">
+            @foreach (var d in Model.LeadershipCulture.DepartmentParticipation.Take(12))
+            {
+                <li class="list-group-item d-flex justify-content-between"><span>@d.DeptName</span><span class="badge bg-info">@d.Attendees</span></li>
+            }
+        </ul>
+    }
+</div>
+}
+
+@if (Model.Sections.Has(ExecReportSections.LeadershipRisks))
+{
+<div class="grid-2 mb-3">
+    <div class="card">
+        <h2 class="h5">أبرز التحديات (السؤال 4)</h2>
+        @if (Model.LeadershipRisks.TopChallenges.Any())
+        {
+            <ul class="list-group list-group-flush">
+                @foreach (var c in Model.LeadershipRisks.TopChallenges.Take(6))
+                {
+                    <li class="list-group-item d-flex justify-content-between"><span>@c.Category</span><span class="badge bg-danger">@c.Count</span></li>
+                }
+            </ul>
+        }
+        else { <p class="muted">لا توجد بيانات بعد.</p> }
+    </div>
+    <div class="card">
+        <h2 class="h5">أبرز الفرص (السؤال 7)</h2>
+        @if (Model.LeadershipRisks.TopOpportunities.Any())
+        {
+            <ul class="list-group list-group-flush">
+                @foreach (var o in Model.LeadershipRisks.TopOpportunities.Take(6))
+                {
+                    <li class="list-group-item d-flex justify-content-between"><span>@o.Category</span><span class="badge bg-success">@o.Count</span></li>
+                }
+            </ul>
+        }
+        else { <p class="muted">لا توجد بيانات بعد.</p> }
+    </div>
+</div>
+}
+
+@if (Model.Sections.Has(ExecReportSections.LeadershipMaturity))
+{
+<div class="card mb-3">
+    <h2 class="h5">النضج التنظيمي</h2>
+    <p class="muted small">ناضجة: @Model.LeadershipMaturity.MatureCount · متطورة: @Model.LeadershipMaturity.DevelopingCount · بحاجة دعم: @Model.LeadershipMaturity.NeedsSupportCount</p>
+    @if (Model.LeadershipMaturity.Departments.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" style="background:#fff;">
+                <thead><tr><th>الإدارة</th><th>المؤشر (من 5)</th><th>التصنيف</th></tr></thead>
+                <tbody>
+                    @foreach (var d in Model.LeadershipMaturity.Departments)
+                    {
+                        <tr><td><strong>@d.DeptName</strong></td><td>@d.Score.ToString("0.##")</td><td>@d.Tier</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else { <p class="muted">لا توجد بيانات بعد.</p> }
+</div>
+}
+
+@if (Model.Sections.Has(ExecReportSections.LeadershipRecommendations))
+{
+<div class="card mb-3">
+    <h2 class="h5">توصيات القيادة</h2>
+    @if (Model.LeadershipRecommendations.Any())
+    {
+        <ol class="small">
+            @foreach (var rec in Model.LeadershipRecommendations)
+            {
+                <li>@rec</li>
+            }
+        </ol>
+    }
+    else { <p class="muted">لا توجد توصيات كافية بعد.</p> }
+</div>
+}
 
 @section Scripts {
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -217,7 +401,8 @@
         var token = tokenEl ? tokenEl.value : '';
         submitBtn.disabled = true;
         showMsg('جارٍ الإرسال...', true);
-        var data = 'email=' + encodeURIComponent(email) + '&format=' + encodeURIComponent(format);
+        var sections = (window.execReportSections && window.execReportSections.current) ? window.execReportSections.current() : '@Model.Sections.ToQueryValue()';
+        var data = 'email=' + encodeURIComponent(email) + '&format=' + encodeURIComponent(format) + '&sections=' + encodeURIComponent(sections);
         var xhr = new XMLHttpRequest();
         xhr.open('POST', '/Admin/ExecutiveReport/Email', true);
         xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
@@ -260,6 +445,85 @@
     if (elClarity) {
         new Chart(elClarity, { type: 'bar', data: { labels: ['1', '2', '3', '4', '5'], datasets: [{ label: 'التكرار', data: clarityDist, backgroundColor: '#299ECE' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } } });
     }
+})();
+</script>
+<script>
+(function () {
+    function ready(fn) {
+        if (document.readyState !== 'loading') { fn(); }
+        else { document.addEventListener('DOMContentLoaded', fn); }
+    }
+    ready(function () {
+        try {
+            var toggle = document.getElementById('customize-toggle');
+            var body = document.getElementById('customize-body');
+            var applyBtn = document.getElementById('sections-apply');
+            var saveBtn = document.getElementById('sections-save');
+            var msgEl = document.getElementById('sections-msg');
+
+            function collect() {
+                var boxes = document.querySelectorAll('.exec-section-cb');
+                var keys = [];
+                for (var i = 0; i < boxes.length; i++) {
+                    if (boxes[i].checked) { keys.push(boxes[i].value); }
+                }
+                return keys.join(',');
+            }
+
+            // Expose the current selection so the email modal can read it.
+            window.execReportSections = { current: collect };
+
+            if (toggle && body) {
+                toggle.onclick = function () {
+                    body.style.display = (body.style.display === 'none' || body.style.display === '') ? 'block' : 'none';
+                };
+            }
+
+            if (applyBtn) {
+                applyBtn.onclick = function () {
+                    var sel = collect();
+                    if (!sel) {
+                        if (msgEl) { msgEl.style.display = 'inline'; msgEl.style.color = '#C0392B'; msgEl.textContent = 'يرجى اختيار قسم واحد على الأقل.'; }
+                        return;
+                    }
+                    window.location.href = '/Admin/ExecutiveReport?sections=' + encodeURIComponent(sel);
+                };
+            }
+
+            if (saveBtn) {
+                saveBtn.onclick = function () {
+                    var sel = collect();
+                    if (!sel) {
+                        if (msgEl) { msgEl.style.display = 'inline'; msgEl.style.color = '#C0392B'; msgEl.textContent = 'يرجى اختيار قسم واحد على الأقل.'; }
+                        return;
+                    }
+                    var tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+                    var token = tokenEl ? tokenEl.value : '';
+                    saveBtn.disabled = true;
+                    if (msgEl) { msgEl.style.display = 'inline'; msgEl.style.color = '#0069A7'; msgEl.textContent = 'جارٍ الحفظ...'; }
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/Admin/ExecutiveReport/SaveDefault', true);
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    xhr.setRequestHeader('RequestVerificationToken', token);
+                    xhr.onreadystatechange = function () {
+                        if (xhr.readyState !== 4) { return; }
+                        saveBtn.disabled = false;
+                        var ok = false, message = 'تعذّر الحفظ.';
+                        try {
+                            var res = JSON.parse(xhr.responseText);
+                            ok = !!res.success;
+                            message = res.message || message;
+                        } catch (err) { message = 'تعذّر الاتصال بالخادم.'; }
+                        if (msgEl) { msgEl.style.display = 'inline'; msgEl.style.color = ok ? '#009845' : '#C0392B'; msgEl.textContent = message; }
+                    };
+                    xhr.send('sections=' + encodeURIComponent(sel));
+                };
+            }
+        } catch (e) {
+            var m = document.getElementById('sections-msg');
+            if (m) { m.style.display = 'inline'; m.style.color = '#C0392B'; m.textContent = 'تعذّر تفعيل أدوات التخصيص.'; }
+        }
+    });
 })();
 </script>
 }
