@@ -1,0 +1,265 @@
+/* ============================================================================
+   phase15-responsive.css — Universal responsive overhaul (Phase 15)
+   ----------------------------------------------------------------------------
+   Loaded LAST so it can correct legacy container max-widths that caused two
+   opposite problems reported on PC/laptop:
+     (a) content too narrow in the centre with huge empty side margins on
+         1440p / 1920p / 4K displays (legacy .container=1100px, .main=1280px,
+         .cx-public-main=1200px hard caps), and
+     (b) overlapping / chaotic elements at intermediate widths (1024–1366px)
+         where the sidebar breakpoint (900px) left the layout cramped.
+
+   Universal breakpoint system (single source of truth):
+     xs   <= 480px        small phone
+     sm   481 - 768px     large phone / portrait tablet
+     md   769 - 1024px    landscape tablet / small laptop
+     lg   1025 - 1440px   laptop
+     xl   1441 - 1920px   desktop
+     xxl  > 1920px        large desktop / 4K
+
+   PURELY responsive/CSS — no business logic, no markup semantics changed.
+   GAC brand tokens (navy/gold/blue, Cairo, RTL) are inherited from dga.css.
+   ============================================================================ */
+
+:root {
+    /* Phase 15 breakpoint tokens (for reference / JS parity) */
+    --bp-xs: 480px;
+    --bp-sm: 768px;
+    --bp-md: 1024px;
+    --bp-lg: 1440px;
+    --bp-xl: 1920px;
+
+    /* Fluid container: fill laptops, cap empty space on huge desktops. */
+    --p15-max: 1600px;          /* lg/xl cap */
+    --p15-max-wide: 1800px;     /* >1920px cap */
+    --p15-pad: clamp(16px, 3vw, 48px);
+}
+
+/* ── 1. Fluid container strategy ─────────────────────────────────────────────
+   Override the legacy hard caps. NEVER constrain below 1200px on desktop. */
+
+.main,
+.container,
+.container-fluid,
+.cx-public-main,
+.app-container,
+.page-wrap {
+    width: 100%;
+    max-width: min(var(--p15-max), 95vw);
+    margin-inline: auto;
+    padding-inline: var(--p15-pad);
+}
+
+/* Bootstrap .container is also used by the journey layout — keep it fluid. */
+.container { max-width: min(var(--p15-max), 95vw) !important; }
+
+/* Very wide displays: let content breathe up to ~1800px. */
+@media (min-width: 1921px) {
+    .main,
+    .container,
+    .container-fluid,
+    .cx-public-main {
+        max-width: var(--p15-max-wide);
+    }
+}
+
+/* Narrow reading container stays narrow (prose), but fluid below its cap. */
+.container--narrow { max-width: min(820px, 95vw) !important; }
+
+/* ── 2. Admin shell main content ─────────────────────────────────────────────
+   .app-content already fills remaining width next to the sidebar; give it
+   fluid padding and an inner cap so 4K monitors don't stretch tables edge to
+   edge while still using the available laptop width. */
+
+.app-content {
+    padding: clamp(16px, 2.2vw, 32px);
+    width: 100%;
+}
+.app-content > * {
+    max-width: var(--p15-max);
+    margin-inline: auto;
+}
+/* Tables/charts/canvas inside admin content may use the full width. */
+.app-content > .data-table-wrap,
+.app-content > .table-responsive,
+.app-content > .chart-wrap,
+.app-content > .chart-box {
+    max-width: 100%;
+}
+
+/* Prose blocks inside cards keep comfortable line length. */
+.prose, .reading-col { max-width: 80ch; }
+
+/* ── 3. Sidebar: desktop ≥1025px fixed; tablet/mobile ≤1024px drawer ──────────
+   Legacy rule collapsed only at ≤900px, leaving 901–1024px cramped. Bump the
+   drawer breakpoint to 1024px to match the md breakpoint. */
+
+/* CRITICAL: the backdrop is the FIRST child of .app-shell. Legacy CSS only gave
+   it position:fixed inside the ≤900px media query, so on desktop it sat as a
+   static grid item and consumed the 264px track — pushing the sidebar into the
+   1fr track and squeezing the main column to ~264px on wide screens. Always
+   take it out of flow. */
+.sidebar-backdrop { position: fixed; inset: 0; display: none; }
+
+@media (max-width: 1024px) {
+    .app-shell { grid-template-columns: 1fr; }
+    .app-sidebar {
+        position: fixed;
+        inset-inline-start: 0;
+        top: 0;
+        height: 100vh;
+        width: var(--sidebar-width);
+        transform: translateX(-100%);
+        transition: transform .2s ease;
+        z-index: 40;
+    }
+    html[dir="rtl"] .app-sidebar { transform: translateX(100%); }
+    .app-sidebar.open,
+    html[dir="rtl"] .app-sidebar.open { transform: translateX(0); box-shadow: -8px 0 24px rgba(0,0,0,.18); }
+    .sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 39; display: none; }
+    .sidebar-backdrop.open { display: block; }
+    .sidebar-toggle { display: inline-flex !important; }
+}
+
+/* Desktop collapse: when body has .sidebar-collapsed, hide the rail and give
+   content the full width. Toggle button shown on desktop too. */
+@media (min-width: 1025px) {
+    .sidebar-toggle { display: inline-flex; }
+    body.sidebar-collapsed .app-shell { grid-template-columns: 0 1fr; }
+    body.sidebar-collapsed .app-sidebar {
+        transform: translateX(-100%);
+        transition: transform .2s ease;
+    }
+    html[dir="rtl"] body.sidebar-collapsed .app-sidebar { transform: translateX(100%); }
+    body.sidebar-collapsed .app-sidebar { width: 0; overflow: hidden; }
+}
+
+/* ── 4. Typography scaling (clamp) ───────────────────────────────────────────
+   Look good on phone AND 4K. Scoped broadly but harmless. */
+
+h1 { font-size: clamp(1.5rem, 3vw + 0.5rem, 2.75rem); }
+h2 { font-size: clamp(1.25rem, 2vw + 0.5rem, 2rem); }
+h3 { font-size: clamp(1.1rem, 1.5vw + 0.4rem, 1.5rem); }
+.quiz-question, .quiz-title, .stage-title { font-size: clamp(1.1rem, 1.5vw + 0.5rem, 1.5rem); }
+
+/* Hero scales smoothly instead of jumping at one breakpoint. */
+.hero h1, .cx-hero h1 { font-size: clamp(1.6rem, 4vw + 0.5rem, 2.75rem); }
+.cx-hero-sub, .hero p { font-size: clamp(0.95rem, 1vw + 0.6rem, 1.15rem); }
+
+/* ── 5. Tables — always scrollable, comfortable minimum width ─────────────────*/
+
+.table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
+.table-responsive > table,
+.table-responsive > .table,
+.table-responsive > .data-table { min-width: 640px; }
+/* On true desktop the min-width never bites; on phones it enables scroll. */
+@media (min-width: 1025px) {
+    .table-responsive > table,
+    .table-responsive > .table,
+    .table-responsive > .data-table { min-width: 100%; }
+}
+
+/* ── 6. Charts (Chart.js) — fluid, height-bounded parents ────────────────────
+   Most canvases already sit in .chart-wrap/.chart-box; ensure both are fluid
+   and height-clamped so responsive:true + maintainAspectRatio:false behave. */
+
+.chart-wrap, .chart-box {
+    position: relative;
+    width: 100%;
+    height: clamp(200px, 32vw, 400px);
+}
+/* Respect any explicit inline height author set (e.g. style="height:180px") */
+.chart-wrap[style*="height"], .chart-box[style*="height"] { height: revert; }
+.chart-wrap > canvas, .chart-box > canvas { width: 100% !important; }
+
+/* ── 7. Strategy map (Konva) + Sankey — responsive containers ────────────────*/
+
+#mapCanvas {
+    width: 100%;
+    max-width: 1200px;
+    margin-inline: auto;
+    max-height: 70vh;
+    overflow: auto;
+}
+@media (max-width: 1024px) { #mapCanvas { max-height: 60vh; } }
+
+/* Sankey keeps its wide min-width but the scroll wrapper must clip it. */
+.sankey-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── 8. Group signature canvas — fluid ───────────────────────────────────────*/
+
+.signature-canvas {
+    width: min(100%, 600px);
+    height: clamp(200px, 30vw, 300px);
+    max-width: 100%;
+}
+
+/* ── 9. Forms — reflow naturally, full-width inputs ──────────────────────────*/
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+.form-field input,
+.form-field select,
+.form-field textarea,
+.input, .select, .textarea, .form-control, .form-select { width: 100%; }
+
+/* Form footers: stack on phone, inline on tablet+. */
+.form-actions { flex-wrap: wrap; }
+@media (max-width: 575.98px) {
+    .form-actions { flex-direction: column; }
+    .form-actions > .btn,
+    .form-actions > a,
+    .form-actions > button { width: 100%; }
+}
+
+/* ── 10. Generic safety nets ─────────────────────────────────────────────────*/
+
+/* Nothing should force horizontal scroll on the page itself. */
+html, body { max-width: 100%; overflow-x: hidden; }
+img, svg, video { max-width: 100%; height: auto; }
+
+/* Card grids reflow comfortably across the full breakpoint range. */
+.stats, .kpi-grid, .cx-stat-strip {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+.cx-feature-grid, .commitments, .wall {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+/* Header title shouldn't crowd actions on narrow widths. */
+@media (max-width: 600px) {
+    .app-header { padding-inline: 14px; }
+    .app-header .actions { gap: 8px; }
+    .user-badge .user-meta { display: none; }
+}
+
+/* ── 11. Print friendly — hide chrome, expand content ───────────────────────*/
+
+@media print {
+    .app-sidebar,
+    .sidebar-backdrop,
+    .app-header,
+    .app-footer,
+    .gac-topbar,
+    .cx-public-header,
+    .cx-public-footer,
+    .modal-backdrop,
+    .sidebar-toggle,
+    .chatbot-launcher,
+    .chatbot-panel,
+    .btn,
+    .pagination { display: none !important; }
+
+    .app-shell { grid-template-columns: 1fr !important; }
+    .app-content,
+    .main,
+    .container,
+    .cx-public-main { max-width: 100% !important; padding: 0 !important; }
+    .app-content > * { max-width: 100% !important; }
+    .card, .gac-card, .data-table-wrap { box-shadow: none !important; border-color: #ccc !important; break-inside: avoid; }
+    .chart-wrap, .chart-box { break-inside: avoid; }
+    body { background: #fff !important; }
+}
