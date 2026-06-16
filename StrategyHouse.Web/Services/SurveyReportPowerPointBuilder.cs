@@ -1,135 +1,95 @@
-using DocumentFormat.OpenXml;
-using DocumentFormat.OpenXml.Packaging;
 using StrategyHouse.Domain.Enums;
 using StrategyHouse.Web.Models;
-using static StrategyHouse.Web.Services.PptxSlideHelper;
-using P = DocumentFormat.OpenXml.Presentation;
+using static StrategyHouse.Web.Services.PptxDeck;
 
 namespace StrategyHouse.Web.Services;
 
-// Phase 13.1 — branded .pptx export of the official survey final report. Title slide,
-// overview, one slide per question (Q1..Q8) with the question text + metric/breakdown,
-// and a conclusions slide. GAC navy/gold, white text on navy, RTL, no embedded charts.
+// Phase 14 — branded .pptx export of the official survey final report, rebuilt on
+// ShapeCrawler. Title slide, overview, one slide per question (Q1..Q8) with the question
+// text + metric/breakdown, and a conclusions slide. GAC navy/gold, RTL, Cairo latin font.
 public class SurveyReportPowerPointBuilder
 {
-    private PptxSlideHelper _h = null!;
-
     public byte[] Build(FinalReportViewModel m)
     {
-        _h = new PptxSlideHelper();
-        using var ms = new MemoryStream();
-        using (var doc = PresentationDocument.Create(ms, DocumentFormat.OpenXml.PresentationDocumentType.Presentation))
-        {
-            var (pres, layout) = Init(doc);
-
-            TitleSlide(pres, layout, m);
-            OverviewSlide(pres, layout, m);
-            foreach (var c in m.Cards.OrderBy(x => x.Order))
-                QuestionSlide(pres, layout, c, m);
-            ConclusionsSlide(pres, layout, m);
-
-            pres.Presentation!.Save();
-        }
-        return ms.ToArray();
-    }
-
-    private void TitleSlide(PresentationPart pres, SlideLayoutPart layout, FinalReportViewModel m)
-    {
+        var deck = new PptxDeck();
         var period = m.DateFrom != null ? $"{m.DateFrom:yyyy-MM-dd} ← {m.DateTo:yyyy-MM-dd}" : "—";
-        var shapes = new List<OpenXmlElement>
+
+        deck.TitleSlide("التقرير النهائي للاستبيان الرسمي", new[]
         {
-            _h.Rect(0L, 3300000L, SlideWidth, 70000L, Gold),
-            _h.TextBox(1000000L, 2200000L, 10200000L, 1100000L, new[]
-            {
-                ("التقرير النهائي للاستبيان الرسمي", 40, true, White),
-            }, center: true),
-            _h.TextBox(1000000L, 3500000L, 10200000L, 1000000L, new[]
-            {
-                (m.SurveyTitle, 20, false, Gold),
-                ("الهيئة العامة للمنافسة", 18, false, "CFE2F0"),
-                ("فترة الجمع: " + period, 14, false, "CFE2F0"),
-            }, center: true),
-        };
-        AddSlide(pres, layout, Navy, shapes);
+            L(m.SurveyTitle, 18, false, Gold),
+            L("الهيئة العامة للمنافسة", 16, false, PaleBlue),
+            L("فترة الجمع: " + period, 13, false, PaleBlue),
+        });
+
+        OverviewSlide(deck, m);
+        foreach (var c in m.Cards.OrderBy(x => x.Order))
+            QuestionSlide(deck, c, m);
+        ConclusionsSlide(deck, m);
+
+        return deck.ToBytes();
     }
 
-    private void OverviewSlide(PresentationPart pres, SlideLayoutPart layout, FinalReportViewModel m)
+    private static void OverviewSlide(PptxDeck deck, FinalReportViewModel m)
     {
-        var shapes = ContentHeader("النظرة العامة");
         var q1 = m.Cards.FirstOrDefault(c => c.Order == 1)?.Likert;
         var q8 = m.Cards.FirstOrDefault(c => c.Order == 8)?.Likert;
-        var lines = new List<(string, int, bool, string)>
+        var lines = new List<Line>
         {
-            ($"إجمالي الردود: {m.TotalResponses}", 22, true, Gold),
-            ($"عدد الأسئلة: {m.Cards.Count}", 16, false, White),
+            L($"إجمالي الردود: {m.TotalResponses}", 20, true, Gold),
+            L($"عدد الأسئلة: {m.Cards.Count}", 14, false, White),
         };
-        if (q1 != null && q1.Total > 0)
-            lines.Add(($"وضوح الاستراتيجية (س1): متوسط {q1.Mean:0.##}/5 · العالية {q1.PctHigh:0.#}%", 16, false, White));
-        if (q8 != null && q8.Total > 0)
-            lines.Add(($"القدرة على المساهمة (س8): متوسط {q8.Mean:0.##}/5 · العالية {q8.PctHigh:0.#}%", 16, false, White));
-        foreach (var t in m.Takeaways.Take(3))
-            lines.Add(($"• {t}", 13, false, White));
-        shapes.Add(_h.TextBox(600000L, 1700000L, SlideWidth - 1200000L, 4500000L, lines));
-        AddSlide(pres, layout, Navy, shapes);
+        if (q1 is { Total: > 0 })
+            lines.Add(L($"وضوح الاستراتيجية (س1): متوسط {q1.Mean:0.##}/5 · العالية {q1.PctHigh:0.#}%", 14, false, White));
+        if (q8 is { Total: > 0 })
+            lines.Add(L($"القدرة على المساهمة (س8): متوسط {q8.Mean:0.##}/5 · العالية {q8.PctHigh:0.#}%", 14, false, White));
+        foreach (var t in m.Takeaways.Take(4))
+            lines.Add(L($"• {t}", 12, false, White));
+        deck.ContentSlide("النظرة العامة", lines);
     }
 
-    private void QuestionSlide(PresentationPart pres, SlideLayoutPart layout, QuestionCard c, FinalReportViewModel m)
+    private static void QuestionSlide(PptxDeck deck, QuestionCard c, FinalReportViewModel m)
     {
-        var shapes = ContentHeader($"السؤال {c.Order}");
-        var lines = new List<(string, int, bool, string)>
-        {
-            (c.QuestionAr, 18, true, Gold),
-        };
+        var lines = new List<Line> { L(c.QuestionAr, 16, true, Gold) };
         switch (c.Type)
         {
             case QuestionType.Likert5:
                 var l = c.Likert;
-                if (l == null || l.Total == 0) { lines.Add(("لا توجد إجابات بعد.", 16, false, White)); break; }
-                lines.Add(($"المتوسط {l.Mean:0.##}/5 · الوسيط {l.Median:0.#} · العالية {l.PctHigh:0.#}% · العدد {l.Total}", 16, false, White));
+                if (l == null || l.Total == 0) { lines.Add(L("لا توجد إجابات بعد.", 14, false, White)); break; }
+                lines.Add(L($"المتوسط {l.Mean:0.##}/5 · الوسيط {l.Median:0.#} · العالية {l.PctHigh:0.#}% · العدد {l.Total}", 14, false, White));
                 for (int s = 1; s <= 5; s++)
                 {
                     int cnt = l.Distribution[s - 1];
                     double pct = l.Total > 0 ? 100.0 * cnt / l.Total : 0;
-                    lines.Add(($"الدرجة {s}: {cnt} ({pct:0.#}%)", 14, false, White));
+                    lines.Add(L($"الدرجة {s}: {cnt} ({pct:0.#}%)", 13, false, White));
                 }
                 break;
             case QuestionType.MultipleChoice:
                 var ch = c.Choices;
-                if (ch == null || ch.Count == 0) { lines.Add(("لا توجد إجابات بعد.", 16, false, White)); break; }
+                if (ch == null || ch.Count == 0) { lines.Add(L("لا توجد إجابات بعد.", 14, false, White)); break; }
                 foreach (var x in ch.Take(8))
-                    lines.Add(($"{x.ChoiceText}: {x.Count} ({x.Percent:0.#}%)", 14, false, White));
+                    lines.Add(L($"{x.ChoiceText}: {x.Count} ({x.Percent:0.#}%)", 13, false, White));
                 break;
             case QuestionType.OpenText:
                 var o = c.OpenText;
-                if (o == null || o.TotalResponses == 0) { lines.Add(("لا توجد إجابات نصية بعد.", 16, false, White)); break; }
-                lines.Add(($"إجمالي الإجابات: {o.TotalResponses} · غير مصنّف: {o.UncategorizedCount}", 16, false, White));
+                if (o == null || o.TotalResponses == 0) { lines.Add(L("لا توجد إجابات نصية بعد.", 14, false, White)); break; }
+                lines.Add(L($"إجمالي الإجابات: {o.TotalResponses} · غير مصنّف: {o.UncategorizedCount}", 14, false, White));
                 foreach (var cat in o.Categories.Take(6))
-                    lines.Add(($"{cat.Category}: {cat.Count} ({cat.Percent:0.#}%)", 14, false, White));
+                    lines.Add(L($"{cat.Category}: {cat.Count} ({cat.Percent:0.#}%)", 13, false, White));
                 break;
         }
         if (m.Interpretations.TryGetValue(c.QuestionId, out var interp) && !string.IsNullOrEmpty(interp))
-            lines.Add(($"التفسير: {interp}", 13, false, "CFE2F0"));
-        shapes.Add(_h.TextBox(600000L, 1700000L, SlideWidth - 1200000L, 4500000L, lines));
-        AddSlide(pres, layout, Navy, shapes);
+            lines.Add(L($"التفسير: {interp}", 12, false, PaleBlue));
+        deck.ContentSlide($"السؤال {c.Order}", lines);
     }
 
-    private void ConclusionsSlide(PresentationPart pres, SlideLayoutPart layout, FinalReportViewModel m)
+    private static void ConclusionsSlide(PptxDeck deck, FinalReportViewModel m)
     {
-        var shapes = ContentHeader("الخلاصة والرؤى");
-        var lines = new List<(string, int, bool, string)>();
+        var lines = new List<Line>();
         if (m.Insights.Count == 0)
-            lines.Add(("لا توجد رؤى كافية بعد.", 16, false, White));
+            lines.Add(L("لا توجد رؤى كافية بعد.", 14, false, White));
         foreach (var ins in m.Insights)
-            lines.Add(($"• {ins}", 14, false, White));
-        lines.Add(("شكراً لجميع المشاركين في الاستبيان الرسمي.", 16, true, Gold));
-        shapes.Add(_h.TextBox(600000L, 1700000L, SlideWidth - 1200000L, 4500000L, lines));
-        AddSlide(pres, layout, Navy, shapes);
+            lines.Add(L($"• {ins}", 13, false, White));
+        lines.Add(L("شكراً لجميع المشاركين في الاستبيان الرسمي.", 14, true, Gold));
+        deck.ContentSlide("الخلاصة والرؤى", lines);
     }
-
-    private List<OpenXmlElement> ContentHeader(string title) => new()
-    {
-        _h.Rect(0L, 0L, SlideWidth, 1300000L, LightNavy),
-        _h.Rect(0L, 1300000L, SlideWidth, 50000L, Gold),
-        _h.TextBox(600000L, 350000L, SlideWidth - 1200000L, 800000L, new[] { (title, 28, true, White) }),
-    };
 }

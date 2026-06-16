@@ -7,6 +7,14 @@
 <div class="hero">
     <h1>@Html.Content("home.hero.title", "منصة إطلاق استراتيجية الهيئة العامة للمنافسة")</h1>
     <p>@Html.Content("home.hero.subtitle", "منصة رقمية تفاعلية لإطلاق الاستراتيجية على مستوى الإدارات الثمانية عشر — تُعرّف الموظفين بالرؤية والرسالة والقيم، تبني الخريطة الاستراتيجية لكل إدارة معاً، وتُسجّل الالتزامات الجماعية بتوقيع تطوعي على الجدار الرقمي للالتزامات.")</p>
+    <div class="row mt-2 btn-stack-mobile">
+        <a href="/Journey" class="btn btn--primary">@Html.Content("home.hero.cta", "ابدأ رحلة إدارتك")</a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>@Html.Content("home.about.title", "عن المنصة")</h2>
+    <p>@Html.Content("home.about.body", "منصة رقمية تفاعلية لإطلاق الاستراتيجية المؤسسية على مستوى الإدارات الثماني عشرة.")</p>
 </div>
 
 <div class="stats">
@@ -56,11 +64,24 @@
     </div>
 </div>
 
-<div class="card">
-    <h2>الدخول السريع</h2>
-    <p class="muted">للمنظم: سجّل الدخول للوصول إلى بيانات الاستراتيجية (الركائز، الأهداف، المبادرات، المشاريع، المؤشرات).</p>
-    <div class="row mt-2 btn-stack-mobile">
-        <a href="/Admin" class="btn btn--primary">لوحة الإدارة</a>
-        <a href="/Account/Login" class="btn btn--secondary">دخول المنظم</a>
+<div class="card card--accent">
+    <h2>@Html.Content("home.objectives.title", "أهداف الرحلة")</h2>
+    <p>@Html.Content("home.objectives.body", "ترسيخ فهم مشترك للاستراتيجية، وربط عمل كل إدارة بالركائز والأهداف المؤسسية.")</p>
+</div>
+
+<div class="card" style="text-align:center;">
+    <h2>@Html.Content("home.cta.title", "هل أنت مستعد لبدء رحلة إدارتك الاستراتيجية؟")</h2>
+    <div class="row mt-2 btn-stack-mobile" style="justify-content:center;">
+        <a href="/Account/Login" class="btn btn--primary">@Html.Content("home.cta.button", "الدخول إلى المنصة")</a>
     </div>
 </div>
+
+<div class="card">
+    <h2>@Html.Content("home.contact.title", "للتواصل مع مكتب الاستراتيجية")</h2>
+    <p class="muted">
+        <span>الهاتف: @Html.Content("home.contact.phone", "011 000 0000")</span><br />
+        <span>البريد الإلكتروني: @Html.Content("home.contact.email", "strategy@gac.gov.sa")</span>
+    </p>
+</div>
+
+<p class="muted" style="text-align:center;margin-top:8px;">@Html.Content("home.footer.note", "جميع الحقوق محفوظة — الهيئة العامة للمنافسة")</p>

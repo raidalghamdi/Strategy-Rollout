@@ -144,6 +144,9 @@ using (var scope = app.Services.CreateScope())
     // Phase 12 — replace the survey bank with the 8 official questions (idempotent via hash).
     await Phase12SurveySeeder.SeedAsync(db);
 
+    // Phase 14 — seed editable home-page CMS keys (idempotent; never overwrites edits).
+    await Phase14HomeContentSeeder.SeedAsync(db);
+
     // Phase 10 — optional one-time quiz reset on startup (controlled by Quiz:ResetOnStartup).
     // Wipes all attempts + questions and reseeds the 5 demo questions. Default false.
     if (builder.Configuration.GetValue<bool>("Quiz:ResetOnStartup"))
