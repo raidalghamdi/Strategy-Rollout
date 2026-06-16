@@ -86,55 +86,34 @@ public class AdminSurveysController : Controller
         return RedirectToAction(nameof(Edit), new { id });
     }
 
+    // Phase 17 — survey questions are now hard-coded in SurveyQuestionsProvider and are
+    // no longer editable from the admin UI. Add/Edit/Delete are disabled and simply
+    // redirect with an explanatory message. (The official 8-question bank is materialised
+    // by Phase12SurveySeeder from the static provider on startup.)
+    private const string QuestionsLockedMsg =
+        "أسئلة الاستبيان أصبحت ثابتة في الكود (SurveyQuestionsProvider) ولا يمكن تعديلها من لوحة التحكم.";
+
     [HttpPost("{id:guid}/AddQuestion")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AddQuestion(Guid id, string type, string questionAr, string? optionsCsv, bool isRequired = true)
+    public IActionResult AddQuestion(Guid id)
     {
-        var survey = await _db.Surveys.FindAsync(id);
-        if (survey != null && !string.IsNullOrWhiteSpace(questionAr))
-        {
-            var order = (await _db.SurveyQuestions.Where(q => q.SurveyId == id).MaxAsync(q => (int?)q.Order) ?? 0) + 1;
-            string? optionsJson = null;
-            if (type == "MCQ")
-            {
-                var opts = (optionsCsv ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-                if (opts.Count >= 2) optionsJson = JsonSerializer.Serialize(opts);
-            }
-            _db.SurveyQuestions.Add(new SurveyQuestion
-            {
-                SurveyId = id,
-                Order = order,
-                Type = type,
-                QuestionAr = questionAr.Trim(),
-                OptionsJson = optionsJson,
-                IsRequired = isRequired,
-            });
-            await _db.SaveChangesAsync();
-        }
+        TempData["SurveyLocked"] = QuestionsLockedMsg;
         return RedirectToAction(nameof(Edit), new { id });
     }
 
-    // Phase 16 — edit the text of an existing question without changing its
-    // type/order/count. Used to fix wording on the official survey from the admin UI.
     [HttpPost("{id:guid}/EditQuestion/{qid:guid}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> EditQuestion(Guid id, Guid qid, string questionAr)
+    public IActionResult EditQuestion(Guid id, Guid qid)
     {
-        var q = await _db.SurveyQuestions.FirstOrDefaultAsync(x => x.Id == qid && x.SurveyId == id);
-        if (q != null && !string.IsNullOrWhiteSpace(questionAr))
-        {
-            q.QuestionAr = questionAr.Trim();
-            await _db.SaveChangesAsync();
-        }
+        TempData["SurveyLocked"] = QuestionsLockedMsg;
         return RedirectToAction(nameof(Edit), new { id });
     }
 
     [HttpPost("{id:guid}/DeleteQuestion/{qid:guid}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteQuestion(Guid id, Guid qid)
+    public IActionResult DeleteQuestion(Guid id, Guid qid)
     {
-        var q = await _db.SurveyQuestions.FirstOrDefaultAsync(x => x.Id == qid && x.SurveyId == id);
-        if (q != null) { _db.SurveyQuestions.Remove(q); await _db.SaveChangesAsync(); }
+        TempData["SurveyLocked"] = QuestionsLockedMsg;
         return RedirectToAction(nameof(Edit), new { id });
     }
 

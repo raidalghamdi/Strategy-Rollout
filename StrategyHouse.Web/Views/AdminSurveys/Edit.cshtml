@@ -46,56 +46,27 @@
         <button class="btn btn-sm btn-outline-warning">توليد رابط جديد</button>
     </form>
 
+    @if (TempData["SurveyLocked"] != null)
+    {
+        <div class="alert alert-warning">@TempData["SurveyLocked"]</div>
+    }
+
     <h4 style="color:#28334A;">الأسئلة (@Model.Questions.Count)</h4>
+    <div class="alert alert-secondary small">
+        أسئلة هذا الاستبيان ثابتة في الكود (<code>SurveyQuestionsProvider</code>) وتُعرَض هنا للاطلاع فقط — لا يمكن إضافتها أو تعديلها أو حذفها من لوحة التحكم.
+    </div>
     <ol class="list-group list-group-numbered mb-3">
         @foreach (var q in Model.Questions)
         {
             <li class="list-group-item">
-                <div class="d-flex justify-content-between align-items-start gap-2">
-                    <div class="flex-grow-1">
-                        <span class="badge bg-info text-dark">@TypeAr(q.Type)</span>
-                        <form method="post" asp-action="EditQuestion" asp-route-id="@Model.Id" asp-route-qid="@q.Id" class="d-flex gap-2 mt-2">
-                            @Html.AntiForgeryToken()
-                            <input name="questionAr" class="form-control form-control-sm" value="@q.QuestionAr" required />
-                            <button class="btn btn-sm btn-outline-primary" type="submit">حفظ النص</button>
-                        </form>
-                        @if (!string.IsNullOrEmpty(q.OptionsJson))
-                        {
-                            var opts = System.Text.Json.JsonSerializer.Deserialize<List<string>>(q.OptionsJson) ?? new();
-                            <div class="small text-muted mt-1">@string.Join(" · ", opts)</div>
-                        }
-                    </div>
-                    <form method="post" asp-action="DeleteQuestion" asp-route-id="@Model.Id" asp-route-qid="@q.Id">
-                        @Html.AntiForgeryToken()
-                        <button class="btn btn-sm btn-outline-danger">حذف</button>
-                    </form>
-                </div>
+                <span class="badge bg-info text-dark">@TypeAr(q.Type)</span>
+                <span class="ms-2">@q.QuestionAr</span>
+                @if (!string.IsNullOrEmpty(q.OptionsJson))
+                {
+                    var opts = System.Text.Json.JsonSerializer.Deserialize<List<string>>(q.OptionsJson) ?? new();
+                    <div class="small text-muted mt-1">@string.Join(" · ", opts)</div>
+                }
             </li>
         }
     </ol>
-
-    <form method="post" asp-action="AddQuestion" asp-route-id="@Model.Id" class="card card-body">
-        @Html.AntiForgeryToken()
-        <h5>إضافة سؤال</h5>
-        <div class="row g-2 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label">النوع</label>
-                <select name="type" class="form-select" id="qtype">
-                    <option value="Likert5">مقياس (1-5)</option>
-                    <option value="MCQ">اختيار من متعدد</option>
-                    <option value="Text">نص حر</option>
-                    <option value="YesNo">نعم/لا</option>
-                </select>
-            </div>
-            <div class="col-md-5">
-                <label class="form-label">نص السؤال</label>
-                <input name="questionAr" class="form-control" required />
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">خيارات (مفصولة بـ |)</label>
-                <input name="optionsCsv" class="form-control" placeholder="للاختيار من متعدد فقط" />
-            </div>
-            <div class="col-md-1"><button class="btn btn-success w-100">إضافة</button></div>
-        </div>
-    </form>
 </div>

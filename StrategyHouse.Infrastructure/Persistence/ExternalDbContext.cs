@@ -1,11 +1,10 @@
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
+using StrategyHouse.Domain.Entities.External;
 
 namespace StrategyHouse.Infrastructure.Persistence;
 
 // =====================================================================
-// Phase 16 — External MSSQL database (Option A schema).
+// Phase 17 — External MSSQL database (Option A schema, full 5 tables).
 //
 // This context is OPTIONAL. It is only registered in DI when the
 // `UseExternalDb` feature flag is true AND a non-empty connection string
@@ -13,33 +12,65 @@ namespace StrategyHouse.Infrastructure.Persistence;
 // (the default in dev), the app runs entirely off the local SQLite
 // ApplicationDbContext exactly as before — nothing here is touched.
 //
-// Option A covers the organisation's Departments table. All journey,
-// quiz, survey, signature and CMS tables remain local in SQLite.
+// The app only ever QUERIES this context (read-only). No migrations are
+// generated against it; the external warehouse owns the schema. Column
+// names are the flattened snake-case names from the warehouse, bound via
+// data annotations on the entity classes plus the FK relationships below.
+//
+// Tables (Option A): Pillars → Objectives → KPIs / Initiatives → Projects.
+// Departments are derived at read time from KPIs.Division (DISTINCT) — there
+// is no separate Departments table in Option A.
 // =====================================================================
 public class ExternalDbContext : DbContext
 {
     public ExternalDbContext(DbContextOptions<ExternalDbContext> options) : base(options) { }
 
-    public DbSet<ExternalDepartment> Departments => Set<ExternalDepartment>();
+    public DbSet<ExternalPillar> Pillars => Set<ExternalPillar>();
+    public DbSet<ExternalObjective> Objectives => Set<ExternalObjective>();
+    public DbSet<ExternalKpi> Kpis => Set<ExternalKpi>();
+    public DbSet<ExternalInitiative> Initiatives => Set<ExternalInitiative>();
+    public DbSet<ExternalProject> Projects => Set<ExternalProject>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
-        b.Entity<ExternalDepartment>().ToTable("Departments");
-    }
-}
 
-// Mirrors the Option A "Departments" table on the external MSSQL server:
-//   id (PK), code, name, level, parent_id, is_active, ...
-// Read-only from the app's perspective (we only query it).
-[Table("Departments")]
-public class ExternalDepartment
-{
-    [Key, Column("id")] public int Id { get; set; }
-    [Column("code"), MaxLength(15)] public string Code { get; set; } = string.Empty;
-    [Column("name"), MaxLength(255)] public string? Name { get; set; }
-    [Column("name_en"), MaxLength(255)] public string? NameEn { get; set; }
-    [Column("level")] public int? Level { get; set; }
-    [Column("parent_id")] public int? ParentId { get; set; }
-    [Column("is_active")] public bool IsActive { get; set; } = true;
+        // Pillars → Objectives (PLR_Code)
+        b.Entity<ExternalObjective>()
+            .HasOne(o => o.Pillar)
+            .WithMany(p => p.Objectives)
+            .HasForeignKey(o => o.PlrCode)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Objectives → Initiatives (Objective_Code)
+        b.Entity<ExternalInitiative>()
+            .HasOne(i => i.Objective)
+            .WithMany(o => o.Initiatives)
+            .HasForeignKey(i => i.ObjectiveCode)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Objectives → KPIs (Objective_Code) + denormalised Pillars → KPIs (PLR_Code)
+        b.Entity<ExternalKpi>()
+            .HasOne(k => k.Objective)
+            .WithMany(o => o.Kpis)
+            .HasForeignKey(k => k.ObjectiveCode)
+            .OnDelete(DeleteBehavior.Restrict);
+        b.Entity<ExternalKpi>()
+            .HasOne(k => k.Pillar)
+            .WithMany(p => p.Kpis)
+            .HasForeignKey(k => k.PlrCode)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Initiatives → Projects (Initiative_Code) + denormalised Pillars → Projects (PLR_Code)
+        b.Entity<ExternalProject>()
+            .HasOne(p => p.Initiative)
+            .WithMany(i => i.Projects)
+            .HasForeignKey(p => p.InitiativeCode)
+            .OnDelete(DeleteBehavior.Restrict);
+        b.Entity<ExternalProject>()
+            .HasOne(p => p.Pillar)
+            .WithMany(p => p.Projects)
+            .HasForeignKey(p => p.PlrCode)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
 }

@@ -1,0 +1,69 @@
+@model StrategyHouse.Web.Controllers.ExternalDataViewModel
+@{
+    ViewData["Title"] = "بيانات قاعدة البيانات الخارجية";
+    string YesNo(bool v) => v ? "نعم" : "لا";
+    var samples = new (string Title, string[] Headers, List<string[]> Rows)[]
+    {
+        ("الركائز Pillars", new[] { "PLR_Code", "PILLAR_Name", "PLR_Periods" }, Model.SamplePillars),
+        ("الأهداف Objectives", new[] { "Objective_Code", "Objective_Name", "PLR_Code" }, Model.SampleObjectives),
+        ("المؤشرات KPIs", new[] { "KPI_Code", "KPI_Name", "Division" }, Model.SampleKpis),
+        ("المبادرات Initiatives", new[] { "Initiative_Code", "Initiative_Name", "Objective_Code" }, Model.SampleInitiatives),
+        ("المشاريع Projects", new[] { "Project_Code", "Project_Name", "Division" }, Model.SampleProjects),
+    };
+}
+
+<div class="d-flex" style="justify-content:space-between;align-items:center;">
+    <h1>بيانات قاعدة البيانات الخارجية (Option A)</h1>
+    <a href="/Admin/ExternalData" class="btn btn-primary">تحديث</a>
+</div>
+
+<table class="table" style="max-width:640px;">
+    <tbody>
+        <tr><th>العلم (UseExternalDb)</th><td>@YesNo(Model.FlagEnabled)</td></tr>
+        <tr><th>سلسلة الاتصال مُعرَّفة</th><td>@YesNo(Model.ConnectionConfigured)</td></tr>
+        <tr><th>السياق مُسجَّل (ExternalDbContext)</th><td>@YesNo(Model.ContextRegistered)</td></tr>
+        <tr><th>الاتصال (ping)</th><td>@YesNo(Model.CanConnect)</td></tr>
+        <tr><th>الإدارات (KPIs.Division المميزة)</th><td>@Model.DistinctDivisions</td></tr>
+    </tbody>
+</table>
+
+@if (!string.IsNullOrEmpty(Model.StatusMessage))
+{
+    <div class="card card-body" style="margin-bottom:1rem;">@Model.StatusMessage</div>
+}
+
+@if (Model.CanConnect && Model.Counts.Count > 0)
+{
+    <h2>عدد السجلات</h2>
+    <table class="table" style="max-width:480px;">
+        <thead><tr><th>الجدول</th><th>العدد</th></tr></thead>
+        <tbody>
+            @foreach (var kv in Model.Counts)
+            {
+                <tr><td>@kv.Key</td><td>@kv.Value</td></tr>
+            }
+        </tbody>
+    </table>
+
+    @foreach (var s in samples)
+    {
+        <h3 style="margin-top:1.5rem;">@s.Title (أول 5)</h3>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>@foreach (var h in s.Headers) { <th>@h</th> }</tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in s.Rows)
+                    {
+                        <tr>@foreach (var c in r) { <td>@c</td> }</tr>
+                    }
+                    @if (s.Rows.Count == 0)
+                    {
+                        <tr><td colspan="@s.Headers.Length">لا توجد بيانات</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}

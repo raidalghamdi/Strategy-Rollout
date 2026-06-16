@@ -132,6 +132,47 @@ dotnet ef database update --project StrategyHouse.Infrastructure --startup-proje
 
 ---
 
+## قاعدة البيانات الخارجية (Option A) | External MSSQL Strategy Warehouse
+
+البيانات الاستراتيجية (الركائز، الأهداف، المؤشرات، المبادرات، المشاريع) يمكن قراءتها مباشرةً من مستودع MSSQL خارجي بدل البذور المحلية. الربط **اختياري** ومُطفأ افتراضياً؛ عند إطفائه يعمل الموقع بالكامل من SQLite المحلي.
+
+The five strategy tables can be read live from an external MSSQL warehouse following the **Option A** schema (`Pillars → Objectives → KPIs / Initiatives → Projects`, with departments derived from `KPIs.Division DISTINCT`). The integration is **off by default** and fully optional.
+
+### التفعيل | Enabling
+
+عيّن العلَم وسلسلة الاتصال (محلياً في `appsettings.json` أو عبر متغيرات بيئة Railway):
+
+```json
+{
+  "Features": { "UseExternalDb": true },
+  "ConnectionStrings": {
+    "ExternalMssql": "Server=YOUR_HOST;Database=YOUR_DB;User Id=USER;Password=PASS;TrustServerCertificate=True;"
+  }
+}
+```
+
+على Railway استخدم متغيرات البيئة (تتجاوز `appsettings.json`):
+
+```
+Features__UseExternalDb=true
+ConnectionStrings__ExternalMssql=Server=...;Database=...;User Id=...;Password=...;TrustServerCertificate=True;
+```
+
+### السلوك | Behavior
+
+- **العلَم مُطفأ (`false`)** — افتراضي التطوير: `ExternalDbContext` لا يُسجَّل في الحاوية، وكل خدمات الاستراتيجية تقرأ من SQLite المحلي. لا شيء يتعطّل.
+- **العلَم مُفعَّل + سلسلة اتصال موجودة** — الركائز/الأهداف/المؤشرات/المبادرات/المشاريع وقائمة الإدارات تُقرأ من MSSQL مباشرةً (مع تخزين مؤقت للإدارات لمدة ٥ دقائق).
+- **العلَم مُفعَّل لكن السلسلة فارغة** — تحذير في السجل والرجوع الآمن إلى SQLite.
+- **فشل الاتصال أثناء التشغيل** — يُلتقط الخطأ، تظهر "البيانات غير متاحة" في صفحات الاستراتيجية فقط، وبقية الموقع يعمل من SQLite.
+
+### التحقق | Verification page
+
+بعد تسجيل الدخول كـ `Admin` أو `Facilitator`، افتح **`/Admin/ExternalData`** لرؤية حالة العلَم، وفحص الاتصال (ping)، وعدد السجلات في الجداول الخمسة، وأول ٥ صفوف من كل جدول.
+
+> **ملاحظة:** أسئلة الاستبيان والاختبار، وردود المشاركين، وبيانات رحلة الجلسة (رموز الدخول، الخرائط، التوقيعات) تبقى دائماً في قاعدة البيانات المحلية بغضّ النظر عن هذا العلَم.
+
+---
+
 ## هيكل المجلدات | Folder Structure
 
 ```

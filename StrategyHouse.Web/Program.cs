@@ -49,7 +49,15 @@ if (useExternalDb && !string.IsNullOrWhiteSpace(externalConn))
 {
     builder.Services.AddDbContext<ExternalDbContext>(options => options.UseSqlServer(externalConn));
 }
+builder.Services.AddMemoryCache();
 builder.Services.AddScoped<DepartmentDirectoryService>();
+// Phase 17 — read services for the Option A strategy tables (external MSSQL).
+// When UseExternalDb is off these return empty lists with a logged warning.
+builder.Services.AddScoped<PillarsService>();
+builder.Services.AddScoped<ObjectivesService>();
+builder.Services.AddScoped<KpisService>();
+builder.Services.AddScoped<InitiativesService>();
+builder.Services.AddScoped<ProjectsService>();
 
 // Identity — three roles: Admin, Facilitator, Viewer.
 builder.Services
