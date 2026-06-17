@@ -18,12 +18,30 @@ public class JourneyController : Controller
     private readonly ApplicationDbContext _db;
     private readonly StrategyContentService _content;
     private readonly StrategyMapPdfService _pdf;
+    private readonly PillarsService _pillarsSvc;
+    private readonly ObjectivesService _objectivesSvc;
+    private readonly InitiativesService _initiativesSvc;
+    private readonly ProjectsService _projectsSvc;
+    private readonly DepartmentDirectoryService _departments;
 
-    public JourneyController(ApplicationDbContext db, StrategyContentService content, StrategyMapPdfService pdf)
+    public JourneyController(
+        ApplicationDbContext db,
+        StrategyContentService content,
+        StrategyMapPdfService pdf,
+        PillarsService pillarsSvc,
+        ObjectivesService objectivesSvc,
+        InitiativesService initiativesSvc,
+        ProjectsService projectsSvc,
+        DepartmentDirectoryService departments)
     {
         _db = db;
         _content = content;
         _pdf = pdf;
+        _pillarsSvc = pillarsSvc;
+        _objectivesSvc = objectivesSvc;
+        _initiativesSvc = initiativesSvc;
+        _projectsSvc = projectsSvc;
+        _departments = departments;
     }
 
     // GET /Journey — landing page with code entry.
@@ -85,17 +103,9 @@ public class JourneyController : Controller
         if (stage > maxAllowed)
             return RedirectToAction(nameof(RunStage), new { sessionId, stage = maxAllowed });
 
-        // Phase 16 — gate entry to Complete (stage 5) only on the attendee count.
-        // The group signature and comment are optional.
-        if (stage == 5)
-        {
-            var ready = await IsMapStageCompleteAsync(tracked);
-            if (!ready)
-            {
-                TempData["Error"] = "قبل الإتمام، يُرجى إدخال عدد الموظفين الحاضرين في مرحلة الخريطة.";
-                return RedirectToAction(nameof(RunStage), new { sessionId, stage = 4 });
-            }
-        }
+        // Phase 18 — the redesigned stage 4 (الرحلة نحو الرؤية) takes no required input,
+        // so advancing to stage 5 (الأثر) is no longer gated. The attendee count moved
+        // to stage 5 as an optional field.
 
         // Record progress: bump the furthest stage reached + activity timestamp.
         if (stage > tracked.CurrentStage)
@@ -119,6 +129,20 @@ public class JourneyController : Controller
 
         var dept = await _db.Departments.FindAsync(session.DeptCode);
         var map = await _db.DepartmentStrategyMaps.FirstOrDefaultAsync(m => m.SessionId == sessionId);
+
+        var housePillars = await BuildHousePillarsAsync();
+        var departmentNames = (await _departments.GetDepartmentsAsync())
+            .Select(d => d.NameAr)
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Select(n => n!)
+            .Distinct()
+            .OrderBy(n => n)
+            .ToList();
+
+        var role = await _db.RoleContributions
+            .Where(r => r.SessionId == sessionId)
+            .OrderByDescending(r => r.CreatedAt)
+            .FirstOrDefaultAsync();
 
         return new JourneyRunViewModel
         {
@@ -146,6 +170,107 @@ public class JourneyController : Controller
                 .OrderByDescending(t => t.CreatedAt)
                 .Select(t => t.SelectedValueText)
                 .FirstOrDefaultAsync(),
+
+            // Phase 18
+            StrategyDataLive = _pillarsSvc.Available,
+            HousePillars = housePillars,
+            DepartmentNames = departmentNames,
+            OpeningReflectionText = await _db.OpeningReflections
+                .Where(r => r.SessionId == sessionId)
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => r.ReflectionText)
+                .FirstOrDefaultAsync(),
+            RoleContribution = role,
+            SelectedInitiative = role?.SelectedInitiativeCode is { Length: > 0 } code
+                ? await ResolveInitiativeAsync(code)
+                : null,
+        };
+    }
+
+    // Phase 18 — vision → pillars → objectives for the strategy-house stage.
+    // External (Phase 17) when UseExternalDb is on; otherwise a 3×3 preview so the
+    // dev/demo screen is never empty. The view shows the "data on connect" notice
+    // whenever StrategyDataLive is false.
+    private async Task<List<StrategyPillarVm>> BuildHousePillarsAsync()
+    {
+        if (_pillarsSvc.Available)
+        {
+            var pillars = await _pillarsSvc.GetAllAsync();
+            var objectives = await _objectivesSvc.GetAllAsync();
+            return pillars.Select(p => new StrategyPillarVm
+            {
+                Code = p.PlrCode,
+                Name = p.PillarName ?? p.PlrCode,
+                Objectives = objectives
+                    .Where(o => o.PlrCode == p.PlrCode)
+                    .Select(o => new StrategyObjectiveVm { Code = o.ObjectiveCode, Name = o.ObjectiveName ?? o.ObjectiveCode })
+                    .ToList(),
+            }).ToList();
+        }
+
+        return BuildPreviewPillars();
+    }
+
+    // Dev preview: 3 pillars × 3 objectives, used when the warehouse is not wired.
+    private static List<StrategyPillarVm> BuildPreviewPillars()
+    {
+        var names = new[] { "تمكين المنافسة", "حماية المنافسة", "التميز المؤسسي" };
+        var list = new List<StrategyPillarVm>();
+        for (var i = 0; i < names.Length; i++)
+        {
+            var objs = new List<StrategyObjectiveVm>();
+            for (var j = 1; j <= 3; j++)
+                objs.Add(new StrategyObjectiveVm { Code = "OBJ" + (i + 1) + j, Name = "هدف توضيحي " + (i + 1) + "." + j });
+            list.Add(new StrategyPillarVm { Code = "PLR" + (i + 1), Name = names[i], Objectives = objs });
+        }
+        return list;
+    }
+
+    // Phase 18 — resolve a chosen initiative to its objective + pillar so the
+    // linkage chain (stages 3 and 4) can be drawn. External when live; otherwise
+    // resolved against the preview pillars by best-effort name lookup.
+    private async Task<StrategyInitiativeVm?> ResolveInitiativeAsync(string initiativeCode)
+    {
+        if (_initiativesSvc.Available)
+        {
+            var inits = await _initiativesSvc.GetAllAsync();
+            var init = inits.FirstOrDefault(i => i.InitiativeCode == initiativeCode);
+            if (init == null) return new StrategyInitiativeVm { Code = initiativeCode, Name = initiativeCode };
+
+            string? pillarCode = null, pillarName = null, objName = init.ObjectiveName;
+            if (!string.IsNullOrEmpty(init.ObjectiveCode))
+            {
+                var obj = await _objectivesSvc.GetByCodeAsync(init.ObjectiveCode);
+                if (obj != null)
+                {
+                    objName ??= obj.ObjectiveName;
+                    pillarCode = obj.PlrCode;
+                    if (!string.IsNullOrEmpty(obj.PlrCode))
+                        pillarName = (await _pillarsSvc.GetByCodeAsync(obj.PlrCode))?.PillarName;
+                }
+            }
+            return new StrategyInitiativeVm
+            {
+                Code = init.InitiativeCode,
+                Name = init.InitiativeName ?? init.InitiativeCode,
+                ObjectiveCode = init.ObjectiveCode,
+                ObjectiveName = objName,
+                PillarCode = pillarCode,
+                PillarName = pillarName,
+            };
+        }
+
+        // Preview fallback: the code is the preview initiative name itself.
+        var preview = BuildPreviewPillars().FirstOrDefault();
+        var firstObj = preview?.Objectives.FirstOrDefault();
+        return new StrategyInitiativeVm
+        {
+            Code = initiativeCode,
+            Name = initiativeCode,
+            ObjectiveCode = firstObj?.Code,
+            ObjectiveName = firstObj?.Name,
+            PillarCode = preview?.Code,
+            PillarName = preview?.Name,
         };
     }
 
@@ -241,12 +366,125 @@ public class JourneyController : Controller
         return Json(new { ok = true });
     }
 
+    // POST /Journey/SaveReflection — Phase 18 stage 1 opening reflection (optional free text).
+    // Latest answer per session wins; empty text clears the stored answer. JSON endpoint.
+    [HttpPost("Journey/SaveReflection")]
+    public async Task<IActionResult> SaveReflection([FromBody] ReflectionDto dto)
+    {
+        var session = await _db.StrategySessions.FindAsync(dto.SessionId);
+        if (session == null) return NotFound();
+
+        var existing = await _db.OpeningReflections.Where(r => r.SessionId == dto.SessionId).ToListAsync();
+        if (existing.Count > 0) _db.OpeningReflections.RemoveRange(existing);
+
+        var text = string.IsNullOrWhiteSpace(dto.ReflectionText) ? null : dto.ReflectionText.Trim();
+        if (text != null && text.Length > 4000) text = text[..4000];
+        if (text != null)
+        {
+            _db.OpeningReflections.Add(new OpeningReflection
+            {
+                SessionId = dto.SessionId,
+                JourneyCode = session.DeptCode,
+                DepartmentCode = session.DeptCode,
+                ReflectionText = text,
+            });
+        }
+        await _db.SaveChangesAsync();
+        return Json(new { ok = true });
+    }
+
+    // GET /Journey/InitiativesForDepartment?division=... — Phase 18 stage 3.
+    // Returns the initiatives owned by / running in a department, with their resolved
+    // objective + pillar so the client can render the linkage chain. External when
+    // live; otherwise a small preview set so the dev screen is never empty.
+    [HttpGet("Journey/InitiativesForDepartment")]
+    public async Task<IActionResult> InitiativesForDepartment(string? division)
+    {
+        division = (division ?? string.Empty).Trim();
+        if (division.Length == 0) return Json(new { ok = true, live = _initiativesSvc.Available, initiatives = Array.Empty<object>() });
+
+        if (_initiativesSvc.Available)
+        {
+            var inits = await _initiativesSvc.GetAllAsync();
+            var projects = await _projectsSvc.GetByDivisionAsync(division);
+
+            // An initiative belongs to a department if it lists the division as an owner
+            // OR if one of the department's projects rolls up to it.
+            var projInitCodes = projects.Where(p => !string.IsNullOrEmpty(p.InitiativeCode))
+                .Select(p => p.InitiativeCode!).ToHashSet();
+            var matched = inits
+                .Where(i => (i.Owners != null && i.Owners.Contains(division))
+                            || projInitCodes.Contains(i.InitiativeCode))
+                .ToList();
+
+            var result = new List<object>();
+            foreach (var i in matched)
+            {
+                var vm = await ResolveInitiativeAsync(i.InitiativeCode);
+                result.Add(new
+                {
+                    code = vm!.Code,
+                    name = vm.Name,
+                    objectiveName = vm.ObjectiveName,
+                    pillarName = vm.PillarName,
+                });
+            }
+            return Json(new { ok = true, live = true, initiatives = result });
+        }
+
+        // Preview fallback — three illustrative initiatives mapped to the preview house.
+        var preview = BuildPreviewPillars();
+        var p0 = preview[0];
+        var sample = new[]
+        {
+            new { code = "INIT-DEMO-1", name = "مبادرة توضيحية — رفع الوعي بالمنافسة", objectiveName = p0.Objectives[0].Name, pillarName = p0.Name },
+            new { code = "INIT-DEMO-2", name = "مبادرة توضيحية — تطوير الأنظمة", objectiveName = p0.Objectives[1].Name, pillarName = p0.Name },
+            new { code = "INIT-DEMO-3", name = "مبادرة توضيحية — تمكين الشراكات", objectiveName = p0.Objectives[2].Name, pillarName = p0.Name },
+        };
+        return Json(new { ok = true, live = false, initiatives = sample });
+    }
+
+    // POST /Journey/SaveRoleContribution — Phase 18 stage 3. Stores the chosen
+    // initiative + the employee's perceived impact (free text). Latest per session wins.
+    [HttpPost("Journey/SaveRoleContribution")]
+    public async Task<IActionResult> SaveRoleContribution([FromBody] RoleContributionDto dto)
+    {
+        var session = await _db.StrategySessions.FindAsync(dto.SessionId);
+        if (session == null) return NotFound();
+
+        var existing = await _db.RoleContributions.Where(r => r.SessionId == dto.SessionId).ToListAsync();
+        if (existing.Count > 0) _db.RoleContributions.RemoveRange(existing);
+
+        var impact = string.IsNullOrWhiteSpace(dto.PerceivedImpact) ? null : dto.PerceivedImpact.Trim();
+        if (impact != null && impact.Length > 4000) impact = impact[..4000];
+        var initCode = string.IsNullOrWhiteSpace(dto.SelectedInitiativeCode) ? null : dto.SelectedInitiativeCode.Trim();
+
+        _db.RoleContributions.Add(new RoleContribution
+        {
+            SessionId = dto.SessionId,
+            JourneyCode = session.DeptCode,
+            DepartmentCode = string.IsNullOrWhiteSpace(dto.DepartmentCode) ? session.DeptCode : dto.DepartmentCode.Trim(),
+            SelectedInitiativeCode = initCode,
+            PerceivedImpact = impact,
+        });
+        await _db.SaveChangesAsync();
+
+        var vm = initCode != null ? await ResolveInitiativeAsync(initCode) : null;
+        return Json(new
+        {
+            ok = true,
+            initiativeName = vm?.Name,
+            objectiveName = vm?.ObjectiveName,
+            pillarName = vm?.PillarName,
+        });
+    }
+
     // GET /Journey/Map/{sessionId} — deep-link alias → Stage 4.
     [HttpGet("Journey/Map/{sessionId:guid}")]
     public IActionResult Map(Guid sessionId) => RedirectToRun(sessionId, 4);
 
-    // POST /Journey/SaveAttendeeCount — Phase 13: team enters how many department
-    // employees are present. One value per session, editable until the map is signed.
+    // POST /Journey/SaveAttendeeCount — Phase 18: the optional attendee count moved to
+    // stage 5 (الأثر). One value per session. Redirects back to stage 5.
     [HttpPost("Journey/SaveAttendeeCount/{sessionId:guid}")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveAttendeeCount(Guid sessionId, int attendeeCount)
@@ -256,13 +494,13 @@ public class JourneyController : Controller
         if (attendeeCount < 1 || attendeeCount > 500)
         {
             TempData["Error"] = "أدخل عدداً صحيحاً بين 1 و500.";
-            return RedirectToRun(sessionId, 4);
+            return RedirectToRun(sessionId, 5);
         }
         session.AttendeeCount = attendeeCount;
         session.LastActivityAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         TempData["Saved"] = "تم حفظ عدد الحاضرين.";
-        return RedirectToRun(sessionId, 4);
+        return RedirectToRun(sessionId, 5);
     }
 
     // POST /Journey/SaveGroupSignature — Phase 13: one group signature per session,
@@ -325,13 +563,6 @@ public class JourneyController : Controller
         await _db.SaveChangesAsync();
         return Json(new { ok = true, assetId = asset.Id });
     }
-
-    // True when the team has both entered an attendee count and saved a group signature
-    // (typed comment OR ink). Gates advancing from Map (4) to Complete (5).
-    // Phase 16 — only the attendee count is required to advance from the Map stage.
-    // The group signature and comment are optional; saved if present, never required.
-    private Task<bool> IsMapStageCompleteAsync(StrategySession session)
-        => Task.FromResult(session.AttendeeCount is > 0);
 
     // GET /Journey/Ink/{assetId} — streams a captured ink/signature PNG (for in-journey preview).
     [HttpGet("Journey/Ink/{assetId:guid}")]
@@ -661,6 +892,43 @@ public class JourneyRunViewModel
     public DepartmentStrategyMap? Map { get; set; }
     public List<MapInkAsset> InkAssets { get; set; } = new();
     public string? SelectedTeamValue { get; set; } // Phase 16 — the team's chosen Big Picture value (Ar text)
+
+    // Phase 18 — redesigned-journey data.
+    // True when the external MSSQL warehouse is the source for the strategy house
+    // (stage 2) and role data (stage 3). False → the views show preview/dummy data
+    // and the "البيانات الاستراتيجية ستتوفر عند الربط" notice.
+    public bool StrategyDataLive { get; set; }
+    public List<StrategyPillarVm> HousePillars { get; set; } = new(); // stage 2 — vision → pillars → objectives
+    public List<string> DepartmentNames { get; set; } = new();        // stage 3 — dropdown options
+    public string? OpeningReflectionText { get; set; }                // stage 1 — saved reflection (if any)
+    public RoleContribution? RoleContribution { get; set; }           // stage 3/4 — saved role contribution (if any)
+    public StrategyInitiativeVm? SelectedInitiative { get; set; }     // stage 4 — resolved linkage for the chosen initiative
+}
+
+// Phase 18 — flattened strategy element shapes the journey views bind to. They are
+// populated either from the external warehouse (Phase 17 services) or from the
+// dev preview/dummy data, so the views never touch the External* entity types.
+public class StrategyPillarVm
+{
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public List<StrategyObjectiveVm> Objectives { get; set; } = new();
+}
+
+public class StrategyObjectiveVm
+{
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+}
+
+public class StrategyInitiativeVm
+{
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? ObjectiveCode { get; set; }
+    public string? ObjectiveName { get; set; }
+    public string? PillarCode { get; set; }
+    public string? PillarName { get; set; }
 }
 
 public class PledgeDto
@@ -711,4 +979,19 @@ public class GroupSignatureDto
     public string? PngBase64 { get; set; }
     public string? StrokesJson { get; set; }
     public string? TypedText { get; set; }
+}
+
+// Phase 18 — opening reflection (stage 1) and role contribution (stage 3).
+public class ReflectionDto
+{
+    public Guid SessionId { get; set; }
+    public string? ReflectionText { get; set; }
+}
+
+public class RoleContributionDto
+{
+    public Guid SessionId { get; set; }
+    public string? DepartmentCode { get; set; }
+    public string? SelectedInitiativeCode { get; set; }
+    public string? PerceivedImpact { get; set; }
 }

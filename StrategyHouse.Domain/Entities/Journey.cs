@@ -145,3 +145,38 @@ public class ModerationAuditLog
     [MaxLength(1000)] public string? Note { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
+
+// =====================================================================
+// Phase 18 — Journey redesign capture tables.
+// Two optional, free-text capture points in the redesigned 5-stage flow.
+// No cascade deletes; rows are kept for analytics. Both store the journey
+// (department) code as a plain string so they survive even if a session is
+// pruned. Mapped to SQLite TEXT columns, same as the rest of the journey.
+// =====================================================================
+
+// Stage 1 (الصورة الكبرى) — the team's free-text answer to the opening
+// reflection question. Optional; the journey continues whether or not it is set.
+[Table("Phase18_OpeningReflections")]
+public class OpeningReflection
+{
+    [Key] public int Id { get; set; }
+    public Guid? SessionId { get; set; }
+    [Required, MaxLength(20)] public string JourneyCode { get; set; } = string.Empty;
+    [MaxLength(20)] public string? DepartmentCode { get; set; }
+    [Column(TypeName = "longtext")] public string? ReflectionText { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+// Stage 3 (دوري في الاستراتيجية) — the employee's chosen initiative and the
+// impact they perceive it contributes to. Optional free text.
+[Table("Phase18_RoleContributions")]
+public class RoleContribution
+{
+    [Key] public int Id { get; set; }
+    public Guid? SessionId { get; set; }
+    [Required, MaxLength(20)] public string JourneyCode { get; set; } = string.Empty;
+    [MaxLength(20)] public string? DepartmentCode { get; set; }
+    [MaxLength(50)] public string? SelectedInitiativeCode { get; set; }
+    [Column(TypeName = "longtext")] public string? PerceivedImpact { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

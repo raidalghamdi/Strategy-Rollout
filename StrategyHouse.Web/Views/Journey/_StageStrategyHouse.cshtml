@@ -1,75 +1,95 @@
 @model StrategyHouse.Web.Controllers.JourneyRunViewModel
 @{
-    var dept = Model.Dept;
     var content = Model.Content;
-    var pillars = Model.Pillars;
-    var objectives = Model.Objectives;
-    var deptObjCodes = Model.DeptObjectiveCodes;
+    var pillars = Model.HousePillars;
+    var live = Model.StrategyDataLive;
 }
-<div class="gac-card">
-    <h2 class="h4 h-md-2">بيت الاستراتيجية — @dept?.NameAr</h2>
-    <p class="text-muted">العناصر المرتبطة بإدارتك مميزة باللون الأزرق. اضغط على أي عنصر لعرض التفاصيل.</p>
+<div class="gac-card" id="house-card">
+    <h2 class="h4 h-md-2">البيت الاستراتيجي</h2>
+    <p class="text-muted">كل مبادرة داخل الهيئة ترتبط بأحد الأهداف والركائز وصولاً للرؤية. استعرض البيت من الأعلى (الرؤية) إلى الأسفل (الأهداف).</p>
 
-    <div class="gac-vision text-center mb-2">
-        <div class="label">الرؤية</div>
-        <div>@content?.Vision.Ar</div>
-    </div>
-    <div class="text-center p-2 mb-2" style="background:#299ECE;border-radius:10px;">
-        <strong>الرسالة:</strong> @content?.Mission.Ar
+    @if (!live)
+    {
+        <div class="alert alert-info" role="note">البيانات الاستراتيجية ستتوفر عند الربط — تُعرض الآن بيانات توضيحية.</div>
+    }
+
+    <div class="house-vision text-center">
+        <div class="house-vision__label">الرؤية</div>
+        <div class="house-vision__text">@content?.Vision.Ar</div>
     </div>
 
-    <div class="row g-2 mb-2">
+    <div class="house-pillars">
         @foreach (var p in pillars)
         {
-            <div class="col-6 col-md">
-                <div class="p-2 text-white text-center" style="background:#5F9600;border-radius:10px;height:100%;">@p.PillarName</div>
-            </div>
-        }
-    </div>
-
-    <div class="row g-2">
-        @foreach (var o in objectives)
-        {
-            var mine = deptObjCodes.Contains(o.ObjectiveCode);
-            var bg = mine ? "#28334A" : "#e7edf5";
-            var fg = mine ? "#fff" : "#9aa7b8";
-            <div class="col-12 col-sm-6 col-md-3">
-                <div class="p-2 text-center house-obj" style="background:@bg;color:@fg;border-radius:8px;cursor:pointer;font-size:.85rem;"
-                     data-name="@o.ObjectiveName" data-mine="@mine.ToString().ToLower()">
-                    @o.ObjectiveName
+            <div class="house-pillar" data-code="@p.Code">
+                <button type="button" class="house-pillar__head" aria-expanded="false">
+                    <span class="house-pillar__name">@p.Name</span>
+                    <span class="house-pillar__chev">▾</span>
+                </button>
+                <div class="house-objs" hidden>
+                    @if (p.Objectives.Count == 0)
+                    {
+                        <div class="house-obj house-obj--empty">لا توجد أهداف مرتبطة.</div>
+                    }
+                    else
+                    {
+                        @foreach (var o in p.Objectives)
+                        {
+                            <div class="house-obj" data-code="@o.Code">@o.Name</div>
+                        }
+                    }
                 </div>
             </div>
         }
     </div>
-
-    <div class="mt-4">
-        <h3 class="values-heading">القيم</h3>
-        <div class="values-grid mt-1">
-            @foreach (var v in content?.Values ?? new List<StrategyHouse.Web.Configuration.LocalizedText>())
-            {
-                <div class="value-card">@v.Ar</div>
-            }
-        </div>
-    </div>
 </div>
 
 <style>
-    #stage-2 .values-heading {
-        color: #28334A; font-weight: 800; display: inline-block;
-        border-bottom: 4px solid #FAC126; padding-bottom: 6px; margin-bottom: 4px;
+    #stage-2 .house-vision {
+        background: #067647; color: #fff; border-radius: 14px; padding: 22px 18px;
+        margin: 6px 0 16px; box-shadow: 0 4px 16px rgba(6,118,71,.25);
     }
-    #stage-2 .value-card {
-        padding: 24px 16px; font-size: 1.25rem; font-weight: 700; text-align: center;
-        background: #fff; color: #28334A; border-radius: 10px; height: 100%;
-        border-bottom: 3px solid #FAC126; box-shadow: 0 2px 10px rgba(40,51,74,.08);
+    #stage-2 .house-vision__label { font-size: .9rem; opacity: .9; margin-bottom: 6px; }
+    #stage-2 .house-vision__text { font-size: 1.15rem; font-weight: 800; line-height: 1.7; }
+    #stage-2 .house-pillars { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+    #stage-2 .house-pillar { border: 2px solid #d5dbe4; border-radius: 14px; background: #fff; overflow: hidden; }
+    #stage-2 .house-pillar.is-open { border-color: #067647; box-shadow: 0 2px 12px rgba(6,118,71,.18); }
+    #stage-2 .house-pillar__head {
+        width: 100%; border: none; background: #0f8f5b; color: #fff; cursor: pointer;
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        padding: 16px 16px; font-weight: 800; font-size: 1.02rem; min-height: 56px;
     }
+    #stage-2 .house-pillar__chev { transition: transform .2s; }
+    #stage-2 .house-pillar.is-open .house-pillar__chev { transform: rotate(180deg); }
+    #stage-2 .house-objs { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+    #stage-2 .house-obj {
+        background: #eef6f1; color: #1d4d39; border-radius: 10px; padding: 12px 14px;
+        font-weight: 600; font-size: .92rem; line-height: 1.6; border-right: 4px solid #067647;
+    }
+    #stage-2 .house-obj--empty { color: #5a6b80; border-right-color: #ccd; background: #f3f5f8; font-weight: 500; }
 </style>
 
 <script>
-document.querySelectorAll('#stage-2 .house-obj').forEach(el => {
-    el.addEventListener('click', () => {
-        const mine = el.dataset.mine === 'true';
-        alert(el.dataset.name + (mine ? '\n(من مسؤوليات إدارتك)' : ''));
-    });
-});
+// Phase 18 — Stage 2 (البيت الاستراتيجي). Pure DOM toggling, iOS Safari-safe ES5.
+(function () {
+    function init() {
+        var heads = document.querySelectorAll('#stage-2 .house-pillar__head');
+        for (var i = 0; i < heads.length; i++) {
+            (function (head) {
+                if (head.__bound) return; head.__bound = true;
+                head.addEventListener('click', function () {
+                    var pillar = head.parentNode;
+                    var objs = pillar.querySelector('.house-objs');
+                    var open = pillar.className.indexOf('is-open') === -1;
+                    pillar.className = open ? 'house-pillar is-open' : 'house-pillar';
+                    head.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    if (objs) { if (open) objs.removeAttribute('hidden'); else objs.setAttribute('hidden', 'hidden'); }
+                });
+            })(heads[i]);
+        }
+    }
+    document.addEventListener('stageReady', function (e) { if (e.detail && e.detail.stage === 2) init(); });
+    if (document.readyState !== 'loading') init();
+    else document.addEventListener('DOMContentLoaded', init);
+})();
 </script>

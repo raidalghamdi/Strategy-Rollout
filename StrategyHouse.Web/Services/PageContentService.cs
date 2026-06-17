@@ -42,7 +42,7 @@ public class PageContentService
         ("journey.stage6.intro", "تهانينا على إتمام رحلة الاستراتيجية."),
         ("quiz.intro", "اختبار قصير لتعزيز فهم الفريق للاستراتيجية المؤسسية."),
         ("survey.thank_you", "شكراً لمشاركتك! تم استلام إجابتك بنجاح."),
-        ("footer.copyright", "الهيئة العامة للمنافسة · منصة إطلاق الاستراتيجية"),
+        ("footer.copyright", "الهيئة العامة للمنافسة · منصة إطلاق استراتيجية الهيئة"),
     };
 
     private static readonly Dictionary<string, string> DefaultMap =

@@ -45,6 +45,10 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
     // Phase 9 — mini CMS for admin-editable page text
     public DbSet<PageContent> PageContents => Set<PageContent>();
 
+    // Phase 18 — redesigned journey capture tables (opening reflection + role contribution)
+    public DbSet<OpeningReflection> OpeningReflections => Set<OpeningReflection>();
+    public DbSet<RoleContribution> RoleContributions => Set<RoleContribution>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -153,5 +157,9 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
         // Phase 6
         b.Entity<DepartmentRoster>().HasIndex(r => new { r.DeptCode, r.IsActive });
         b.Entity<ChatbotConversation>().HasIndex(c => c.AskedAt);
+
+        // Phase 18 — index the redesigned-journey capture tables by session for fast reads.
+        b.Entity<OpeningReflection>().HasIndex(r => r.SessionId);
+        b.Entity<RoleContribution>().HasIndex(r => r.SessionId);
     }
 }
