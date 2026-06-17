@@ -23,21 +23,11 @@ if (File.Exists(cairoFontPath))
 }
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
-// Database — SQLite (dev) / MySQL (production), provider-switchable via appsettings.
-var provider = builder.Configuration["Database:Provider"] ?? "Sqlite";
+// Database — SQLite primary store for the app (sessions, CMS, surveys, mirror tables).
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    if (provider.Equals("MySql", StringComparison.OrdinalIgnoreCase))
-    {
-        var conn = builder.Configuration.GetConnectionString("MySql")
-            ?? throw new InvalidOperationException("MySql connection string missing.");
-        options.UseMySql(conn, ServerVersion.AutoDetect(conn));
-    }
-    else
-    {
-        var conn = builder.Configuration.GetConnectionString("Sqlite") ?? "Data Source=strategy_house.db";
-        options.UseSqlite(conn);
-    }
+    var conn = builder.Configuration.GetConnectionString("Sqlite") ?? "Data Source=strategy_house.db";
+    options.UseSqlite(conn);
 });
 
 // Phase 16 — optional external MSSQL (Option A schema). Registered only when the
@@ -58,6 +48,10 @@ builder.Services.AddScoped<ObjectivesService>();
 builder.Services.AddScoped<KpisService>();
 builder.Services.AddScoped<InitiativesService>();
 builder.Services.AddScoped<ProjectsService>();
+// Phase 19.5 — MSSQL→SQLite mirror push + resilient strategy data provider
+// (live MSSQL → SQLite mirror → dummy fallback).
+builder.Services.AddScoped<IMssqlMirrorService, MssqlMirrorService>();
+builder.Services.AddScoped<IStrategyDataProvider, StrategyDataProvider>();
 
 // Identity — three roles: Admin, Facilitator, Viewer.
 builder.Services

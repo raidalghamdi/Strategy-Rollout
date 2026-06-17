@@ -27,9 +27,9 @@ A configurable, Arabic-first platform that runs the Strategy House rollout for t
 ## التقنيات | Tech stack
 
 - **.NET 8** / **ASP.NET Core 8 MVC** (Razor Views, server-rendered)
-- **Entity Framework Core 8** with provider switch:
-  - **SQLite** (default for development; file: `strategy_house.db`)
-  - **MySQL / MariaDB** via Pomelo (production)
+- **Entity Framework Core 8**:
+  - **SQLite** primary store (file: `strategy_house.db`)
+  - **Microsoft SQL Server** optional external warehouse (read-only, Phase 17)
 - **ASP.NET Identity** (3 roles: `Admin`, `Facilitator`, `Viewer`)
 - **SignalR** for the Movement 2 real-time canvas sync (`/hubs/canvas`)
 - **QRCoder** for in-room QR display (baseline + survey)
@@ -107,27 +107,6 @@ dotnet run
 # الموقع: http://localhost:5080
 # دخول تجريبي: admin@gac.gov.sa / Demo@123
 # رمز الجلسة التجريبية: DEMO-001
-```
-
----
-
-## التبديل إلى MySQL | Switching to MySQL
-
-في `StrategyHouse.Web/appsettings.json`:
-
-```json
-{
-  "Database": { "Provider": "MySql" },
-  "ConnectionStrings": {
-    "MySql": "Server=localhost;Database=strategy_house;User=root;Password=YOUR_PASSWORD;"
-  }
-}
-```
-
-ثم:
-
-```bash
-dotnet ef database update --project StrategyHouse.Infrastructure --startup-project StrategyHouse.Web
 ```
 
 ---

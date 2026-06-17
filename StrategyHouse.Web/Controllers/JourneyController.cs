@@ -23,6 +23,7 @@ public class JourneyController : Controller
     private readonly InitiativesService _initiativesSvc;
     private readonly ProjectsService _projectsSvc;
     private readonly DepartmentDirectoryService _departments;
+    private readonly IStrategyDataProvider _strategyData;
 
     public JourneyController(
         ApplicationDbContext db,
@@ -32,7 +33,8 @@ public class JourneyController : Controller
         ObjectivesService objectivesSvc,
         InitiativesService initiativesSvc,
         ProjectsService projectsSvc,
-        DepartmentDirectoryService departments)
+        DepartmentDirectoryService departments,
+        IStrategyDataProvider strategyData)
     {
         _db = db;
         _content = content;
@@ -42,6 +44,7 @@ public class JourneyController : Controller
         _initiativesSvc = initiativesSvc;
         _projectsSvc = projectsSvc;
         _departments = departments;
+        _strategyData = strategyData;
     }
 
     // GET /Journey — landing page with code entry.
@@ -486,88 +489,7 @@ public class JourneyController : Controller
     // empty. Each node carries a category so the client can colour the layers.
     [HttpGet("api/strategy/sankey")]
     public async Task<IActionResult> StrategySankey()
-        => Json(await BuildStrategyFlowAsync());
-
-    private async Task<object> BuildStrategyFlowAsync()
-    {
-        var nodes = new List<object>();
-        var seen = new HashSet<string>();
-        var links = new List<object>();
-
-        void AddNode(string name, string category)
-        {
-            if (string.IsNullOrWhiteSpace(name) || !seen.Add(name)) return;
-            nodes.Add(new { name, category });
-        }
-        void AddLink(string? source, string? target)
-        {
-            if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(target) || source == target) return;
-            links.Add(new { source, target, value = 1 });
-        }
-
-        if (_pillarsSvc.Available)
-        {
-            var pillars = await _pillarsSvc.GetAllAsync();
-            var objectives = await _objectivesSvc.GetAllAsync();
-            var initiatives = await _initiativesSvc.GetAllAsync();
-            var projects = await _projectsSvc.GetAllAsync();
-
-            var pillarName = pillars.ToDictionary(p => p.PlrCode, p => p.PillarName ?? p.PlrCode);
-            var objByCode = objectives.ToDictionary(o => o.ObjectiveCode, o => o);
-            var initByCode = initiatives.ToDictionary(i => i.InitiativeCode, i => i);
-
-            foreach (var p in pillars) AddNode(p.PillarName ?? p.PlrCode, "pillar");
-            foreach (var o in objectives)
-            {
-                var oName = o.ObjectiveName ?? o.ObjectiveCode;
-                AddNode(oName, "objective");
-                if (o.PlrCode != null && pillarName.TryGetValue(o.PlrCode, out var pName)) AddLink(pName, oName);
-            }
-            foreach (var i in initiatives)
-            {
-                var iName = i.InitiativeName ?? i.InitiativeCode;
-                AddNode(iName, "initiative");
-                if (i.ObjectiveCode != null && objByCode.TryGetValue(i.ObjectiveCode, out var o))
-                    AddLink(o.ObjectiveName ?? o.ObjectiveCode, iName);
-            }
-            foreach (var pr in projects)
-            {
-                var prName = pr.ProjectName ?? pr.ProjectCode;
-                AddNode(prName, "project");
-                if (pr.InitiativeCode != null && initByCode.TryGetValue(pr.InitiativeCode, out var i))
-                    AddLink(i.InitiativeName ?? i.InitiativeCode, prName);
-            }
-
-            return new { ok = true, live = true, nodes, links };
-        }
-
-        // Dev/preview fallback — 3 pillars × 3 objectives × 3 initiatives × 3 projects.
-        var pillarNames = new[] { "تمكين المنافسة", "حماية المنافسة", "التميز المؤسسي" };
-        for (var p = 0; p < pillarNames.Length; p++)
-        {
-            var pName = pillarNames[p];
-            AddNode(pName, "pillar");
-            for (var o = 1; o <= 3; o++)
-            {
-                var oName = "هدف " + (p + 1) + "." + o;
-                AddNode(oName, "objective");
-                AddLink(pName, oName);
-                for (var n = 1; n <= 3; n++)
-                {
-                    var iName = "مبادرة " + (p + 1) + "." + o + "." + n;
-                    AddNode(iName, "initiative");
-                    AddLink(oName, iName);
-                    for (var pr = 1; pr <= 3; pr++)
-                    {
-                        var prName = "مشروع " + (p + 1) + "." + o + "." + n + "." + pr;
-                        AddNode(prName, "project");
-                        AddLink(iName, prName);
-                    }
-                }
-            }
-        }
-        return new { ok = true, live = false, nodes, links };
-    }
+        => Json(await _strategyData.GetSankeyDataAsync(HttpContext.RequestAborted));
 
     // GET /Journey/Map/{sessionId} — deep-link alias → Stage 4.
     [HttpGet("Journey/Map/{sessionId:guid}")]

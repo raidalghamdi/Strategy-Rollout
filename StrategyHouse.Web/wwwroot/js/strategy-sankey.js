@@ -86,7 +86,18 @@
                     loadEcharts(function (err) {
                         if (err || !window.echarts) { fail(el); return; }
                         el.innerHTML = '';
-                        try { draw(el, data); }
+                        if (data.dummy) {
+                            var warn = document.createElement('div');
+                            warn.className = 'alert alert-warning mb-2';
+                            warn.textContent = data.warning
+                                || 'البيانات تجريبية — يرجى الضغط على زر دفع البيانات في صفحة الإدارة.';
+                            el.appendChild(warn);
+                        }
+                        var chartHost = document.createElement('div');
+                        chartHost.style.width = '100%';
+                        chartHost.style.height = '100%';
+                        el.appendChild(chartHost);
+                        try { draw(chartHost, data); }
                         catch (e) { fail(el); }
                     });
                 })
@@ -102,4 +113,3 @@
     window.StrategySankey = window.StrategySankey || {};
     window.StrategySankey.render = render;
 })();
-</content>

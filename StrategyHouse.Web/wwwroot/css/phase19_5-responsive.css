@@ -1,0 +1,76 @@
+/* =====================================================================
+   Phase 19.5 — alignment + full responsiveness pass.
+   Builds on responsive.css / phase15-responsive.css. Breakpoints:
+   mobile <576, tablet 576–991, laptop 992–1199, wide ≥1200.
+   Preserves Cairo font, RTL, DGA green body, gold+navy brand accents.
+   ===================================================================== */
+
+/* ---- Journey content: cap width on ultrawide, center the column ---- */
+.journey-section,
+.journey-nav,
+.journey-progress,
+.journey-section + * {
+    max-width: 1200px;
+    margin-inline: auto;
+}
+
+/* ---- Equal-height cards inside any Bootstrap row in the journey ---- */
+.journey-section .row { align-items: stretch; }
+.journey-section .row > [class*="col-"] { display: flex; }
+.journey-section .row > [class*="col-"] > .gac-card,
+.journey-section .row > [class*="col-"] > .gac-vision { width: 100%; }
+
+/* ---- Stage 1 (Big Picture): center vision + mission, cap card width ---- */
+#stage-1 .row,
+.journey-section .row.big-picture-row { justify-content: center; }
+.gac-vision { display: flex; flex-direction: column; justify-content: center; }
+
+/* ---- Stepper: center labels on wide, allow horizontal scroll on mobile ---- */
+@media (min-width: 992px) {
+    .journey-stepper {
+        justify-content: center;
+        overflow-x: visible;
+        flex-wrap: wrap;
+    }
+    .journey-stepper .pip { flex: 0 1 auto; }
+}
+
+/* ---- Stage 5 (الأثر) ---- */
+/* Attendee count input block centered, capped width. */
+#stage-5 form .form-control[name="attendeeCount"] { max-width: 200px; }
+.attendee-center { max-width: 400px; margin-inline: auto; }
+
+/* Team values: explicit 5 desktop / 2 tablet / 1 mobile (overrides auto-fill). */
+#team-values .tv-grid { grid-template-columns: 1fr; }
+@media (min-width: 576px) {
+    #team-values .tv-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 992px) {
+    #team-values .tv-grid { grid-template-columns: repeat(5, 1fr); }
+}
+
+/* Interactive-questions / cards equal height within a flex row. */
+.journey-section .gac-card { height: 100%; }
+
+/* ---- Sankey: responsive width + guaranteed min-height (desktop 400 / mobile 300).
+   The container keeps its inline height; min-height is the floor so the chart host
+   (which inherits height) is never collapsed. ECharts auto-resizes on window resize. */
+#sankey-chart {
+    width: 100% !important;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+#sankey-chart > div:last-child { flex: 1 1 auto; min-height: 320px; }
+@media (max-width: 575.98px) {
+    #sankey-chart { min-height: 300px; }
+    #sankey-chart > div:last-child { min-height: 240px; }
+}
+
+/* ---- Admin pages: tables scroll, forms stack on mobile ---- */
+@media (max-width: 575.98px) {
+    .w-md-auto { width: 100% !important; }
+}
+@media (min-width: 576px) {
+    .w-md-auto { width: auto !important; }
+}

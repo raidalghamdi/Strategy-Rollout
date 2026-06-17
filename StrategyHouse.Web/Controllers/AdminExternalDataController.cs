@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using StrategyHouse.Domain.Entities;
 using StrategyHouse.Infrastructure.Persistence;
 using StrategyHouse.Web.Services;
 
@@ -17,15 +18,18 @@ public class AdminExternalDataController : Controller
 {
     private readonly IConfiguration _config;
     private readonly DepartmentDirectoryService _depts;
+    private readonly IMssqlMirrorService _mirror;
     private readonly ExternalDbContext? _external;
 
     public AdminExternalDataController(
         IConfiguration config,
         DepartmentDirectoryService depts,
+        IMssqlMirrorService mirror,
         ExternalDbContext? external = null)
     {
         _config = config;
         _depts = depts;
+        _mirror = mirror;
         _external = external;
     }
 
@@ -37,6 +41,7 @@ public class AdminExternalDataController : Controller
             FlagEnabled = _config.GetValue<bool>("Features:UseExternalDb"),
             ContextRegistered = _external != null,
             ConnectionConfigured = !string.IsNullOrWhiteSpace(_config.GetConnectionString("ExternalMssql")),
+            Mirror = await _mirror.GetMetadataAsync(),
         };
 
         if (_external == null)
@@ -93,6 +98,24 @@ public class AdminExternalDataController : Controller
 
         return View(vm);
     }
+
+    // POST /Admin/ExternalData/PushToSqlite — Phase 19.5. Admin-only. Mirrors all
+    // five MSSQL strategy tables into the local SQLite Mirror_* tables so the app
+    // has a resilient offline copy. Returns JSON for the AJAX caller.
+    [HttpPost("PushToSqlite")]
+    [Authorize(Roles = "Admin")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PushToSqlite()
+    {
+        var result = await _mirror.PushAllAsync(HttpContext.RequestAborted);
+        return Json(new
+        {
+            success = result.Success,
+            recordCount = result.RecordCount,
+            durationSeconds = result.DurationSeconds,
+            errorMessage = result.ErrorMessage,
+        });
+    }
 }
 
 public class ExternalDataViewModel
@@ -104,6 +127,7 @@ public class ExternalDataViewModel
     public string StatusMessage { get; set; } = "";
     public Dictionary<string, int> Counts { get; set; } = new();
     public int DistinctDivisions { get; set; }
+    public MirrorMetadata? Mirror { get; set; }
 
     // Each sample row is [code, name, extra] for compact display.
     public List<string[]> SamplePillars { get; set; } = new();
