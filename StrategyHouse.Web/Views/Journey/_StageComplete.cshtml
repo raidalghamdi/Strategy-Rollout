@@ -28,21 +28,8 @@
     </form>
 </div>
 
-@* 2) Interactive questions — inline quiz. Phase 19.6: a standalone-quiz fallback
-   link is always rendered below the title so users still reach the quiz even when
-   the inline widget fails to load (e.g. iOS Safari, JS disabled, fetch error).
-   Phase 19.10: button goes DIRECTLY to /Quiz/Start (the actual quiz play page),
-   bypassing /Quiz Index which redirects admins to /Admin/Quiz (the bank manager). *@
-<div class="gac-card mt-3" id="inline-quiz-card">
-    <h3 class="h5" style="color:#28334A;font-weight:800;">الأسئلة التفاعلية</h3>
-    <p class="text-muted mb-3">اختبر معرفتك بالاستراتيجية المؤسسية في أسئلة قصيرة وممتعة.</p>
-    <div id="inlineQuizArea"></div>
-    <div class="mt-3">
-        <a href="/Quiz/Start/@Model.Session.Id" id="quizFallbackLink" class="btn quiz-fallback-btn" target="_blank" rel="noopener" style="min-height:44px;background:#FAC126;border-color:#FAC126;color:#00192B;font-weight:700;">ابدأ الاختبار الآن</a>
-    </div>
-</div>
-
-@* 3) Team values — moved from stage 1 (Phase 19), reworded. *@
+@* 2) Team values — Phase 19.11: swapped order so team values come BEFORE the
+   interactive questions block. Moved from stage 1 in Phase 19 with reworded prompt. *@
 <div class="gac-card mt-3" id="team-values">
     <h3 class="h5" style="color:#28334A;font-weight:800;">بعد هذه التجربة… أي قيمة ستكون الأقرب لك في عملك اليومي؟</h3>
     <p class="text-muted">اختياري — اختر قيمة واحدة</p>
@@ -57,6 +44,20 @@
         }
     </div>
     <div id="tv-status" class="small text-muted mt-2" style="min-height:1.2em;"></div>
+</div>
+
+@* 3) Interactive questions — inline quiz. Phase 19.6: a standalone-quiz fallback
+   link is always rendered below the title so users still reach the quiz even when
+   the inline widget fails to load (e.g. iOS Safari, JS disabled, fetch error).
+   Phase 19.10: button goes DIRECTLY to /Quiz/Start (the actual quiz play page),
+   bypassing /Quiz Index which redirects admins to /Admin/Quiz (the bank manager). *@
+<div class="gac-card mt-3" id="inline-quiz-card">
+    <h3 class="h5" style="color:#28334A;font-weight:800;">الأسئلة التفاعلية</h3>
+    <p class="text-muted mb-3">اختبر معرفتك بالاستراتيجية المؤسسية في أسئلة قصيرة وممتعة.</p>
+    <div id="inlineQuizArea"></div>
+    <div class="mt-3">
+        <a href="/Quiz/Start/@Model.Session.Id" id="quizFallbackLink" class="btn quiz-fallback-btn" target="_blank" rel="noopener" style="min-height:44px;background:#FAC126;border-color:#FAC126;color:#00192B;font-weight:700;">ابدأ الاختبار الآن</a>
+    </div>
 </div>
 
 @* 4) Thank-you — hidden until the inline quiz is completed. No department name. *@
