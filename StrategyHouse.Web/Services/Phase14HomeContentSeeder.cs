@@ -22,6 +22,25 @@ public static class Phase14HomeContentSeeder
             added = true;
         }
 
+        // Phase 19 — reconcile a few home keys whose default text changed this phase.
+        // Only rewrite rows that still hold the previous phase's default, so genuine
+        // admin edits are preserved. Maps old default → new default per key.
+        var reconcile = new (string Key, string Old, string New)[]
+        {
+            ("home.contact.title", "للتواصل مع مكتب الاستراتيجية", "للتواصل مع إدارة الاستراتيجية والأداء المؤسسي"),
+            ("home.cta.title", "هل أنت مستعد لبدء رحلة إدارتك الاستراتيجية؟", "ابدأ رحلة إدارتك الاستراتيجية"),
+        };
+        foreach (var (key, oldVal, newVal) in reconcile)
+        {
+            var row = db.PageContents.FirstOrDefault(p => p.Key == key);
+            if (row != null && row.ValueAr == oldVal)
+            {
+                row.ValueAr = newVal;
+                row.UpdatedAt = now;
+                added = true;
+            }
+        }
+
         if (added) await db.SaveChangesAsync();
     }
 }
