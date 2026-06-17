@@ -80,7 +80,11 @@
 
     <section id="stage-@stage" class="journey-section is-active" data-stage="@stage">
         <h2 class="section-title h5">@stage — @current.Item2</h2>
-        <p class="text-muted small">@Html.Content(introKey)</p>
+        @* Phase 19.6 — stage 1 no longer shows the "select members" instruction line. *@
+        @if (stage != 1)
+        {
+            <p class="text-muted small">@Html.Content(introKey)</p>
+        }
         @await Html.PartialAsync(PartialFor(stage), Model)
     </section>
 
