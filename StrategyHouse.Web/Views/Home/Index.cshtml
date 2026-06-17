@@ -1,6 +1,6 @@
 @using StrategyHouse.Web.Controllers
 @{
-    ViewData["Title"] = "الرئيسية — منصة إطلاق الاستراتيجية";
+    ViewData["Title"] = "الرئيسية — منصة إطلاق استراتيجية الهيئة";
     var stats = (HomeStats)ViewBag.Stats;
 }
 
@@ -79,8 +79,7 @@
 <div class="card">
     <h2>@Html.Content("home.contact.title", "للتواصل مع مكتب الاستراتيجية")</h2>
     <p class="muted">
-        <span>الهاتف: @Html.Content("home.contact.phone", "011 000 0000")</span><br />
-        <span>البريد الإلكتروني: @Html.Content("home.contact.email", "strategy@gac.gov.sa")</span>
+        للتواصل: <a href="mailto:strategy@gac.gov.sa">strategy@gac.gov.sa</a>
     </p>
 </div>
 

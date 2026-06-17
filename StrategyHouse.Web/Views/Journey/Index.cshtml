@@ -2,24 +2,15 @@
     Layout = "_JourneyLayout";
     ViewData["Title"] = "ابدأ رحلة إدارتك";
     var code = ViewBag.Code as string;
-    var content = ViewBag.Content as StrategyHouse.Web.Services.StrategyContentService;
 }
 
 <div class="row justify-content-center">
     <div class="col-lg-7">
         <div class="text-center mb-4">
             <div style="font-size:3rem;font-weight:900;color:var(--gac-primary);">GAC</div>
-            <h1 class="mt-2">رحلة الاستراتيجية</h1>
+            <h1 class="mt-2">رحلة استراتيجية الهيئة</h1>
             <p class="text-muted">اكتشف كيف يرتبط عمل إدارتك برؤية الهيئة العامة للمنافسة</p>
         </div>
-
-        @if (content != null)
-        {
-            <div class="gac-vision mb-4 text-center">
-                <div class="label">الرؤية</div>
-                <div style="font-size:1.15rem;">@content.Vision.Ar</div>
-            </div>
-        }
 
         @if (TempData["Error"] != null)
         {

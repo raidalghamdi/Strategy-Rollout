@@ -1,266 +1,79 @@
 @model StrategyHouse.Web.Controllers.JourneyRunViewModel
 @{
-    var dept = Model.Dept;
-    var kpis = Model.Kpis;
-    var projects = Model.Projects;
-    var pledges = Model.Pledges;
-    var map = Model.Map;
-    var ink = Model.InkAssets;
-    var locked = map?.SignedAt != null;
-    var attendee = Model.Session.AttendeeCount;
-
-    // Phase 13 — the single active group signature for this session (MemberId == null).
-    var groupSig = ink
-        .Where(a => a.AssetKind == "signature" && a.MemberId == null && a.IsActive)
-        .OrderByDescending(a => a.CapturedAt)
-        .FirstOrDefault();
-    var groupComment = groupSig?.TypedText;
-    var hasGroupInk = groupSig?.PngBlob != null;
+    var sel = Model.SelectedInitiative;
+    var visionText = Model.Content?.Vision.Ar;
+    var hasSelection = sel != null && !string.IsNullOrEmpty(sel.Code);
 }
+<div class="gac-card text-center" id="journey-card">
+    <h2 class="h4 h-md-2">الرحلة نحو الرؤية</h2>
 
-@if (TempData["Saved"] != null) { <div class="alert alert-success">@TempData["Saved"]</div> }
-@if (TempData["Error"] != null) { <div class="alert alert-danger">@TempData["Error"]</div> }
-
-@{
-    var valueColors = new[] { "#299ECE", "#5F9600", "#FAC126", "#5F9600", "#28334A" };
-    var values = Model.Content?.Values ?? new List<StrategyHouse.Web.Configuration.LocalizedText>();
-
-    string PledgeName(string type, string code)
+    @if (!hasSelection)
     {
-        if (type == "OBJ") return Model.Objectives.FirstOrDefault(o => o.ObjectiveCode == code)?.ObjectiveName ?? code;
-        if (type == "INIT") return Model.Initiatives.FirstOrDefault(i => i.InitiativeCode == code)?.InitiativeName ?? code;
-        return code;
-    }
-}
-
-@* Phase 13 — attendee count entered by the team (top of the Map stage). *@
-<div class="gac-card mb-3">
-    <h3 class="h5" style="color:#28334A;font-weight:800;border-bottom:4px solid #FAC126;display:inline-block;padding-bottom:6px;">عدد الموظفين الحاضرين من هذه الإدارة</h3>
-    <p class="text-muted small mt-2 mb-2">عدد الموظفين الحاضرين مطلوب للمتابعة. التوقيع والتعليقات اختياريان.</p>
-    <form method="post" asp-action="SaveAttendeeCount" asp-route-sessionId="@Model.Session.Id" class="d-flex flex-wrap gap-2 align-items-center">
-        @Html.AntiForgeryToken()
-        <input type="number" id="attendeeCount" name="attendeeCount" class="form-control" style="max-width:160px;min-height:44px;"
-               min="1" max="500" value="@(attendee.HasValue ? attendee.Value.ToString() : "")" placeholder="مثال: 12" required />
-        <button type="submit" class="btn gac-btn-primary text-white" style="min-height:44px;">حفظ العدد</button>
-        @if (attendee.HasValue)
-        {
-            <span class="text-success small">العدد المحفوظ حالياً: <strong>@attendee</strong></span>
-        }
-    </form>
-</div>
-
-@if (pledges.Any())
-{
-    <div class="gac-card mb-3">
-        <h3 class="h5" style="color:#28334A;font-weight:800;border-bottom:4px solid #FAC126;display:inline-block;padding-bottom:6px;">مساهمات الفريق</h3>
-        <p class="text-muted small mt-2">الالتزامات التي اختارت إدارتك المساهمة فيها في المرحلة السابقة.</p>
-        <div class="d-grid gap-2" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">
-            @foreach (var p in pledges)
-            {
-                var typeLabel = p.ElementType == "OBJ" ? "هدف" : p.ElementType == "INIT" ? "مبادرة" : p.ElementType;
-                var typeColor = p.ElementType == "OBJ" ? "#28334A" : "#5F9600";
-                <div class="commitment-card" style="border:2px solid #FAC126;border-radius:12px;padding:14px;background:#fff;box-shadow:0 2px 10px rgba(250,193,38,.18);">
-                    <span class="badge" style="background:@typeColor;">@typeLabel</span>
-                    <p class="mb-0 mt-2" style="color:#28334A;font-weight:600;font-size:1.02rem;line-height:1.7;">@PledgeName(p.ElementType, p.ElementCode)</p>
-                </div>
-            }
-        </div>
-    </div>
-}
-
-<div class="gac-card mb-3">
-    <h2 class="h4 h-md-2">خريطة الاستراتيجية — @dept?.NameAr</h2>
-    <p class="text-muted">معاينة عناصر إدارتك: المؤشرات والمشاريع والمساهمات.</p>
-    @if (values.Any())
-    {
-        <div class="mb-3">
-            <div class="text-muted small mb-2">القيم</div>
-            <div class="d-flex flex-wrap gap-2">
-                @for (var vi = 0; vi < values.Count; vi++)
-                {
-                    <span class="value-chip" style="background:@valueColors[vi % valueColors.Length];">@values[vi].Ar</span>
-                }
-            </div>
-        </div>
-    }
-    <div id="mapCanvas" style="border:1px dashed #299ECE;border-radius:10px;background:#fff;max-height:60vh;overflow:auto;"></div>
-</div>
-
-@* Phase 13 — one group signature + comment, replacing per-member signature pads. *@
-<div class="gac-card">
-    <h3 class="h5" style="color:#28334A;font-weight:800;border-bottom:4px solid #FAC126;display:inline-block;padding-bottom:6px;">توقيع الفريق وتعليقاته</h3>
-    @if (locked)
-    {
-        <div class="alert alert-success mt-3">تم توقيع الخريطة وقفلها.</div>
-        @if (hasGroupInk)
-        {
-            <img src="/Journey/Ink/@groupSig!.Id" style="max-width:100%;width:600px;border:1px solid #eee;border-radius:8px;" alt="توقيع الفريق" />
-        }
-        @if (!string.IsNullOrWhiteSpace(groupComment))
-        {
-            <div class="mt-2" style="color:#28334A;font-weight:600;white-space:pre-wrap;">@groupComment</div>
-        }
+        <div class="alert alert-info mt-2">اختر مبادرتك في مرحلة «دوري في الاستراتيجية» لعرض ارتباط دورك بالرؤية.</div>
     }
     else
     {
-        <p class="text-muted small mt-2">اختياري — يمكنك الرسم بالقلم و/أو كتابة تعليق باسم الفريق. هذه الخطوة غير مطلوبة للمتابعة.</p>
-        <div class="mb-2">
-            <label class="form-label fw-bold" style="color:#28334A;">توقيع/رسم الفريق</label>
-            <div id="groupCanvasWrap" style="touch-action:none;border:1px solid #299ECE;border-radius:8px;background:#fff;max-width:100%;">
-                <div id="groupCanvas"></div>
-            </div>
-            <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
-                <button type="button" id="groupClear" class="btn btn-sm btn-outline-secondary" style="min-height:44px;">مسح</button>
-            </div>
+        <p class="text-muted">شاهد كيف يتصل دورك — خطوة بخطوة — حتى رؤية الهيئة.</p>
+        <div id="journeyChain" class="jchain">
+            <div class="jnode jnode--init" data-step="0"><span class="jlabel">مبادرتك</span><span class="jtext">@sel!.Name</span></div>
+            <div class="jarrow" data-step="1">↓</div>
+            <div class="jnode jnode--obj" data-step="2"><span class="jlabel">الهدف</span><span class="jtext">@(string.IsNullOrEmpty(sel.ObjectiveName) ? "—" : sel.ObjectiveName)</span></div>
+            <div class="jarrow" data-step="3">↓</div>
+            <div class="jnode jnode--pillar" data-step="4"><span class="jlabel">الركيزة</span><span class="jtext">@(string.IsNullOrEmpty(sel.PillarName) ? "—" : sel.PillarName)</span></div>
+            <div class="jarrow" data-step="5">↓</div>
+            <div class="jnode jnode--vision" data-step="6"><span class="jlabel">الرؤية</span><span class="jtext">@visionText</span></div>
         </div>
-        <div class="mb-2">
-            <label class="form-label fw-bold" for="groupComment" style="color:#28334A;">تعليق الفريق</label>
-            <textarea id="groupComment" class="form-control" rows="5" maxlength="2000" style="max-width:100%;"
-                      placeholder="اكتب تعليقات الفريق وملاحظاته حول الاستراتيجية...">@groupComment</textarea>
-        </div>
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-            <button type="button" id="groupSave" class="btn gac-btn-primary text-white" style="min-height:44px;">حفظ توقيع الفريق</button>
-            <span id="groupStatus" class="small @(groupSig != null ? "text-success" : "text-muted")">@(groupSig != null ? "تم حفظ التوقيع ✓" : "")</span>
-        </div>
+        <div id="journeyMsg" class="jmsg">أنت أقرب للرؤية مما تتصور</div>
     }
 </div>
 
+<style>
+    #stage-4 .jchain { display: flex; flex-direction: column; align-items: stretch; gap: 8px; max-width: 640px; margin: 18px auto 0; }
+    #stage-4 .jnode {
+        border-radius: 14px; padding: 16px 18px; color: #fff; text-align: center;
+        opacity: 0; transform: translateY(14px) scale(.98); transition: opacity .5s ease, transform .5s ease;
+    }
+    #stage-4 .jnode.is-in { opacity: 1; transform: translateY(0) scale(1); }
+    #stage-4 .jnode--init { background: #5F9600; }
+    #stage-4 .jnode--obj { background: #299ECE; }
+    #stage-4 .jnode--pillar { background: #0f8f5b; }
+    #stage-4 .jnode--vision { background: #067647; }
+    #stage-4 .jlabel { display: block; font-size: .82rem; opacity: .9; }
+    #stage-4 .jtext { display: block; font-weight: 800; line-height: 1.7; margin-top: 4px; }
+    #stage-4 .jarrow { text-align: center; color: #067647; font-size: 1.5rem; line-height: 1; opacity: 0; transition: opacity .5s ease; }
+    #stage-4 .jarrow.is-in { opacity: 1; }
+    #stage-4 .jmsg {
+        margin-top: 22px; color: #067647; font-size: 1.6rem; font-weight: 900; line-height: 1.6;
+        opacity: 0; transform: translateY(10px); transition: opacity .6s ease, transform .6s ease;
+    }
+    #stage-4 .jmsg.is-in { opacity: 1; transform: translateY(0); }
+</style>
+
 <script>
-// Phase 13 — Map stage (stage 4). iOS Safari-safe ES5: IIFE, string concat, for-loops,
-// window.* exposure, try/catch with a visible fallback. No template literals, no block scoping.
+// Phase 18 — Stage 4 (الرحلة نحو الرؤية). Animated reveal of the linkage chain.
+// iOS Safari-safe ES5: IIFE, for-loops, setTimeout stagger, no template literals,
+// no block scope, try/catch with fallback (reveal everything at once).
 window.__stageMapInit = (function () {
     var done = false;
     return function () {
         if (done) return; done = true;
         try {
-            var sessionId = "@Model.Session.Id";
-            var tokenEl = document.querySelector('#stage-4 input[name="__RequestVerificationToken"]')
-                       || document.querySelector('input[name="__RequestVerificationToken"]');
-            var csrf = tokenEl ? tokenEl.value : '';
-
-            var kpis = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(kpis.Select(k => k.KpiName ?? k.KpiCode)));
-            var projects = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(projects.Select(p => p.ProjectName ?? p.ProjectCode)));
-            var pledges = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(pledges.Select(p => PledgeName(p.ElementType, p.ElementCode))));
-
-            var cont = document.getElementById('mapCanvas');
-            var width = (cont && cont.clientWidth) ? cont.clientWidth : 900;
-            var stage = new Konva.Stage({ container: 'mapCanvas', width: width, height: 360 });
-            var layer = new Konva.Layer(); stage.add(layer);
-
-            function column(title, items, x, color) {
-                layer.add(new Konva.Text({ x: x, y: 10, text: title, fontSize: 16, fontStyle: 'bold', fill: color, width: width / 3 - 20, align: 'right' }));
-                var n = Math.min(items.length, 8);
-                for (var i = 0; i < n; i++) {
-                    var y = 40 + i * 38;
-                    layer.add(new Konva.Rect({ x: x, y: y, width: width / 3 - 20, height: 32, fill: '#FAFBFC', stroke: color, cornerRadius: 6, draggable: true }));
-                    layer.add(new Konva.Text({ x: x + 6, y: y + 8, text: items[i], fontSize: 12, fill: '#1d2733', width: width / 3 - 32, align: 'right' }));
-                }
+            var steps = document.querySelectorAll('#stage-4 [data-step]');
+            if (!steps || steps.length === 0) return;
+            for (var i = 0; i < steps.length; i++) {
+                (function (node, idx) {
+                    setTimeout(function () {
+                        node.className = node.className + ' is-in';
+                    }, 350 * idx);
+                })(steps[i], i);
             }
-            function drawColumns() {
-                layer.destroyChildren();
-                column('مؤشرات', kpis, 10, '#28334A');
-                column('مشاريع', projects, width / 3 + 5, '#5F9600');
-                column('المساهمة', pledges, 2 * width / 3, '#FAC126');
-                layer.draw();
-            }
-            drawColumns();
-
-            var rT;
-            window.addEventListener('resize', function () {
-                clearTimeout(rT);
-                rT = setTimeout(function () {
-                    var w = (cont && cont.clientWidth) ? cont.clientWidth : width;
-                    if (Math.abs(w - width) < 8) return;
-                    width = w; stage.width(width); drawColumns();
-                }, 200);
-            });
-
-            @if (!locked)
-            {
-                <text>
-                // Build the single group signature pad.
-                var pad = null;
-                var groupNode = document.getElementById('groupCanvas');
-                if (groupNode) {
-                    var isMobile = window.matchMedia('(max-width: 767.98px)').matches;
-                    var wrap = document.getElementById('groupCanvasWrap');
-                    var gw = (wrap && wrap.clientWidth) ? wrap.clientWidth : 600;
-                    var padW = isMobile ? gw : Math.min(gw, 600);
-                    var padH = isMobile ? 280 : 300;
-                    var pst = new Konva.Stage({ container: 'groupCanvas', width: padW, height: padH });
-                    var ply = new Konva.Layer(); pst.add(ply);
-                    var painting = false, line = null;
-                    var strokes = [];
-                    pst.on('pointerdown', function (e) {
-                        painting = true;
-                        var pos = pst.getPointerPosition();
-                        var pressure = (e.evt && e.evt.pressure) ? e.evt.pressure : 0.5;
-                        line = new Konva.Line({ stroke: '#28334A', strokeWidth: 1 + pressure * 3, lineCap: 'round', lineJoin: 'round', points: [pos.x, pos.y], tension: 0.2 });
-                        ply.add(line);
-                        strokes.push({ c: '#28334A', p: [pos.x, pos.y] });
-                    });
-                    pst.on('pointermove', function () {
-                        if (!painting || !line) return;
-                        var pos = pst.getPointerPosition();
-                        line.points(line.points().concat([pos.x, pos.y]));
-                        strokes[strokes.length - 1].p.push(pos.x, pos.y);
-                        ply.batchDraw();
-                    });
-                    function stop() { painting = false; line = null; }
-                    pst.on('pointerup', stop); pst.on('pointerleave', stop);
-                    pad = {
-                        clear: function () { ply.destroyChildren(); ply.draw(); strokes.length = 0; },
-                        isEmpty: function () { return strokes.length === 0; },
-                        png: function () { return pst.toDataURL({ pixelRatio: 1, mimeType: 'image/png' }); },
-                        strokesJson: function () { return JSON.stringify(strokes); }
-                    };
-                }
-
-                var clearBtn = document.getElementById('groupClear');
-                if (clearBtn) clearBtn.addEventListener('click', function () { if (pad) pad.clear(); });
-
-                var saveBtn = document.getElementById('groupSave');
-                var statusEl = document.getElementById('groupStatus');
-                if (saveBtn) saveBtn.addEventListener('click', function () {
-                    var commentEl = document.getElementById('groupComment');
-                    var comment = commentEl ? commentEl.value.replace(/^\s+|\s+$/g, '') : '';
-                    var hasInk = pad && !pad.isEmpty();
-                    if (!hasInk && !comment) {
-                        statusEl.textContent = 'ارسم توقيع الفريق أو اكتب تعليقاً أولاً';
-                        statusEl.className = 'small text-danger';
-                        return;
-                    }
-                    statusEl.textContent = 'جارٍ الحفظ...';
-                    statusEl.className = 'small text-muted';
-                    var body = {
-                        sessionId: sessionId,
-                        pngBase64: hasInk ? pad.png() : null,
-                        strokesJson: hasInk ? pad.strokesJson() : null,
-                        typedText: comment ? comment : null
-                    };
-                    fetch('/Journey/SaveGroupSignature', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': csrf },
-                        body: JSON.stringify(body)
-                    }).then(function (r) { return r.json(); }).then(function (data) {
-                        if (data && data.ok) {
-                            statusEl.textContent = 'تم حفظ التوقيع ✓';
-                            statusEl.className = 'small text-success';
-                            setTimeout(function () { location.reload(); }, 700);
-                        } else {
-                            statusEl.textContent = 'تعذّر الحفظ';
-                            statusEl.className = 'small text-danger';
-                        }
-                    }).catch(function () {
-                        statusEl.textContent = 'تعذّر الحفظ — تحقق من الاتصال';
-                        statusEl.className = 'small text-danger';
-                    });
-                });
-                </text>
-            }
+            var msg = document.getElementById('journeyMsg');
+            if (msg) setTimeout(function () { msg.className = 'jmsg is-in'; }, 350 * steps.length + 200);
         } catch (err) {
-            var host = document.getElementById('mapCanvas');
-            if (host) host.innerHTML = '<div style="padding:16px;color:#b00;">تعذّر تحميل الخريطة. يرجى تحديث الصفحة.</div>';
+            var nodes = document.querySelectorAll('#stage-4 [data-step]');
+            for (var k = 0; k < nodes.length; k++) nodes[k].className = nodes[k].className + ' is-in';
+            var m = document.getElementById('journeyMsg');
+            if (m) m.className = 'jmsg is-in';
         }
     };
 })();

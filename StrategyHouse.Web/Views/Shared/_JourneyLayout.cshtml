@@ -1,5 +1,5 @@
 @{
-    var title = (ViewData["Title"] as string) ?? "رحلة الاستراتيجية";
+    var title = (ViewData["Title"] as string) ?? "رحلة استراتيجية الهيئة";
 }
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -47,13 +47,13 @@
 <body>
     <div class="gac-topbar">
         <img src="~/images/gac-logo-white.png" alt="الهيئة العامة للمنافسة" class="brand-logo" />
-        <span class="topbar-title">رحلة الاستراتيجية — الهيئة العامة للمنافسة</span>
+        <span class="topbar-title">رحلة استراتيجية الهيئة — الهيئة العامة للمنافسة</span>
     </div>
     <main class="container py-4">
         @RenderBody()
     </main>
     <footer class="text-center text-muted py-4" style="font-size:.85rem;">
-        © @DateTime.Now.Year — الهيئة العامة للمنافسة · منصة إطلاق الاستراتيجية
+        © @DateTime.Now.Year — الهيئة العامة للمنافسة · منصة إطلاق استراتيجية الهيئة
     </footer>
 
     @if (User?.Identity?.IsAuthenticated == true)

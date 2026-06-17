@@ -7,10 +7,10 @@
     var stages = new[]
     {
         (1, "الصورة الكبرى"),
-        (2, "بيت الاستراتيجية"),
-        (3, "المساهمة"),
-        (4, "الخريطة والتوقيع"),
-        (5, "الإتمام"),
+        (2, "البيت الاستراتيجي"),
+        (3, "دوري في الاستراتيجية"),
+        (4, "الرحلة نحو الرؤية"),
+        (5, "الأثر"),
     };
     var current = stages.First(s => s.Item1 == stage);
     var introKey = $"journey.stage{stage}.intro";
@@ -23,8 +23,6 @@
         _ => "_StageComplete",
     };
     ViewData["Title"] = $"المرحلة {stage} — {current.Item2}";
-    // The Map stage (4) advances through its own group-signature flow; the others use the Next button.
-    var nextIsButton = stage != 4;
 }
 
 @section Styles {
@@ -94,13 +92,13 @@
             }
         </div>
         <div class="nav-side nav-next">
-            @if (stage < 5 && nextIsButton)
+            @if (stage == 4)
+            {
+                <a class="btn gac-btn-primary text-white" href="/Journey/Run/@sessionId/5">المتابعة إلى مرحلة الأثر ⟵</a>
+            }
+            else if (stage < 5)
             {
                 <a class="btn gac-btn-primary text-white" href="/Journey/Run/@sessionId/@(stage + 1)">التالي ⟵</a>
-            }
-            else if (stage == 4)
-            {
-                <a class="btn gac-btn-primary text-white" href="/Journey/Run/@sessionId/5">المتابعة إلى الإتمام ⟵</a>
             }
         </div>
     </div>
@@ -117,79 +115,9 @@
         if (stage === 4 && window.__stageMapInit) window.__stageMapInit();
         if (stage === 5 && window.__stageCompleteConfetti) window.__stageCompleteConfetti();
         document.dispatchEvent(new CustomEvent('stageReady', { detail: { stage: stage } }));
-        if (stage === 1 && typeof initSankey === 'function') initSankey();
     }
     document.addEventListener('DOMContentLoaded', fireReady);
     if (document.readyState !== 'loading') fireReady();
 })();
 </script>
-@if (stage == 1)
-{
-    <script>
-    function initSankey() {
-        const host = document.getElementById('sankey');
-        if (!host || host.__done) return; host.__done = true;
-        let data = {};
-        try { data = JSON.parse(host.getAttribute('data-sankey') || '{}'); } catch (e) {}
-        const NAVY = '#28334A', GREY = '#CECFD2';
-        function render() {
-            host.innerHTML = '';
-            // Wide fixed canvas so long project/KPI names show in full and the
-            // container scrolls horizontally on narrow screens (Phase 9 item 3).
-            const width = Math.max(1800, host.clientWidth);
-            const height = Math.min(700, Math.max(420, (data.nodes ? data.nodes.length : 6) * 30));
-            const svg = d3.select('#sankey').append('svg')
-                .attr('width', width).attr('height', height)
-                .attr('viewBox', '0 0 ' + width + ' ' + height);
-            if (!data.nodes || data.nodes.length === 0) {
-                svg.append('text').attr('x', 20).attr('y', 40)
-                    .text('لا توجد عناصر مرتبطة بهذه الإدارة بعد.').attr('fill', '#5a6b80');
-                return;
-            }
-            // Reserve generous right/left margins so long Arabic project & KPI labels are
-            // not clipped at the canvas edges (Phase 10 item 2).
-            const sankey = d3.sankey().nodeWidth(20).nodePadding(18)
-                .extent([[260, 10], [width - 260, height - 10]]);
-            const graph = sankey({
-                nodes: data.nodes.map(d => Object.assign({}, d)),
-                links: data.links.map(d => Object.assign({}, d)),
-            });
-            const link = svg.append('g').attr('fill', 'none').selectAll('path')
-                .data(graph.links).join('path')
-                .attr('d', d3.sankeyLinkHorizontal())
-                .attr('stroke', '#ECECED').attr('stroke-opacity', 0.7)
-                .attr('stroke-width', d => Math.max(1.5, d.width));
-            link.on('mouseenter', function () { d3.select(this).attr('stroke', NAVY).attr('stroke-opacity', 0.3); })
-                .on('mouseleave', function () { d3.select(this).attr('stroke', '#ECECED').attr('stroke-opacity', 0.7); });
-            const node = svg.append('g').selectAll('g').data(graph.nodes).join('g');
-            node.append('rect')
-                .attr('x', d => d.x0).attr('y', d => d.y0)
-                .attr('height', d => Math.max(2, d.y1 - d.y0)).attr('width', d => d.x1 - d.x0)
-                .attr('rx', 3)
-                .attr('fill', d => (d.layer === 'objective' || d.layer === 'vision') ? NAVY : GREY);
-
-            const labelType = {
-                vision: 'الرؤية', pillar: 'ركيزة', objective: 'هدف',
-                initiative: 'مبادرة', project: 'مشروع', kpi: 'مؤشر',
-            };
-            function truncate(s) { return s && s.length > 28 ? s.slice(0, 27) + '…' : (s || ''); }
-
-            // Every node (pillar, objective, initiative, project, KPI) gets a visible label.
-            // Source-side nodes (left half) read to the right of the rect; target-side to the left.
-            const text = node.append('text')
-                .attr('y', d => (d.y0 + d.y1) / 2).attr('dy', '0.35em')
-                .attr('font-family', 'Cairo, sans-serif').attr('font-size', '13px')
-                .attr('font-weight', 600).attr('fill', NAVY)
-                // Force LTR text-anchor semantics so RTL page direction doesn't flip alignment.
-                .style('direction', 'ltr')
-                .attr('x', d => d.x0 < width / 2 ? d.x1 + 8 : d.x0 - 8)
-                .attr('text-anchor', d => d.x0 < width / 2 ? 'start' : 'end')
-                .text(d => truncate(d.name));
-            // Native SVG tooltip with full name + node type.
-            text.append('title').text(d => (d.name || '') + ' — ' + (labelType[d.layer] || ''));
-        }
-        render();
-    }
-    </script>
-}
 }

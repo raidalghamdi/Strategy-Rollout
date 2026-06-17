@@ -1,38 +1,48 @@
 @model StrategyHouse.Web.Controllers.JourneyRunViewModel
 @{
     var dept = Model.Dept;
-    var map = Model.Map;
-    var hasPdf = map?.PdfBlob != null;
-    var signed = map?.SignedAt != null;
+    var attendee = Model.Session.AttendeeCount;
+    var hashtag = "#أنا_مشارك";
 }
+@if (TempData["Saved"] != null) { <div class="alert alert-success">@TempData["Saved"]</div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger">@TempData["Error"]</div> }
+
 <div class="gac-card text-center">
-    @if (signed)
-    {
-        <div style="font-size:3rem;">🎉</div>
-        <h1 class="h2">تهانينا، @dept?.NameAr!</h1>
-        <p class="lead text-muted">لقد أتممت رحلة الاستراتيجية ووقّعت خريطتكم.</p>
+    <div style="font-size:3rem;">🎉</div>
+    <h1 class="h2">شكراً لك، @dept?.NameAr!</h1>
+    <p class="lead text-muted">لقد أتممت رحلة استراتيجية الهيئة. أنت الآن جزء من قصة تحقيق الرؤية.</p>
+</div>
 
-        @if (hasPdf)
+@* Phase 18 — the attendee count is now an optional field on the final stage. *@
+<div class="gac-card mt-3">
+    <h3 class="h5" style="color:#28334A;font-weight:800;border-bottom:4px solid #FAC126;display:inline-block;padding-bottom:6px;">عدد الحاضرين من إدارتك (اختياري)</h3>
+    <p class="text-muted small mt-2 mb-2">يساعدنا هذا الرقم على قياس مدى الوصول. تعبئته اختيارية.</p>
+    <form method="post" asp-action="SaveAttendeeCount" asp-route-sessionId="@Model.Session.Id" class="d-flex flex-wrap gap-2 align-items-center">
+        @Html.AntiForgeryToken()
+        <input type="number" id="attendeeCount" name="attendeeCount" class="form-control" style="max-width:160px;min-height:44px;"
+               min="1" max="500" value="@(attendee.HasValue ? attendee.Value.ToString() : "")" placeholder="مثال: 12" />
+        <button type="submit" class="btn gac-btn-primary text-white" style="min-height:44px;">حفظ العدد</button>
+        @if (attendee.HasValue)
         {
-            <a class="btn btn-lg gac-btn-primary text-white mt-2 w-100 w-md-auto" asp-action="Pdf" asp-route-sessionId="@Model.Session.Id">تحميل خريطة الاستراتيجية (PDF)</a>
+            <span class="text-success small">العدد المحفوظ حالياً: <strong>@attendee</strong></span>
         }
-        else
-        {
-            <p class="text-muted">سيتم تجهيز ملف الـ PDF قريباً.</p>
-        }
-    }
-    else
-    {
-        <div style="font-size:3rem;">📝</div>
-        <h1 class="h3">أوشكت على الانتهاء</h1>
-        <p class="text-muted">أكمل توقيع الخريطة في المرحلة السابقة لإصدار ملف الـ PDF النهائي.</p>
-    }
+    </form>
+</div>
 
-    <hr class="my-4" />
-    <div class="mt-2">
-        <p class="text-muted mb-3">اختبر معرفتك بالاستراتيجية المؤسسية في اختبار قصير وممتع.</p>
-        <a class="btn btn-lg quiz-pill-gold w-100 w-md-auto"
-           href="/Quiz/Start/@Model.Session.Id" target="_blank" rel="noopener">ابدأ الاختبار التفاعلي ⟵</a>
+<div class="gac-card mt-3 text-center">
+    <h3 class="h5" style="color:#28334A;font-weight:800;">اختبر معرفتك</h3>
+    <p class="text-muted mb-3">اختبر معرفتك بالاستراتيجية المؤسسية في اختبار قصير وممتع.</p>
+    <a class="btn btn-lg quiz-pill-gold w-100 w-md-auto"
+       href="/Quiz/Start/@Model.Session.Id" target="_blank" rel="noopener">ابدأ الاختبار التفاعلي ⟵</a>
+</div>
+
+<div class="gac-card mt-3 text-center" id="share-card">
+    <h3 class="h5" style="color:#28334A;font-weight:800;">شارك مشاركتك</h3>
+    <p class="text-muted">أنت الآن سفير للاستراتيجية. شارك زملاءك أنك كنت جزءاً من الرحلة.</p>
+    <div class="share-tag" id="shareTag">@hashtag</div>
+    <div class="d-flex flex-wrap gap-2 justify-content-center mt-3">
+        <button type="button" id="copyShare" class="btn gac-btn-primary text-white" style="min-height:44px;">نسخ الوسم</button>
+        <span id="shareStatus" class="small text-success" style="align-self:center;"></span>
     </div>
 </div>
 
@@ -43,23 +53,69 @@
         box-shadow: 0 4px 14px rgba(250, 193, 38, .35);
     }
     .quiz-pill-gold:hover { background: #e7ae12; color: #28334A; }
+    #share-card .share-tag {
+        display: inline-block; margin-top: 8px; background: #eef6f1; color: #067647;
+        font-size: 1.8rem; font-weight: 900; border-radius: 14px; padding: 14px 28px;
+        border: 2px dashed #067647;
+    }
 </style>
 
 <script>
+// Phase 18 — Stage 5 (الأثر). Confetti + copy-to-clipboard share. iOS Safari-safe ES5.
 window.__stageCompleteConfetti = function () {
     if (window.__confettiDone) return; window.__confettiDone = true;
-    const c = document.createElement('canvas');
-    c.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:999';
-    document.body.appendChild(c);
-    c.width = innerWidth; c.height = innerHeight;
-    const ctx = c.getContext('2d');
-    const colors = ['#28334A','#299ECE','#5F9600','#FAC126','#5F9600'];
-    const parts = Array.from({length:120}, () => ({ x: Math.random()*c.width, y: -20-Math.random()*c.height, r: 4+Math.random()*6, c: colors[Math.floor(Math.random()*colors.length)], v: 2+Math.random()*3 }));
-    let frames = 0;
-    (function loop() {
-        ctx.clearRect(0,0,c.width,c.height);
-        parts.forEach(p => { p.y += p.v; ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, p.r, p.r); });
-        if (frames++ < 200) requestAnimationFrame(loop); else c.remove();
-    })();
+    try {
+        var c = document.createElement('canvas');
+        c.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:999';
+        document.body.appendChild(c);
+        c.width = window.innerWidth; c.height = window.innerHeight;
+        var ctx = c.getContext('2d');
+        var colors = ['#28334A', '#299ECE', '#5F9600', '#FAC126', '#067647'];
+        var parts = [];
+        for (var i = 0; i < 120; i++) {
+            parts.push({
+                x: Math.random() * c.width, y: -20 - Math.random() * c.height,
+                r: 4 + Math.random() * 6, col: colors[Math.floor(Math.random() * colors.length)],
+                v: 2 + Math.random() * 3
+            });
+        }
+        var frames = 0;
+        function loop() {
+            ctx.clearRect(0, 0, c.width, c.height);
+            for (var j = 0; j < parts.length; j++) {
+                var p = parts[j]; p.y += p.v; ctx.fillStyle = p.col; ctx.fillRect(p.x, p.y, p.r, p.r);
+            }
+            if (frames++ < 200) requestAnimationFrame(loop); else c.parentNode && c.parentNode.removeChild(c);
+        }
+        loop();
+    } catch (e) { /* confetti is decorative; ignore failures */ }
 };
+
+(function () {
+    function init() {
+        var btn = document.getElementById('copyShare');
+        var status = document.getElementById('shareStatus');
+        var tag = document.getElementById('shareTag');
+        if (!btn || btn.__bound) return; btn.__bound = true;
+        btn.addEventListener('click', function () {
+            var text = tag ? tag.textContent : '#أنا_مشارك';
+            function done() { if (status) status.textContent = 'تم نسخ الوسم ✓'; }
+            function fail() {
+                try {
+                    var ta = document.createElement('textarea');
+                    ta.value = text; document.body.appendChild(ta); ta.select();
+                    document.execCommand('copy'); document.body.removeChild(ta); done();
+                } catch (e) { if (status) status.textContent = 'انسخ الوسم يدوياً: ' + text; }
+            }
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(done, fail);
+                } else { fail(); }
+            } catch (e) { fail(); }
+        });
+    }
+    document.addEventListener('stageReady', function (e) { if (e.detail && e.detail.stage === 5) init(); });
+    if (document.readyState !== 'loading') init();
+    else document.addEventListener('DOMContentLoaded', init);
+})();
 </script>
