@@ -28,6 +28,12 @@
 @section Styles {
     <link rel="stylesheet" href="~/css/responsive.css" asp-append-version="true" />
     <style>
+        /* Phase 19.13 — unified stepper palette aligned with GAC brand:
+           done   = navy #00192B (white text)
+           active = gold #FAC126 (navy text, gold-accent border)
+           locked = soft gray (muted text)
+           Removes the previous green/cyan/gray mix that clashed with the
+           authority brand and had weak contrast (green text on green chip). */
         .journey-stepper {
             position: sticky; top: 0; z-index: 50; background: #fff;
             box-shadow: 0 2px 12px rgba(40,51,74,.08);
@@ -35,16 +41,49 @@
         }
         .journey-stepper .pip {
             flex: 1 0 auto; min-width: 96px; text-align: center; padding: 8px 10px;
-            border-radius: 10px; background: #e7edf5; color: #5a6b80; font-size: .82rem;
-            text-decoration: none; white-space: nowrap; transition: background .2s;
+            border-radius: 999px; background: #EFEFEF; color: #5a6b80; font-size: .82rem;
+            text-decoration: none; white-space: nowrap; transition: background .2s, color .2s;
+            border: 1px solid transparent;
         }
-        .journey-stepper .pip.active { background: var(--gac-cyan); color: #04303a; font-weight: 700; }
-        .journey-stepper .pip.done { background: var(--gac-green); color: #fff; }
-        .journey-stepper .pip.locked { opacity: .55; pointer-events: none; }
+        .journey-stepper .pip.active {
+            background: #FAC126; color: #00192B; font-weight: 800;
+            border-color: #E5AF1F;
+            box-shadow: 0 2px 10px rgba(250, 193, 38, .35);
+        }
+        .journey-stepper .pip.done {
+            background: #00192B; color: #FFFFFF; font-weight: 700;
+            border-color: #00192B;
+        }
+        .journey-stepper .pip.locked {
+            background: #EFEFEF; color: #8a96a8; opacity: 1; pointer-events: none;
+            border-color: #E1E5EB;
+        }
         .journey-section .section-title { color: var(--gac-primary); margin-bottom: 6px; }
         .journey-nav { display:flex; justify-content:space-between; gap:12px; margin-top: 20px; }
         .journey-nav .nav-side { display: flex; }
         .journey-progress { font-size:.85rem; color:#5a6b80; text-align:center; margin: 4px 0 14px; }
+
+        /* Phase 19.13 — Back button gets a proper ghost-button shape so it
+           reads as a button (not floating text). Navy outline + navy text on
+           white, with a subtle navy hover fill. Matches the Next button's pill
+           shape (border-radius:999px) and minimum height for touch (44px). */
+        .journey-nav .btn.btn-outline-secondary {
+            background: #FFFFFF !important;
+            color: #00192B !important;
+            border: 1.5px solid #00192B !important;
+            border-radius: 999px !important;
+            font-weight: 700;
+            min-height: 44px;
+            padding: .55rem 1.4rem;
+            display: inline-flex; align-items: center; justify-content: center;
+            transition: background .15s ease, color .15s ease;
+        }
+        .journey-nav .btn.btn-outline-secondary:hover,
+        .journey-nav .btn.btn-outline-secondary:focus {
+            background: #00192B !important;
+            color: #FFFFFF !important;
+            border-color: #00192B !important;
+        }
         @@media (max-width: 576px) {
             .journey-stepper { gap: 4px; padding: 8px; }
             .journey-stepper .pip { min-width: 0; flex: 1 1 auto; font-size: .68rem; padding: 7px 3px; }

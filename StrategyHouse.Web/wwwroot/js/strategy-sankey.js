@@ -29,6 +29,9 @@
 
     function colorFor(category) {
         switch (category) {
+            // Phase 19.13 — Vision is now the left-most root node in the flow.
+            // Use the navy brand color so it visually anchors the chart.
+            case 'vision': return '#00192B';
             case 'pillar': return '#067647';
             case 'objective': return '#299ECE';
             case 'initiative': return '#FAC126';

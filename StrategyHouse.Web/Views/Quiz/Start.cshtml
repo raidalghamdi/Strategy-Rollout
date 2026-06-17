@@ -187,14 +187,15 @@ else
             }
         }
 
-        // Run immediately since the quiz-card markup is already in the DOM
-        // (this script tag sits right after the card). Defer only if the
-        // document is still parsing (extremely unlikely given placement).
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', boot);
-        } else {
-            boot();
-        }
+        // Phase 19.13 — call boot() unconditionally. The script tag sits right
+        // after the quiz-card markup in the DOM, so document.getElementById will
+        // find the elements at parse time. Waiting for DOMContentLoaded turned
+        // out to be a trap: on iOS Safari that event is held back until ALL the
+        // CDN <script src> tags later in the body have loaded (bootstrap/d3/d3-sankey/konva
+        // — together ~600KB). On a flaky network or CDN hiccup the quiz never
+        // booted. Running boot() right here, before the parser even sees the
+        // CDN scripts, makes the quiz independent of them.
+        boot();
     })();
     </script>
 }
