@@ -74,7 +74,7 @@ public static class SeedData
         if (await db.Pillars.AnyAsync()) return;
 
         var rnd = new Random(20260614);
-        var start = new DateTime(2025, 1, 1);
+        var start = new DateTime(2026, 1, 1);
         var end = new DateTime(2030, 12, 31);
 
         // ---- 5.1 Pillars ----
@@ -218,8 +218,8 @@ public static class SeedData
             for (int j = 0; j < count; j++)
             {
                 var budget = Math.Round((decimal)(1_500_000 + rnd.Next(0, 3_500_001)), 2);
-                var sMonth = rnd.Next(0, 9); // 2025 Q1-Q3
-                var sDate = new DateTime(2025, 1, 1).AddMonths(sMonth);
+                var sMonth = rnd.Next(0, 9); // 2026 Q1-Q3
+                var sDate = new DateTime(2026, 1, 1).AddMonths(sMonth);
                 var eDate = sDate.AddMonths(18 + rnd.Next(0, 19));
                 var name = initiativeNameBank[(initSeq - 1) % initiativeNameBank.Length];
                 initiatives.Add(new Initiative
@@ -276,9 +276,9 @@ public static class SeedData
             var gac = Math.Round(budget * (decimal)(0.70 + rnd.NextDouble() * 0.30), 2);
             var deptCode = PickDept(plr);
 
-            // 7-year liquidity spread over the project window (pick 3-5 consecutive years from 2025)
-            var spread = new decimal[7]; // 2025..2031
-            int firstYear = rnd.Next(0, 3);          // 2025-2027 start
+            // 7-year liquidity spread over the project window (pick 3-5 consecutive years from 2026)
+            var spread = new decimal[7]; // 2026..2032
+            int firstYear = rnd.Next(0, 3);          // 2026-2028 start
             int span = 3 + rnd.Next(0, 3);            // 3-5 years
             int lastYear = Math.Min(6, firstYear + span - 1);
             int activeYears = lastYear - firstYear + 1;
