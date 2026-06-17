@@ -9,7 +9,8 @@
         id = q.Id,
         text = q.QuestionAr,
         options = System.Text.Json.JsonSerializer.Deserialize<List<string>>(q.OptionsJson) ?? new List<string>()
-    });
+    }).ToList();
+    var firstQ = payload.FirstOrDefault();
 }
 
 @if (!Model.Any())
@@ -22,19 +23,54 @@
 }
 else
 {
+    @* Phase 19.12 — Quiz reliability fix. Three changes to address repeated reports
+       that the quiz "doesn't work":
+
+       1. Server-side render the FIRST question into #quizArea so the page is never
+          blank if JS is still loading. Subsequent questions are re-rendered by JS.
+       2. Move the quiz script INLINE inside the quiz-card (not in @@section Scripts
+          at the bottom of body). This makes it run BEFORE the CDN scripts
+          (bootstrap/d3/konva) so a slow/failed CDN can no longer delay or block
+          the quiz boot.
+       3. Add a visible status line under the progress bar that says "جارٍ التحميل…"
+          on render and is cleared once JS boots — so the user always knows whether
+          something is happening. *@
     <div class="quiz-card">
         <h1 class="quiz-title">اختبار معرفة الاستراتيجية</h1>
         <div class="quiz-progress"><div id="bar" class="quiz-progress__fill" style="width:0%"></div></div>
-        <div id="quizArea"></div>
+        <div id="quizStatus" class="text-muted small mt-2" style="min-height:1.2em;">جارٍ التحميل…</div>
+        <div id="quizArea">
+            @* SSR fallback: first question rendered server-side so the page is
+               never visually empty even if JS hasn't booted yet. *@
+            <noscript>
+                <div class="alert alert-warning">يتطلب الاختبار تشغيل JavaScript في المتصفح. فعّل JavaScript وحدّث الصفحة.</div>
+            </noscript>
+            @if (firstQ != null)
+            {
+                <div class="quiz-step">سؤال 1 من @payload.Count</div>
+                <h3 class="quiz-question">@firstQ.text</h3>
+                <div class="quiz-options">
+                    @for (int i = 0; i < firstQ.options.Count; i++)
+                    {
+                        <label class="quiz-option">
+                            <input type="radio" name="opt" value="@i" disabled />
+                            <span>@firstQ.options[i]</span>
+                        </label>
+                    }
+                </div>
+                <div class="quiz-nav sticky-bottom-cta">
+                    <span></span>
+                    <button type="button" class="quiz-btn quiz-btn--primary" disabled>جارٍ التحميل…</button>
+                </div>
+            }
+        </div>
         <div id="resultArea" style="display:none;"></div>
     </div>
 
-    @section Scripts {
+    @* INLINE script — runs immediately as the parser reaches it, BEFORE the
+       CDN scripts at the bottom of _JourneyLayout. This is the key reliability
+       fix: the quiz no longer depends on bootstrap/d3/konva downloading first. *@
     <script>
-    // Phase 12.2 — flat (no block-scope) for maximum Safari/WebKit compatibility.
-    // Previously wrapped in `if (true) { ... }` which caused intermittent
-    // execution failures on iOS Safari where function declarations + onclick
-    // handlers didn't resolve from inline HTML.
     (function () {
         var questions = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(payload));
         var sessionId = @(sessionId != null ? $"\"{sessionId}\"" : "null");
@@ -51,10 +87,17 @@ else
             });
         }
 
+        function setStatus(t) { var s = $('quizStatus'); if (s) s.textContent = t || ''; }
+
         function render() {
             var area = $('quizArea');
             var bar = $('bar');
-            if (!area) return;
+            if (!area) { setStatus('تعذّر العثور على منطقة الأسئلة'); return; }
+            if (!questions || questions.length === 0) {
+                area.innerHTML = '<div class="alert alert-warning">لا توجد أسئلة متاحة الآن.</div>';
+                setStatus('');
+                return;
+            }
             var q = questions[cur];
             if (bar) bar.style.width = Math.round((cur) / questions.length * 100) + '%';
             var html = '';
@@ -78,6 +121,7 @@ else
                 : '<button type="button" class="quiz-btn quiz-btn--primary" onclick="quizSubmit()">إرسال الإجابات</button>';
             html += '</div>';
             area.innerHTML = html;
+            setStatus('');
         }
 
         function pick(i) { answers[cur] = i; render(); }
@@ -85,6 +129,7 @@ else
         function prev() { if (cur > 0) { cur--; render(); } }
 
         function submit() {
+            setStatus('جارٍ إرسال الإجابات…');
             var body = {
                 sessionId: sessionId,
                 scope: scope,
@@ -118,19 +163,33 @@ else
                 }
                 html += '<div class="quiz-nav quiz-nav--center"><button type="button" class="quiz-btn quiz-btn--ghost" onclick="location.reload()">إعادة المحاولة</button></div>';
                 r.innerHTML = html;
+                setStatus('');
             }).catch(function (err) {
+                setStatus('');
                 var area = $('quizArea');
                 if (area) area.innerHTML = '<div class="alert alert-danger">تعذّر إرسال الإجابات. حاول مرة أخرى.</div>';
             });
         }
 
-        // Expose to global scope with unique names so iOS Safari inline onclick can resolve them.
+        // Expose to global scope so iOS Safari inline onclick can resolve them.
         window.quizPick = pick;
         window.quizNext = next;
         window.quizPrev = prev;
         window.quizSubmit = submit;
 
-        function boot() { try { render(); } catch (e) { var a = $('quizArea'); if (a) a.innerHTML = '<div class="alert alert-danger">تعذّر تحميل الاختبار. حدّث الصفحة.</div>'; } }
+        function boot() {
+            try {
+                render();
+            } catch (e) {
+                setStatus('');
+                var a = $('quizArea');
+                if (a) a.innerHTML = '<div class="alert alert-danger">تعذّر تحميل الاختبار: ' + esc(String(e)) + '. حدّث الصفحة.</div>';
+            }
+        }
+
+        // Run immediately since the quiz-card markup is already in the DOM
+        // (this script tag sits right after the card). Defer only if the
+        // document is still parsing (extremely unlikely given placement).
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', boot);
         } else {
@@ -138,5 +197,4 @@ else
         }
     })();
     </script>
-    }
 }
