@@ -3,7 +3,7 @@
 ## المتطلبات | Prerequisites
 
 - **.NET 8 SDK** ([download](https://dotnet.microsoft.com/download/dotnet/8.0))
-- (اختياري) **MySQL 8** للإنتاج. SQLite يعمل افتراضياً بدون أي إعداد.
+- SQLite يعمل افتراضياً بدون أي إعداد. (اختياري) **Microsoft SQL Server** كمستودع خارجي للقراءة فقط.
 
 تحقّق من النسخة:
 ```bash
@@ -91,40 +91,7 @@ dotnet run
 
 ---
 
-## ٥. التبديل إلى MySQL | Switching to MySQL
-
-في `StrategyHouse.Web/appsettings.json`:
-
-```json
-{
-  "Database": { "Provider": "MySql" },
-  "ConnectionStrings": {
-    "MySql": "Server=localhost;Port=3306;Database=strategy_house;User=root;Password=YOUR_PASSWORD;"
-  }
-}
-```
-
-ثم:
-
-```bash
-# تأكد من تثبيت أداة EF
-dotnet tool install --global dotnet-ef
-
-# إنشاء وتطبيق هجرة MySQL
-dotnet ef migrations add InitMySql \
-  --project StrategyHouse.Infrastructure \
-  --startup-project StrategyHouse.Web
-
-dotnet ef database update \
-  --project StrategyHouse.Infrastructure \
-  --startup-project StrategyHouse.Web
-```
-
-سيبذر التطبيق البيانات تلقائياً عند أول تشغيل.
-
----
-
-## ٦. إعادة تهيئة قاعدة البيانات | Resetting the DB
+## ٥. إعادة تهيئة قاعدة البيانات | Resetting the DB
 
 لحذف SQLite وإعادة البذر:
 
@@ -136,7 +103,7 @@ dotnet run
 
 ---
 
-## ٧. نشر إنتاجي | Production Deploy
+## ٦. نشر إنتاجي | Production Deploy
 
 ```bash
 dotnet publish StrategyHouse.Web -c Release -o ./publish
@@ -146,12 +113,11 @@ dotnet publish StrategyHouse.Web -c Release -o ./publish
 
 تذكّر:
 - استخدم HTTPS خلف عكسي proxy (nginx).
-- بدّل `Database:Provider` إلى `MySql` ووفّر `ConnectionStrings:MySql`.
 - بدّل قيم `App:BaseUrl` و `App:NoReplyEmail` لقيم الإنتاج.
 
 ---
 
-## ٨. استكشاف الأخطاء | Troubleshooting
+## ٧. استكشاف الأخطاء | Troubleshooting
 
 | المشكلة | الحل |
 |---|---|
@@ -163,7 +129,7 @@ dotnet publish StrategyHouse.Web -c Release -o ./publish
 
 ---
 
-## ٩. الترخيص والملاحظات | License & Notes
+## ٨. الترخيص والملاحظات | License & Notes
 
 - المحتوى الاستراتيجي المبذور (الرؤية، الرسالة، القيم، الركائز، الأهداف، الإدارات) **بيانات مكان قابلة للاستبدال**.
 - استبدلها بالمحتوى الحقيقي قبل الإنتاج من `/Admin/Framework/1` أو من `SeedData.cs`.

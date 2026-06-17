@@ -12,10 +12,74 @@
     };
 }
 
-<div class="d-flex" style="justify-content:space-between;align-items:center;">
-    <h1>بيانات قاعدة البيانات الخارجية (Option A)</h1>
-    <a href="/Admin/ExternalData" class="btn btn-primary">تحديث</a>
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+    <h1 class="h3 mb-0">بيانات قاعدة البيانات الخارجية (Option A)</h1>
+    <a href="/Admin/ExternalData" class="btn btn-outline-secondary">تحديث</a>
 </div>
+
+@if (User.IsInRole("Admin"))
+{
+    @Html.AntiForgeryToken()
+    <div class="card border-0 shadow-sm mb-4" style="border-top:4px solid #FAC126 !important;">
+        <div class="card-body">
+            <h2 class="h5 mb-2">مزامنة البيانات | Microsoft SQL → SQLite</h2>
+            <p class="text-muted small mb-3">
+                ينسخ هذا الإجراء جميع جداول الاستراتيجية (الركائز، الأهداف، المؤشرات، المبادرات، المشاريع)
+                من Microsoft SQL إلى نسخة محلية في SQLite تُستخدم كاحتياطي عند تعذّر الاتصال المباشر.
+            </p>
+            <button id="pushBtn" type="button" class="btn btn-lg w-100 w-md-auto"
+                    style="background-color:#FAC126;border-color:#FAC126;color:#00192B;font-weight:700;">
+                <span id="pushSpinner" class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
+                <span id="pushLabel">دفع البيانات من Microsoft SQL إلى SQLite</span>
+            </button>
+            <div id="pushAlert" class="mt-3 d-none" role="alert"></div>
+
+            <div class="mt-4">
+                <h3 class="h6">حالة آخر دفع</h3>
+                <table class="table table-sm" style="max-width:560px;">
+                    <tbody>
+                        <tr>
+                            <th style="width:40%;">آخر دفع</th>
+                            <td id="metaLastPush">
+                                @(Model.Mirror?.LastPushAt is { } lp
+                                    ? lp.AddHours(3).ToString("dd/MM/yyyy HH:mm") + " (توقيت الرياض)"
+                                    : "لم يتم الدفع بعد")
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>عدد السجلات</th>
+                            <td id="metaCount">@(Model.Mirror?.RecordCount ?? 0)</td>
+                        </tr>
+                        <tr>
+                            <th>الحالة</th>
+                            <td id="metaStatus">
+                                @{
+                                    var st = Model.Mirror?.Status ?? "";
+                                    var badge = st == "Success" ? "bg-success"
+                                        : st == "Failed" ? "bg-danger"
+                                        : st == "InProgress" ? "bg-warning text-dark"
+                                        : "bg-secondary";
+                                    var stText = st == "Success" ? "ناجح"
+                                        : st == "Failed" ? "فشل"
+                                        : st == "InProgress" ? "قيد التنفيذ"
+                                        : "—";
+                                }
+                                <span class="badge @badge">@stText</span>
+                            </td>
+                        </tr>
+                        @if (!string.IsNullOrEmpty(Model.Mirror?.ErrorMessage))
+                        {
+                            <tr>
+                                <th>رسالة الخطأ</th>
+                                <td id="metaError" class="text-danger small">@Model.Mirror!.ErrorMessage</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
 
 <table class="table" style="max-width:640px;">
     <tbody>
@@ -65,5 +129,106 @@
                 </tbody>
             </table>
         </div>
+    }
+}
+
+@if (User.IsInRole("Admin"))
+{
+    @section Scripts {
+        <script>
+        // Phase 19.5 — push MSSQL → SQLite. iOS Safari-safe: ES5, IIFE, string
+        // concat, var, no template literals, no block scope, try/catch fallback.
+        (function () {
+            function byId(id) { return document.getElementById(id); }
+
+            function setBusy(busy) {
+                var btn = byId('pushBtn');
+                var sp = byId('pushSpinner');
+                var lbl = byId('pushLabel');
+                if (!btn) return;
+                btn.disabled = busy;
+                if (sp) { if (busy) { sp.classList.remove('d-none'); } else { sp.classList.add('d-none'); } }
+                if (lbl) { lbl.textContent = busy ? 'جارٍ الدفع…' : 'دفع البيانات من Microsoft SQL إلى SQLite'; }
+            }
+
+            function showAlert(kind, html) {
+                var box = byId('pushAlert');
+                if (!box) return;
+                box.className = 'mt-3 alert alert-' + kind;
+                box.innerHTML = html;
+            }
+
+            function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+            function riyadhNow() {
+                // Approximate Riyadh time (UTC+3) for the optimistic status update.
+                var d = new Date(Date.now() + 3 * 3600 * 1000);
+                return pad(d.getUTCDate()) + '/' + pad(d.getUTCMonth() + 1) + '/' + d.getUTCFullYear()
+                    + ' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ' (توقيت الرياض)';
+            }
+
+            function updateStatus(success, count) {
+                var lp = byId('metaLastPush'); if (lp) { lp.textContent = riyadhNow(); }
+                var c = byId('metaCount'); if (c) { c.textContent = count; }
+                var s = byId('metaStatus');
+                if (s) {
+                    s.innerHTML = success
+                        ? '<span class="badge bg-success">ناجح</span>'
+                        : '<span class="badge bg-danger">فشل</span>';
+                }
+            }
+
+            function onClick() {
+                if (!window.confirm('هل أنت متأكد؟ سيتم استبدال البيانات الحالية في SQLite بالكامل.')) return;
+                var tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+                var token = tokenEl ? tokenEl.value : '';
+                setBusy(true);
+                showAlert('info', 'جارٍ دفع البيانات…');
+                try {
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/Admin/ExternalData/PushToSqlite', true);
+                    xhr.setRequestHeader('RequestVerificationToken', token);
+                    xhr.setRequestHeader('Accept', 'application/json');
+                    xhr.onreadystatechange = function () {
+                        if (xhr.readyState !== 4) return;
+                        setBusy(false);
+                        try {
+                            var res = JSON.parse(xhr.responseText);
+                            if (xhr.status >= 200 && xhr.status < 300 && res.success) {
+                                showAlert('success', 'تم دفع ' + res.recordCount + ' سجلاً بنجاح خلال '
+                                    + res.durationSeconds + ' ثانية.');
+                                updateStatus(true, res.recordCount);
+                            } else {
+                                var err = (res && res.errorMessage) ? res.errorMessage : 'حدث خطأ غير متوقع.';
+                                showAlert('danger', 'فشل الدفع: ' + err);
+                                updateStatus(false, 0);
+                            }
+                        } catch (e) {
+                            showAlert('danger', 'تعذّر قراءة استجابة الخادم.');
+                        }
+                    };
+                    xhr.onerror = function () {
+                        setBusy(false);
+                        showAlert('danger', 'تعذّر الاتصال بالخادم.');
+                    };
+                    xhr.send();
+                } catch (e) {
+                    setBusy(false);
+                    showAlert('danger', 'تعذّر بدء عملية الدفع.');
+                }
+            }
+
+            function init() {
+                var btn = byId('pushBtn');
+                if (btn) { btn.addEventListener('click', onClick); }
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+        })();
+        </script>
     }
 }

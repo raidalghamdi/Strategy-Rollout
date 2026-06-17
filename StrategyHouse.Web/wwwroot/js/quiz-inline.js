@@ -132,5 +132,3 @@
     window.StrategyInlineQuiz = window.StrategyInlineQuiz || {};
     window.StrategyInlineQuiz.init = init;
 })();
-</content>
-</invoke>

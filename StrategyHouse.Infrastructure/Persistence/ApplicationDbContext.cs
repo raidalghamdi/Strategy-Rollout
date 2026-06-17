@@ -49,6 +49,15 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
     public DbSet<OpeningReflection> OpeningReflections => Set<OpeningReflection>();
     public DbSet<RoleContribution> RoleContributions => Set<RoleContribution>();
 
+    // Phase 19.5 — local SQLite mirror of the external MSSQL strategy warehouse,
+    // populated by the admin push action and read as a fallback when MSSQL is down.
+    public DbSet<MirrorPillar> MirrorPillars => Set<MirrorPillar>();
+    public DbSet<MirrorObjective> MirrorObjectives => Set<MirrorObjective>();
+    public DbSet<MirrorKpi> MirrorKpis => Set<MirrorKpi>();
+    public DbSet<MirrorInitiative> MirrorInitiatives => Set<MirrorInitiative>();
+    public DbSet<MirrorProject> MirrorProjects => Set<MirrorProject>();
+    public DbSet<MirrorMetadata> MirrorMetadata => Set<MirrorMetadata>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -161,5 +170,16 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
         // Phase 18 — index the redesigned-journey capture tables by session for fast reads.
         b.Entity<OpeningReflection>().HasIndex(r => r.SessionId);
         b.Entity<RoleContribution>().HasIndex(r => r.SessionId);
+
+        // Phase 19.5 — index mirror tables by their warehouse codes for chain lookups.
+        b.Entity<MirrorPillar>().HasIndex(p => p.PlrCode);
+        b.Entity<MirrorObjective>().HasIndex(o => o.ObjectiveCode);
+        b.Entity<MirrorObjective>().HasIndex(o => o.PlrCode);
+        b.Entity<MirrorKpi>().HasIndex(k => k.KpiCode);
+        b.Entity<MirrorKpi>().HasIndex(k => k.ObjectiveCode);
+        b.Entity<MirrorInitiative>().HasIndex(i => i.InitiativeCode);
+        b.Entity<MirrorInitiative>().HasIndex(i => i.ObjectiveCode);
+        b.Entity<MirrorProject>().HasIndex(p => p.ProjectCode);
+        b.Entity<MirrorProject>().HasIndex(p => p.InitiativeCode);
     }
 }

@@ -16,7 +16,7 @@
 <div class="gac-card">
     <h3 class="h5" style="color:#28334A;font-weight:800;border-bottom:4px solid #FAC126;display:inline-block;padding-bottom:6px;">عدد الحاضرين من إدارتك (اختياري)</h3>
     <p class="text-muted small mt-2 mb-2">يساعدنا هذا الرقم على قياس مدى الوصول. تعبئته اختيارية.</p>
-    <form method="post" asp-action="SaveAttendeeCount" asp-route-sessionId="@Model.Session.Id" class="d-flex flex-wrap gap-2 align-items-center">
+    <form method="post" asp-action="SaveAttendeeCount" asp-route-sessionId="@Model.Session.Id" class="attendee-center d-flex flex-wrap gap-2 align-items-center justify-content-center">
         @Html.AntiForgeryToken()
         <input type="number" id="attendeeCount" name="attendeeCount" class="form-control" style="max-width:160px;min-height:44px;"
                min="1" max="500" value="@(attendee.HasValue ? attendee.Value.ToString() : "")" placeholder="مثال: 12" />
@@ -65,7 +65,10 @@
 </div>
 
 <style>
-    #team-values .tv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+    /* Phase 19.5 — explicit 1 / 2 / 5 columns (mobile / tablet / desktop). */
+    #team-values .tv-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @@media (min-width: 576px) { #team-values .tv-grid { grid-template-columns: repeat(2, 1fr); } }
+    @@media (min-width: 992px) { #team-values .tv-grid { grid-template-columns: repeat(5, 1fr); } }
     #team-values .tv-card {
         border: 2px solid #d5dbe4; border-radius: 12px; padding: 16px 14px; background: #fff;
         text-align: center; cursor: pointer; transition: border-color .15s, box-shadow .15s;
@@ -199,4 +202,3 @@ window.__stageCompleteConfetti = function () {
     else document.addEventListener('DOMContentLoaded', init);
 })();
 </script>
-</content>
