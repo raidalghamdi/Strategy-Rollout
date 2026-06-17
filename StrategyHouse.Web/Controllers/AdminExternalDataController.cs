@@ -19,17 +19,20 @@ public class AdminExternalDataController : Controller
     private readonly IConfiguration _config;
     private readonly DepartmentDirectoryService _depts;
     private readonly IMssqlMirrorService _mirror;
+    private readonly ExternalDbDiagnostics _diagnostics;
     private readonly ExternalDbContext? _external;
 
     public AdminExternalDataController(
         IConfiguration config,
         DepartmentDirectoryService depts,
         IMssqlMirrorService mirror,
+        ExternalDbDiagnostics diagnostics,
         ExternalDbContext? external = null)
     {
         _config = config;
         _depts = depts;
         _mirror = mirror;
+        _diagnostics = diagnostics;
         _external = external;
     }
 
@@ -97,6 +100,28 @@ public class AdminExternalDataController : Controller
         }
 
         return View(vm);
+    }
+
+    // GET /Admin/ExternalData/TestConnection — Phase 19.7. Admin-only read-only
+    // diagnostic. Runs a bounded CanConnect probe against the external MSSQL,
+    // masks the password, categorises any failure and returns an Arabic hint as
+    // JSON for the admin UI. Never throws to the caller.
+    [HttpGet("TestConnection")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> TestConnection()
+    {
+        var r = await _diagnostics.TestAsync(HttpContext.RequestAborted);
+        return Json(new
+        {
+            useExternalDb = r.UseExternalDb,
+            connectionStringMasked = r.ConnectionStringMasked,
+            canConnect = r.CanConnect,
+            errorMessage = r.ErrorMessage,
+            errorCategory = r.ErrorCategory,
+            arabicHint = r.ArabicHint,
+            latencyMs = r.LatencyMs,
+            serverVersion = r.ServerVersion,
+        });
     }
 
     // POST /Admin/ExternalData/PushToSqlite — Phase 19.5. Admin-only. Mirrors all

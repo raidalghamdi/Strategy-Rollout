@@ -52,6 +52,8 @@ builder.Services.AddScoped<ProjectsService>();
 // (live MSSQL → SQLite mirror → dummy fallback).
 builder.Services.AddScoped<IMssqlMirrorService, MssqlMirrorService>();
 builder.Services.AddScoped<IStrategyDataProvider, StrategyDataProvider>();
+// Phase 19.7 — external MSSQL connection diagnostics (startup probe + admin endpoint).
+builder.Services.AddScoped<ExternalDbDiagnostics>();
 
 // Identity — three roles: Admin, Facilitator, Viewer.
 builder.Services
@@ -177,6 +179,39 @@ using (var scope = app.Services.CreateScope())
     // and regenerate signed-map PDFs so existing maps show their signatures.
     var pdf = scope.ServiceProvider.GetRequiredService<StrategyMapPdfService>();
     await SignatureBackfill.RunAsync(db, pdf);
+
+    // Phase 19.7 — when UseExternalDb is true, probe the external MSSQL on startup
+    // and log the FULL exception chain (password masked) at Warning so Railway logs
+    // reveal why the connection fails. Never throws: the app must keep running on
+    // the mirror/dummy fallback even when the warehouse is unreachable.
+    if (builder.Configuration.GetValue<bool>("Features:UseExternalDb"))
+    {
+        var startupLog = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("ExternalDbStartupProbe");
+        try
+        {
+            var diag = scope.ServiceProvider.GetRequiredService<ExternalDbDiagnostics>();
+            var probe = await diag.TestAsync();
+            if (probe.CanConnect)
+            {
+                startupLog.LogInformation(
+                    "External MSSQL probe OK in {LatencyMs}ms. Conn={Masked} Version={Version}",
+                    probe.LatencyMs, probe.ConnectionStringMasked, probe.ServerVersion);
+            }
+            else
+            {
+                startupLog.LogWarning(
+                    "External MSSQL probe FAILED ({Category}) in {LatencyMs}ms. Conn={Masked} Error={Error} Hint={Hint}",
+                    probe.ErrorCategory, probe.LatencyMs, probe.ConnectionStringMasked,
+                    probe.ErrorMessage, probe.ArabicHint);
+            }
+        }
+        catch (Exception ex)
+        {
+            startupLog.LogWarning(ex,
+                "External MSSQL startup probe threw unexpectedly; continuing on mirror/dummy fallback.");
+        }
+    }
 }
 
 if (!app.Environment.IsDevelopment())
