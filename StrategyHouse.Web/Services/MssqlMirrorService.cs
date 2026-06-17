@@ -74,6 +74,26 @@ public class MssqlMirrorService : IMssqlMirrorService
             var initiatives = await _external.Initiatives.AsNoTracking().ToListAsync(ct);
             var projects = await _external.Projects.AsNoTracking().ToListAsync(ct);
 
+            // Phase 19.8 — guard against wiping a good mirror with an empty source.
+            // If MSSQL is reachable but has no pillars, abort BEFORE touching the
+            // mirror so the previous offline copy is preserved.
+            if (pillars.Count == 0)
+            {
+                const string emptyMsg = "تم الاتصال بقاعدة Microsoft SQL لكن لم يتم العثور على أي مرتكزات (Pillars). تم إلغاء عملية الدفع وحفظ النسخة السابقة. تحقق من البيانات في الخادم الخارجي قبل المحاولة مرة أخرى.";
+                meta.Status = "Aborted_Empty";
+                meta.ErrorMessage = emptyMsg;
+                meta.LastPushAt = DateTime.UtcNow;
+                meta.DurationSeconds = Math.Round((DateTime.UtcNow - startedAt).TotalSeconds, 1);
+                await _db.SaveChangesAsync(ct);
+                _log.LogWarning("Mirror push aborted: external MSSQL returned 0 pillars; previous mirror preserved.");
+                return new MirrorPushResult
+                {
+                    Success = false,
+                    ErrorMessage = emptyMsg,
+                    DurationSeconds = meta.DurationSeconds,
+                };
+            }
+
             await using var tx = await _db.Database.BeginTransactionAsync(ct);
             try
             {

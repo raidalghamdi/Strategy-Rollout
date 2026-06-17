@@ -20,6 +20,27 @@
 @if (User.IsInRole("Admin"))
 {
     @Html.AntiForgeryToken()
+
+    <div class="card border-0 shadow-sm mb-4" style="border-top:4px solid #00192B !important;">
+        <div class="card-body">
+            <h2 class="h5 mb-2">تفعيل قاعدة البيانات الخارجية | UseExternalDb</h2>
+            <p class="text-muted small mb-3">
+                يتحكم هذا المفتاح في استخدام قاعدة بيانات Microsoft SQL الخارجية كمصدر مباشر للبيانات.
+                عند التفعيل يُستخدم الاتصال المباشر (ثم النسخة المحلية كاحتياطي)، وعند التعطيل يعمل الموقع
+                على النسخة المحلية (SQLite) فقط. يُحفظ الإعداد فوراً دون الحاجة لإعادة تشغيل الخادم.
+            </p>
+            <div class="form-check form-switch" style="min-height:auto;">
+                <input class="form-check-input" type="checkbox" role="switch" id="useExternalToggle"
+                       style="width:3rem;height:1.5rem;cursor:pointer;"
+                       @(Model.FlagEnabled ? "checked" : "") />
+                <label class="form-check-label ms-2" for="useExternalToggle" id="useExternalLabel">
+                    @(Model.FlagEnabled ? "مفعّل" : "معطّل")
+                </label>
+            </div>
+            <div id="toggleAlert" class="mt-3 d-none" role="alert"></div>
+        </div>
+    </div>
+
     <div class="card border-0 shadow-sm mb-4" style="border-top:4px solid #FAC126 !important;">
         <div class="card-body">
             <h2 class="h5 mb-2">مزامنة البيانات | Microsoft SQL → SQLite</h2>
@@ -57,10 +78,12 @@
                                     var st = Model.Mirror?.Status ?? "";
                                     var badge = st == "Success" ? "bg-success"
                                         : st == "Failed" ? "bg-danger"
+                                        : st == "Aborted_Empty" ? "bg-warning text-dark"
                                         : st == "InProgress" ? "bg-warning text-dark"
                                         : "bg-secondary";
                                     var stText = st == "Success" ? "ناجح"
                                         : st == "Failed" ? "فشل"
+                                        : st == "Aborted_Empty" ? "أُلغي — المصدر فارغ"
                                         : st == "InProgress" ? "قيد التنفيذ"
                                         : "—";
                                 }
@@ -417,6 +440,92 @@
             function init() {
                 var btn = byId('testBtn');
                 if (btn) { btn.addEventListener('click', onClick); }
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+        })();
+
+        // Phase 19.8 — toggle UseExternalDb at runtime. iOS Safari-safe: ES5, IIFE,
+        // string concat, var, no template literals, no block scope, try/catch fallback.
+        (function () {
+            function byId(id) { return document.getElementById(id); }
+
+            function showAlert(kind, text) {
+                var box = byId('toggleAlert');
+                if (!box) return;
+                box.className = 'mt-3 alert alert-' + kind;
+                box.textContent = text;
+            }
+
+            function setLabel(enabled) {
+                var lbl = byId('useExternalLabel');
+                if (lbl) { lbl.textContent = enabled ? 'مفعّل' : 'معطّل'; }
+            }
+
+            function onChange() {
+                var cb = byId('useExternalToggle');
+                if (!cb) return;
+                var desired = cb.checked;
+                var confirmMsg = desired
+                    ? 'هل تريد تفعيل قاعدة البيانات الخارجية (UseExternalDb)؟ سيُستخدم الاتصال المباشر بـ Microsoft SQL.'
+                    : 'هل تريد تعطيل قاعدة البيانات الخارجية؟ سيعمل الموقع على النسخة المحلية (SQLite) فقط.';
+                if (!window.confirm(confirmMsg)) {
+                    cb.checked = !desired; // revert the visual toggle
+                    return;
+                }
+
+                var tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+                var token = tokenEl ? tokenEl.value : '';
+                cb.disabled = true;
+                showAlert('info', 'جارٍ حفظ الإعداد…');
+                try {
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/Admin/ExternalData/SetUseExternalDb', true);
+                    xhr.setRequestHeader('RequestVerificationToken', token);
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    xhr.setRequestHeader('Accept', 'application/json');
+                    xhr.onreadystatechange = function () {
+                        if (xhr.readyState !== 4) return;
+                        cb.disabled = false;
+                        try {
+                            var res = JSON.parse(xhr.responseText);
+                            if (xhr.status >= 200 && xhr.status < 300 && res.success) {
+                                cb.checked = res.enabled;
+                                setLabel(res.enabled);
+                                showAlert('success', res.message);
+                            } else {
+                                cb.checked = res && typeof res.enabled === 'boolean' ? res.enabled : !desired;
+                                setLabel(cb.checked);
+                                showAlert('danger', (res && res.message) ? res.message : 'تعذّر حفظ الإعداد.');
+                            }
+                        } catch (e) {
+                            cb.checked = !desired;
+                            setLabel(cb.checked);
+                            showAlert('danger', 'تعذّر قراءة استجابة الخادم.');
+                        }
+                    };
+                    xhr.onerror = function () {
+                        cb.disabled = false;
+                        cb.checked = !desired;
+                        setLabel(cb.checked);
+                        showAlert('danger', 'تعذّر الاتصال بالخادم.');
+                    };
+                    xhr.send('enabled=' + (desired ? 'true' : 'false'));
+                } catch (e) {
+                    cb.disabled = false;
+                    cb.checked = !desired;
+                    setLabel(cb.checked);
+                    showAlert('danger', 'تعذّر بدء عملية الحفظ.');
+                }
+            }
+
+            function init() {
+                var cb = byId('useExternalToggle');
+                if (cb) { cb.addEventListener('change', onChange); }
             }
 
             if (document.readyState === 'loading') {

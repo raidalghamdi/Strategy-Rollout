@@ -1,7 +1,9 @@
+using Microsoft.Extensions.Options;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using StrategyHouse.Domain.Entities;
+using StrategyHouse.Web.Configuration;
 
 namespace StrategyHouse.Web.Services;
 
@@ -16,10 +18,12 @@ public class ProgrammePosterPdfService
     private const string Gold = "#D79A2B";
 
     private readonly StrategyContentService _content;
+    private readonly string _periodLabel;
 
-    public ProgrammePosterPdfService(StrategyContentService content)
+    public ProgrammePosterPdfService(StrategyContentService content, IOptions<StrategyContentOptions> options)
     {
         _content = content;
+        _periodLabel = string.IsNullOrWhiteSpace(options.Value.PeriodLabel) ? "2026-2030" : options.Value.PeriodLabel;
         QuestPDF.Settings.License = LicenseType.Community;
     }
 
@@ -49,7 +53,7 @@ public class ProgrammePosterPdfService
                     {
                         row.RelativeItem().Column(c =>
                         {
-                            c.Item().Text("الاستراتيجية المؤسسية 2025-2030").FontSize(40).Bold().FontColor(Primary);
+                            c.Item().Text("الاستراتيجية المؤسسية " + _periodLabel).FontSize(40).Bold().FontColor(Primary);
                             c.Item().Text("الهيئة العامة للمنافسة").FontSize(22).FontColor(Gold);
                         });
                         row.ConstantItem(160).AlignLeft().Text("GAC").FontSize(60).Bold().FontColor(Primary);

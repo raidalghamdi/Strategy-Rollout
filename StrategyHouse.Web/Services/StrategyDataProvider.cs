@@ -141,7 +141,9 @@ public class StrategyDataProvider : IStrategyDataProvider
             var initiatives = await _external.Initiatives.AsNoTracking().ToListAsync(token);
             var projects = await _external.Projects.AsNoTracking().ToListAsync(token);
 
-            if (pillars.Count == 0 && objectives.Count == 0) return null;
+            // Phase 19.8 — if the live source has no pillars, treat it as "not live"
+            // and fall back to the mirror rather than returning empty live data.
+            if (pillars.Count == 0) return null;
 
             return new StrategyDataSet
             {

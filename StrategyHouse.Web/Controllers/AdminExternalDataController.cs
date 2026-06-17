@@ -1,8 +1,13 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using StrategyHouse.Domain.Entities;
 using StrategyHouse.Infrastructure.Persistence;
+using StrategyHouse.Web.Configuration;
 using StrategyHouse.Web.Services;
 
 namespace StrategyHouse.Web.Controllers;
@@ -20,6 +25,9 @@ public class AdminExternalDataController : Controller
     private readonly DepartmentDirectoryService _depts;
     private readonly IMssqlMirrorService _mirror;
     private readonly ExternalDbDiagnostics _diagnostics;
+    private readonly IOptionsMonitor<FeaturesOptions> _features;
+    private readonly IWebHostEnvironment _env;
+    private readonly ILogger<AdminExternalDataController> _log;
     private readonly ExternalDbContext? _external;
 
     public AdminExternalDataController(
@@ -27,12 +35,18 @@ public class AdminExternalDataController : Controller
         DepartmentDirectoryService depts,
         IMssqlMirrorService mirror,
         ExternalDbDiagnostics diagnostics,
+        IOptionsMonitor<FeaturesOptions> features,
+        IWebHostEnvironment env,
+        ILogger<AdminExternalDataController> log,
         ExternalDbContext? external = null)
     {
         _config = config;
         _depts = depts;
         _mirror = mirror;
         _diagnostics = diagnostics;
+        _features = features;
+        _env = env;
+        _log = log;
         _external = external;
     }
 
@@ -41,7 +55,9 @@ public class AdminExternalDataController : Controller
     {
         var vm = new ExternalDataViewModel
         {
-            FlagEnabled = _config.GetValue<bool>("Features:UseExternalDb"),
+            // Read the LIVE flag value via IOptionsMonitor so a runtime toggle is
+            // reflected immediately (appsettings.json is reloadable).
+            FlagEnabled = _features.CurrentValue.UseExternalDb,
             ContextRegistered = _external != null,
             ConnectionConfigured = !string.IsNullOrWhiteSpace(_config.GetConnectionString("ExternalMssql")),
             Mirror = await _mirror.GetMetadataAsync(),
@@ -122,6 +138,57 @@ public class AdminExternalDataController : Controller
             latencyMs = r.LatencyMs,
             serverVersion = r.ServerVersion,
         });
+    }
+
+    // POST /Admin/ExternalData/SetUseExternalDb — Phase 19.8. Admin-only. Writes the
+    // Features:UseExternalDb flag to appsettings.json. Because the JSON file is added
+    // with reloadOnChange:true and every consumer reads the flag live (IConfiguration /
+    // IOptionsMonitor), the change takes effect without an app restart. The
+    // ExternalDbContext is registered whenever a connection string exists, so enabling
+    // the flag activates the already-registered context immediately.
+    [HttpPost("SetUseExternalDb")]
+    [Authorize(Roles = "Admin")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetUseExternalDb([FromForm] bool enabled)
+    {
+        try
+        {
+            var path = Path.Combine(_env.ContentRootPath, "appsettings.json");
+            var json = await System.IO.File.ReadAllTextAsync(path, HttpContext.RequestAborted);
+            var root = JsonNode.Parse(json) as JsonObject
+                ?? throw new InvalidOperationException("appsettings.json is not a JSON object.");
+
+            if (root["Features"] is not JsonObject features)
+            {
+                features = new JsonObject();
+                root["Features"] = features;
+            }
+            features["UseExternalDb"] = enabled;
+
+            var output = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+
+            // Atomic write: write to a temp file in the same directory, then replace.
+            var tmp = path + ".tmp";
+            await System.IO.File.WriteAllTextAsync(tmp, output, HttpContext.RequestAborted);
+            System.IO.File.Move(tmp, path, overwrite: true);
+
+            _log.LogInformation("UseExternalDb toggled to {Enabled} via admin UI.", enabled);
+
+            var message = enabled
+                ? "تم تفعيل UseExternalDb. اضغط «اختبر الاتصال» للتحقق من الاتصال بقاعدة Microsoft SQL."
+                : "تم تعطيل UseExternalDb. يعمل الموقع الآن على النسخة المحلية (SQLite).";
+            return Json(new { success = true, enabled, message });
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Failed to write UseExternalDb flag to appsettings.json.");
+            return Json(new
+            {
+                success = false,
+                enabled = _features.CurrentValue.UseExternalDb,
+                message = "تعذّر حفظ الإعداد في appsettings.json: " + ex.Message,
+            });
+        }
     }
 
     // POST /Admin/ExternalData/PushToSqlite — Phase 19.5. Admin-only. Mirrors all

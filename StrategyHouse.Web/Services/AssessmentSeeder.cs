@@ -11,15 +11,18 @@ namespace StrategyHouse.Web.Services;
 // Idempotent: quiz skips if bank already full; survey skips if its title exists.
 public static class AssessmentSeeder
 {
-    private const string ProgrammeSurveyTitle = "تقييم برنامج الاستراتيجية 2025-2030";
+    // Phase 19.8 — the period label is runtime config (StrategyContent:PeriodLabel),
+    // no longer a hardcoded const. The caller supplies it; we default to "2026-2030".
+    private static string ProgrammeSurveyTitle(string periodLabel) =>
+        "تقييم برنامج الاستراتيجية " + (string.IsNullOrWhiteSpace(periodLabel) ? "2026-2030" : periodLabel);
 
     // Phase 5: quiz auto-seed removed — production starts with 0 questions until an
     // admin clicks "Regenerate" or adds questions manually. Survey seed remains.
     // Phase 6: seed 5 hand-crafted demo questions so the quiz is never empty.
-    public static async Task RunAsync(ApplicationDbContext db, QuizGeneratorService quiz)
+    public static async Task RunAsync(ApplicationDbContext db, QuizGeneratorService quiz, string periodLabel = "2026-2030")
     {
         await EnsureDemoQuizAsync(db);
-        await SeedProgrammeSurveyAsync(db);
+        await SeedProgrammeSurveyAsync(db, periodLabel);
     }
 
     // Phase 6 — idempotent: only seeds when the bank is completely empty so admin
@@ -97,13 +100,14 @@ public static class AssessmentSeeder
         return demo;
     }
 
-    private static async Task SeedProgrammeSurveyAsync(ApplicationDbContext db)
+    private static async Task SeedProgrammeSurveyAsync(ApplicationDbContext db, string periodLabel)
     {
-        if (await db.Surveys.AnyAsync(s => s.TitleAr == ProgrammeSurveyTitle)) return;
+        var title = ProgrammeSurveyTitle(periodLabel);
+        if (await db.Surveys.AnyAsync(s => s.TitleAr == title)) return;
 
         var survey = new Survey
         {
-            TitleAr = ProgrammeSurveyTitle,
+            TitleAr = title,
             DescriptionAr = "شاركنا رأيك حول برنامج إطلاق الاستراتيجية المؤسسية ورحلة الإدارات.",
             Audience = "Public",
             IsActive = true,
