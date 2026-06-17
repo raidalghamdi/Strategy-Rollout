@@ -57,6 +57,23 @@ public class QuizController : Controller
     public IActionResult Play(Guid? sessionId)
         => RedirectToAction(nameof(Start), new { sessionId });
 
+    // GET /Quiz/Questions — Phase 19: JSON feed of the active questions so the quiz
+    // can be embedded inline (e.g. stage 5 of the journey) without a full page render.
+    // Returns the same shape the standalone view serialises ({ id, text, options }).
+    [HttpGet("Quiz/Questions")]
+    public IActionResult Questions(int count = 5)
+    {
+        if (count < 1) count = 1;
+        if (count > 50) count = 50;
+        var picked = QuizQuestionsProvider.GetRandom(count).Select(q => new
+        {
+            id = q.Id,
+            text = q.QuestionAr,
+            options = System.Text.Json.JsonSerializer.Deserialize<List<string>>(q.OptionsJson) ?? new List<string>(),
+        });
+        return Json(new { ok = true, questions = picked });
+    }
+
     // POST /Quiz/Submit — grade server-side, never trust client.
     [HttpPost("Quiz/Submit")]
     public async Task<IActionResult> Submit([FromBody] QuizSubmitDto dto)

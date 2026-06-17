@@ -1,20 +1,19 @@
 @model StrategyHouse.Web.Controllers.JourneyRunViewModel
 @{
-    var dept = Model.Dept;
     var attendee = Model.Session.AttendeeCount;
     var hashtag = "#أنا_مشارك";
+    var selectedTeamValue = Model.SelectedTeamValue;
+    // Phase 19 — team values moved here from stage 1 with a reworded prompt.
+    var teamValues = new[] { "الشفافية", "التعاون", "التميز", "العدالة", "الابتكار" };
 }
 @if (TempData["Saved"] != null) { <div class="alert alert-success">@TempData["Saved"]</div> }
 @if (TempData["Error"] != null) { <div class="alert alert-danger">@TempData["Error"]</div> }
 
-<div class="gac-card text-center">
-    <div style="font-size:3rem;">🎉</div>
-    <h1 class="h2">شكراً لك، @dept?.NameAr!</h1>
-    <p class="lead text-muted">لقد أتممت رحلة استراتيجية الهيئة. أنت الآن جزء من قصة تحقيق الرؤية.</p>
-</div>
+@* Phase 19 — Stage 5 (الأثر) order: 1) attendee count, 2) interactive questions
+   (inline quiz), 3) team values, 4) thank-you (hidden until the quiz completes). *@
 
-@* Phase 18 — the attendee count is now an optional field on the final stage. *@
-<div class="gac-card mt-3">
+@* 1) Optional attendee count. *@
+<div class="gac-card">
     <h3 class="h5" style="color:#28334A;font-weight:800;border-bottom:4px solid #FAC126;display:inline-block;padding-bottom:6px;">عدد الحاضرين من إدارتك (اختياري)</h3>
     <p class="text-muted small mt-2 mb-2">يساعدنا هذا الرقم على قياس مدى الوصول. تعبئته اختيارية.</p>
     <form method="post" asp-action="SaveAttendeeCount" asp-route-sessionId="@Model.Session.Id" class="d-flex flex-wrap gap-2 align-items-center">
@@ -29,16 +28,35 @@
     </form>
 </div>
 
-<div class="gac-card mt-3 text-center">
-    <h3 class="h5" style="color:#28334A;font-weight:800;">اختبر معرفتك</h3>
-    <p class="text-muted mb-3">اختبر معرفتك بالاستراتيجية المؤسسية في اختبار قصير وممتع.</p>
-    <a class="btn btn-lg quiz-pill-gold w-100 w-md-auto"
-       href="/Quiz/Start/@Model.Session.Id" target="_blank" rel="noopener">ابدأ الاختبار التفاعلي ⟵</a>
+@* 2) Interactive questions — inline quiz. *@
+<div class="gac-card mt-3" id="inline-quiz-card">
+    <h3 class="h5" style="color:#28334A;font-weight:800;">الأسئلة التفاعلية</h3>
+    <p class="text-muted mb-3">اختبر معرفتك بالاستراتيجية المؤسسية في أسئلة قصيرة وممتعة.</p>
+    <div id="inlineQuizArea"></div>
 </div>
 
-<div class="gac-card mt-3 text-center" id="share-card">
-    <h3 class="h5" style="color:#28334A;font-weight:800;">شارك مشاركتك</h3>
-    <p class="text-muted">أنت الآن سفير للاستراتيجية. شارك زملاءك أنك كنت جزءاً من الرحلة.</p>
+@* 3) Team values — moved from stage 1 (Phase 19), reworded. *@
+<div class="gac-card mt-3" id="team-values">
+    <h3 class="h5" style="color:#28334A;font-weight:800;">بعد هذه التجربة… أي قيمة ستكون الأقرب لك في عملك اليومي؟</h3>
+    <p class="text-muted">اختياري — اختر قيمة واحدة</p>
+    <div class="tv-grid">
+        @foreach (var v in teamValues)
+        {
+            var isSel = !string.IsNullOrEmpty(selectedTeamValue) && selectedTeamValue == v;
+            <label class="tv-card @(isSel ? "is-selected" : "")" data-key="@v" data-text="@v">
+                <input type="radio" name="teamValue" value="@v" @(isSel ? "checked" : "") />
+                <span class="tv-name">@v</span>
+            </label>
+        }
+    </div>
+    <div id="tv-status" class="small text-muted mt-2" style="min-height:1.2em;"></div>
+</div>
+
+@* 4) Thank-you — hidden until the inline quiz is completed. No department name. *@
+<div class="gac-card mt-3 text-center" id="thanks-card" style="display:none;">
+    <div style="font-size:3rem;">🎉</div>
+    <h1 class="h2">شكراً لك!</h1>
+    <p class="lead text-muted">لقد أتممت رحلة استراتيجية الهيئة. أنت الآن جزء من قصة تحقيق الرؤية.</p>
     <div class="share-tag" id="shareTag">@hashtag</div>
     <div class="d-flex flex-wrap gap-2 justify-content-center mt-3">
         <button type="button" id="copyShare" class="btn gac-btn-primary text-white" style="min-height:44px;">نسخ الوسم</button>
@@ -47,21 +65,26 @@
 </div>
 
 <style>
-    .quiz-pill-gold {
-        background: #FAC126; color: #28334A; font-weight: 800;
-        border: none; border-radius: 999px; padding: 12px 28px;
-        box-shadow: 0 4px 14px rgba(250, 193, 38, .35);
+    #team-values .tv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+    #team-values .tv-card {
+        border: 2px solid #d5dbe4; border-radius: 12px; padding: 16px 14px; background: #fff;
+        text-align: center; cursor: pointer; transition: border-color .15s, box-shadow .15s;
+        display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px; margin: 0;
     }
-    .quiz-pill-gold:hover { background: #e7ae12; color: #28334A; }
-    #share-card .share-tag {
+    #team-values .tv-card.is-selected { border-color: #067647; box-shadow: 0 2px 10px rgba(6,118,71,.2); }
+    #team-values .tv-card input[type=radio] { width: 20px; height: 20px; accent-color: #067647; }
+    #team-values .tv-name { font-weight: 700; color: #28334A; }
+    #thanks-card .share-tag {
         display: inline-block; margin-top: 8px; background: #eef6f1; color: #067647;
         font-size: 1.8rem; font-weight: 900; border-radius: 14px; padding: 14px 28px;
         border: 2px dashed #067647;
     }
 </style>
 
+<script src="~/js/quiz-inline.js" asp-append-version="true"></script>
 <script>
-// Phase 18 — Stage 5 (الأثر). Confetti + copy-to-clipboard share. iOS Safari-safe ES5.
+// Phase 19 — Stage 5 (الأثر). Inline quiz + team values + reveal thank-you on
+// quiz completion + copy-to-clipboard share. iOS Safari-safe ES5.
 window.__stageCompleteConfetti = function () {
     if (window.__confettiDone) return; window.__confettiDone = true;
     try {
@@ -92,7 +115,34 @@ window.__stageCompleteConfetti = function () {
 };
 
 (function () {
-    function init() {
+    var sessionId = '@Model.Session.Id';
+    var deptCode = @(Model.Session.DeptCode != null ? "'" + Model.Session.DeptCode + "'" : "null");
+
+    function startQuiz() {
+        var area = document.getElementById('inlineQuizArea');
+        if (!area || area.__started) return; area.__started = true;
+        try {
+            window.StrategyInlineQuiz.init({
+                mount: area,
+                sessionId: sessionId,
+                scope: 'General',
+                deptCode: deptCode,
+                onComplete: function () { revealThanks(); }
+            });
+        } catch (e) {
+            area.innerHTML = '<div class="alert alert-danger">تعذّر تحميل الأسئلة. حدّث الصفحة.</div>';
+        }
+    }
+
+    function revealThanks() {
+        var card = document.getElementById('thanks-card');
+        if (!card) return;
+        card.style.display = '';
+        if (window.__stageCompleteConfetti) window.__stageCompleteConfetti();
+        try { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+    }
+
+    function bindShare() {
         var btn = document.getElementById('copyShare');
         var status = document.getElementById('shareStatus');
         var tag = document.getElementById('shareTag');
@@ -114,8 +164,39 @@ window.__stageCompleteConfetti = function () {
             } catch (e) { fail(); }
         });
     }
+
+    function bindValues() {
+        var radios = document.querySelectorAll('#team-values input[name="teamValue"]');
+        var status = document.getElementById('tv-status');
+        for (var i = 0; i < radios.length; i++) {
+            (function (radio) {
+                if (radio.__bound) return; radio.__bound = true;
+                radio.addEventListener('change', function () {
+                    var card = radio.closest('.tv-card');
+                    var key = card ? card.getAttribute('data-key') : '';
+                    var text = card ? card.getAttribute('data-text') : radio.value;
+                    var cards = document.querySelectorAll('#team-values .tv-card');
+                    for (var j = 0; j < cards.length; j++) cards[j].className = 'tv-card';
+                    if (card) card.className = 'tv-card is-selected';
+                    if (status) status.textContent = 'جارٍ الحفظ...';
+                    try {
+                        fetch('@Url.Action("SaveTeamValue")', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ sessionId: sessionId, valueKey: key, valueText: text })
+                        }).then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+                          .then(function () { if (status) status.textContent = 'تم حفظ اختياركم: ' + text; })
+                          .catch(function () { if (status) status.textContent = 'تعذّر الحفظ، حاول مرة أخرى.'; });
+                    } catch (e) { if (status) status.textContent = 'تعذّر الحفظ، حاول مرة أخرى.'; }
+                });
+            })(radios[i]);
+        }
+    }
+
+    function init() { startQuiz(); bindValues(); bindShare(); }
     document.addEventListener('stageReady', function (e) { if (e.detail && e.detail.stage === 5) init(); });
     if (document.readyState !== 'loading') init();
     else document.addEventListener('DOMContentLoaded', init);
 })();
 </script>
+</content>

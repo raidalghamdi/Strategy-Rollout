@@ -113,7 +113,8 @@
     var stage = @stage;
     function fireReady() {
         if (stage === 4 && window.__stageMapInit) window.__stageMapInit();
-        if (stage === 5 && window.__stageCompleteConfetti) window.__stageCompleteConfetti();
+        // Phase 19 — stage 5 confetti now fires only after the inline quiz completes
+        // (the thank-you block is revealed then), so it is no longer fired on load.
         document.dispatchEvent(new CustomEvent('stageReady', { detail: { stage: stage } }));
     }
     document.addEventListener('DOMContentLoaded', fireReady);

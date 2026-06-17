@@ -42,24 +42,23 @@
 
 <div class="grid-2">
     <div class="card card--accent">
-        <h2>كيف تعمل الجلسة (٩٠ دقيقة)</h2>
+        <h2>@Html.Content("home.session.title")</h2>
         <ol>
-            <li><strong>الحركة الأولى (٢٠ دقيقة) — التعريف:</strong> قياس مرجعي مجهول، ثم عرض بيت الاستراتيجية (الرؤية، الرسالة، القيم، الركائز، الأهداف).</li>
-            <li><strong>الحركة الثانية (٤٠ دقيقة) — البناء الجماعي:</strong> كل إدارة تبني خريطتها الاستراتيجية على لوحة تفاعلية بالربط بين عناصرها (مشاريع، مؤشرات، أدوار) وبين الأهداف والركائز.</li>
-            <li><strong>الحركة الثالثة (٣٠ دقيقة) — الالتزام:</strong> اختيار الالتزامات الجماعية، ربطها بعناصر الإطار، وتوقيع تطوعي على iPad.</li>
-            <li><strong>إغلاق:</strong> استبيان قصير ثم رسالة شكر بريدية في اليوم نفسه مع رابط الاختبار الاختياري.</li>
+            <li><strong>@Html.Content("home.session.item1.title"):</strong> @Html.Content("home.session.item1.body")</li>
+            <li><strong>@Html.Content("home.session.item2.title"):</strong> @Html.Content("home.session.item2.body")</li>
+            <li><strong>@Html.Content("home.session.item3.title"):</strong> @Html.Content("home.session.item3.body")</li>
+            <li><strong>@Html.Content("home.session.item4.title"):</strong> @Html.Content("home.session.item4.body")</li>
         </ol>
     </div>
 
     <div class="card card--accent">
-        <h2>المبادئ التشغيلية</h2>
+        <h2>@Html.Content("home.principles.title")</h2>
         <ul>
-            <li>الإدارات مكتملة، بدون تجميع مختلط بين إدارات.</li>
-            <li>أيام التشغيل ٢ إلى ٥ فقط (لا أول ولا آخر يوم).</li>
-            <li>مكتب الاستراتيجية فقط هو المُيسّر؛ رئيس الإدارة راعٍ نشط بدور محدد سلفاً عبر <strong>خريطة رحلة رئيس الإدارة</strong>.</li>
-            <li>التوقيع تطوعي، يُضاف على خريطة الإدارة في منطقة A3.</li>
-            <li>جدار الالتزامات الرقمي يبقى مفتوحاً للحضور خلال الأسبوع، ثم يُعمَّم عند الإكمال.</li>
-            <li>التصميم عربي RTL، واضح ومؤسسي بهوية الهيئة العامة للمنافسة.</li>
+            <li>@Html.Content("home.principles.item1")</li>
+            <li>@Html.Content("home.principles.item2")</li>
+            <li>@Html.Content("home.principles.item3")</li>
+            <li>@Html.Content("home.principles.item4")</li>
+            <li>@Html.Content("home.principles.item5")</li>
         </ul>
     </div>
 </div>
@@ -69,15 +68,8 @@
     <p>@Html.Content("home.objectives.body", "ترسيخ فهم مشترك للاستراتيجية، وربط عمل كل إدارة بالركائز والأهداف المؤسسية.")</p>
 </div>
 
-<div class="card" style="text-align:center;">
-    <h2>@Html.Content("home.cta.title", "هل أنت مستعد لبدء رحلة إدارتك الاستراتيجية؟")</h2>
-    <div class="row mt-2 btn-stack-mobile" style="justify-content:center;">
-        <a href="/Account/Login" class="btn btn--primary">@Html.Content("home.cta.button", "الدخول إلى المنصة")</a>
-    </div>
-</div>
-
 <div class="card">
-    <h2>@Html.Content("home.contact.title", "للتواصل مع مكتب الاستراتيجية")</h2>
+    <h2>@Html.Content("home.contact.title", "للتواصل مع إدارة الاستراتيجية والأداء المؤسسي")</h2>
     <p class="muted">
         للتواصل: <a href="mailto:strategy@gac.gov.sa">strategy@gac.gov.sa</a>
     </p>
