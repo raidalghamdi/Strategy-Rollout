@@ -48,8 +48,8 @@
 
         function fail(reason) {
             if (window.console) console.log('[inline-quiz] load failed: ' + (reason || 'unknown') + ' — showing standalone-quiz fallback');
-            mount.innerHTML = '<div class="alert alert-warning">تعذّر تحميل الأسئلة هنا. يمكنك فتح الاختبار في صفحة منفصلة:</div>'
-                + '<div class="mt-2"><a href="/Quiz" class="btn quiz-fallback-btn" style="min-height:44px;background:#FAC126;border-color:#FAC126;color:#00192B;font-weight:700;">افتح الاختبار</a></div>';
+            mount.innerHTML = '<div class="alert alert-warning">تعذّر تحميل الأسئلة هنا. يمكنك بدء الاختبار في صفحة منفصلة:</div>'
+                + '<div class="mt-2"><a href="/Quiz/Start" target="_blank" rel="noopener" class="btn quiz-fallback-btn" style="min-height:44px;background:#FAC126;border-color:#FAC126;color:#00192B;font-weight:700;">ابدأ الاختبار الآن</a></div>';
         }
 
         function render() {
