@@ -30,22 +30,26 @@
 
         function load() {
             try {
+                if (window.console) console.log('[inline-quiz] fetching /Quiz/Questions?count=5');
                 fetch('/Quiz/Questions?count=5', { headers: { 'Accept': 'application/json' } })
-                    .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+                    .then(function (r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
                     .then(function (data) {
                         questions = (data && data.questions) ? data.questions : [];
-                        if (!questions.length) { fail(); return; }
+                        if (window.console) console.log('[inline-quiz] loaded ' + questions.length + ' question(s)');
+                        if (!questions.length) { fail('empty question set'); return; }
                         answers = new Array(questions.length);
                         for (var k = 0; k < questions.length; k++) answers[k] = -1;
                         cur = 0;
                         render();
                     })
                     .catch(fail);
-            } catch (e) { fail(); }
+            } catch (e) { fail(e); }
         }
 
-        function fail() {
-            mount.innerHTML = '<div class="alert alert-danger">تعذّر تحميل الأسئلة. حدّث الصفحة وحاول مرة أخرى.</div>';
+        function fail(reason) {
+            if (window.console) console.log('[inline-quiz] load failed: ' + (reason || 'unknown') + ' — showing standalone-quiz fallback');
+            mount.innerHTML = '<div class="alert alert-warning">تعذّر تحميل الأسئلة هنا. يمكنك فتح الاختبار في صفحة منفصلة:</div>'
+                + '<div class="mt-2"><a href="/Quiz" class="btn quiz-fallback-btn" style="min-height:44px;background:#FAC126;border-color:#FAC126;color:#00192B;font-weight:700;">افتح الاختبار</a></div>';
         }
 
         function render() {
