@@ -47,17 +47,20 @@ public class StrategyDataProvider : IStrategyDataProvider
     private readonly ExternalDbContext? _external;
     private readonly IConfiguration _config;
     private readonly ILogger<StrategyDataProvider> _log;
+    private readonly StrategyContentService? _content;
 
     public StrategyDataProvider(
         ApplicationDbContext db,
         IConfiguration config,
         ILogger<StrategyDataProvider> log,
-        ExternalDbContext? external = null)
+        ExternalDbContext? external = null,
+        StrategyContentService? content = null)
     {
         _db = db;
         _config = config;
         _log = log;
         _external = external;
+        _content = content;
     }
 
     public async Task<StrategyDataSet> GetStrategyAsync(CancellationToken ct = default)
@@ -94,7 +97,18 @@ public class StrategyDataProvider : IStrategyDataProvider
         var objByCode = data.Objectives.ToDictionary(o => o.Code, o => o, StringComparer.Ordinal);
         var initByCode = data.Initiatives.ToDictionary(i => i.Code, i => i, StringComparer.Ordinal);
 
-        foreach (var p in data.Pillars) AddNode(p.Name, "pillar");
+        // Phase 19.13 — add the Vision as the left-most root node so the flow
+        // reads end-to-end: Vision → Pillars → Objectives → Initiatives → Projects.
+        // Falls back to a generic label when the content service isn't wired.
+        var visionLabel = _content?.Vision.Ar;
+        if (string.IsNullOrWhiteSpace(visionLabel)) visionLabel = "الرؤية";
+        AddNode(visionLabel, "vision");
+
+        foreach (var p in data.Pillars)
+        {
+            AddNode(p.Name, "pillar");
+            AddLink(visionLabel, p.Name);
+        }
         foreach (var o in data.Objectives)
         {
             AddNode(o.Name, "objective");
