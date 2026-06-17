@@ -1,7 +1,9 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using StrategyHouse.Domain.Entities;
 using StrategyHouse.Infrastructure.Persistence;
+using StrategyHouse.Web.Configuration;
 
 namespace StrategyHouse.Web.Services;
 
@@ -11,8 +13,13 @@ namespace StrategyHouse.Web.Services;
 public class QuizGeneratorService
 {
     private readonly ApplicationDbContext _db;
+    private readonly int? _randomSeed;
 
-    public QuizGeneratorService(ApplicationDbContext db) { _db = db; }
+    public QuizGeneratorService(ApplicationDbContext db, IOptions<StrategyContentOptions> options)
+    {
+        _db = db;
+        _randomSeed = options.Value.RandomSeed;
+    }
 
     public async Task<int> GenerateAllAsync()
     {
@@ -26,7 +33,7 @@ public class QuizGeneratorService
         var depts = await _db.Departments.OrderBy(d => d.DeptCode).ToListAsync();
         if (pillars.Count == 0) return 0;
 
-        var rnd = new Random(20260614);
+        var rnd = _randomSeed.HasValue ? new Random(_randomSeed.Value) : Random.Shared;
         var values = new[] { "الشفافية", "التعاون", "التميز", "العدالة", "الابتكار" };
         var fakeValues = new[] { "السرعة", "الربحية", "التوسع", "المنافسة الداخلية", "الهرمية", "الحصرية" };
         var qs = new List<QuizQuestion>();

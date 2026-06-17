@@ -73,7 +73,9 @@ public class PageContentService
             if (_loaded) return;
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            foreach (var row in db.PageContents.AsNoTracking().ToList())
+            var rows = db.PageContents.AsNoTracking().ToList();
+            _cache.Clear();
+            foreach (var row in rows)
                 _cache[row.Key] = row.ValueAr;
             _loaded = true;
         }
@@ -109,6 +111,15 @@ public class PageContentService
             row.UpdatedAt = DateTime.UtcNow;
         }
         await db.SaveChangesAsync();
-        _cache[key] = value; // invalidate/refresh the single key
+
+        // Invalidate the in-memory cache under the same gate used by EnsureLoaded so
+        // the next read repopulates fresh from the database. Without this the Singleton
+        // served stale values until an app restart. We keep the in-memory caching
+        // behaviour: reads still hit the cache; only writes force a one-time reload.
+        lock (_gate)
+        {
+            _cache[key] = value;
+            _loaded = false;
+        }
     }
 }

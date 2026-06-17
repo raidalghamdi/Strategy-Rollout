@@ -9,7 +9,10 @@ namespace StrategyHouse.Web.Services;
 // department if it already has any roster rows so admin edits are never overwritten.
 public static class RosterSeeder
 {
-    public static async Task RunAsync(ApplicationDbContext db)
+    // Phase 19.8 — the shuffle seed is configurable (StrategyContent:RandomSeed).
+    // Null (default) → Random.Shared (non-deterministic). A fixed int reproduces the
+    // same roster across runs when determinism is explicitly required.
+    public static async Task RunAsync(ApplicationDbContext db, int? randomSeed = null)
     {
         var depts = await db.Departments.Where(d => d.IsActive).OrderBy(d => d.DeptCode)
             .Select(d => d.DeptCode).ToListAsync();
@@ -27,7 +30,7 @@ public static class RosterSeeder
             "السبيعي", "العنزي", "الزهراني", "البقمي", "العمري", "الرشيدي", "الجهني", "الشمري",
         };
 
-        var rnd = new Random(20260614);
+        var rnd = randomSeed.HasValue ? new Random(randomSeed.Value) : Random.Shared;
         var toAdd = new List<DepartmentRoster>();
 
         foreach (var dept in depts)

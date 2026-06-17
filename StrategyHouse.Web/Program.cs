@@ -30,12 +30,17 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(conn);
 });
 
-// Phase 16 — optional external MSSQL (Option A schema). Registered only when the
-// UseExternalDb feature flag is true AND a connection string is supplied. When off
-// (default), the app runs entirely on the local SQLite context as before.
-var useExternalDb = builder.Configuration.GetValue<bool>("Features:UseExternalDb");
+// Phase 16 / 19.8 — optional external MSSQL (Option A schema). The ExternalDbContext
+// is now registered whenever a connection string is supplied, INDEPENDENT of the
+// UseExternalDb flag. This lets the flag be toggled at runtime (it is reloadable JSON;
+// see IOptionsMonitor<FeaturesOptions> below) and take effect immediately — every
+// consumer gates live behaviour on the flag via IConfiguration, so flipping it on
+// activates the already-registered context with no server restart. When no connection
+// string is configured the context is left unregistered (injected as null) exactly as
+// before, so the app runs entirely on the local SQLite context.
+builder.Services.Configure<FeaturesOptions>(builder.Configuration.GetSection("Features"));
 var externalConn = builder.Configuration.GetConnectionString("ExternalMssql");
-if (useExternalDb && !string.IsNullOrWhiteSpace(externalConn))
+if (!string.IsNullOrWhiteSpace(externalConn))
 {
     builder.Services.AddDbContext<ExternalDbContext>(options => options.UseSqlServer(externalConn));
 }
@@ -153,8 +158,10 @@ using (var scope = app.Services.CreateScope())
     await SeedData.RunAsync(db, userManager, roleManager);
 
     // Phase 4 — programme survey (quiz auto-seed removed in Phase 5; admin-controlled).
+    // Phase 19.8 — period label comes from StrategyContent:PeriodLabel (default 2026-2030).
     var quiz = scope.ServiceProvider.GetRequiredService<QuizGeneratorService>();
-    await AssessmentSeeder.RunAsync(db, quiz);
+    var periodLabel = builder.Configuration.GetValue<string>("StrategyContent:PeriodLabel") ?? "2026-2030";
+    await AssessmentSeeder.RunAsync(db, quiz, periodLabel);
 
     // Phase 12 — replace the survey bank with the 8 official questions (idempotent via hash).
     await Phase12SurveySeeder.SeedAsync(db);
@@ -173,7 +180,9 @@ using (var scope = app.Services.CreateScope())
     await AssessmentSeeder.EnsureDemoQuizAsync(db);
 
     // Phase 6 — predefined department roster (default-checked attendees in stage 1).
-    await RosterSeeder.RunAsync(db);
+    // Phase 19.8 — shuffle seed is config-driven (StrategyContent:RandomSeed); null → Random.Shared.
+    var rosterSeed = builder.Configuration.GetValue<int?>("StrategyContent:RandomSeed");
+    await RosterSeeder.RunAsync(db, rosterSeed);
 
     // Phase 5 — one-time signature backfill: flip pending signature ink to Approved
     // and regenerate signed-map PDFs so existing maps show their signatures.
