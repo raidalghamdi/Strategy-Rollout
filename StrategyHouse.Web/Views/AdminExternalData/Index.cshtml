@@ -77,6 +77,86 @@
                     </tbody>
                 </table>
             </div>
+
+            <hr class="my-4" />
+
+            <h2 class="h5 mb-2">تشخيص الاتصال | Microsoft SQL</h2>
+            <p class="text-muted small mb-3">
+                يفحص هذا الإجراء الاتصال المباشر بقاعدة بيانات Microsoft SQL ويعرض سبب الفشل (إن وجد)
+                مع شرح بالعربي. آمن للقراءة فقط — لا يعدّل أي بيانات.
+            </p>
+
+            @if (!Model.FlagEnabled)
+            {
+                <div class="alert alert-warning" role="alert">
+                    العلم UseExternalDb معطل في الإعدادات. لتفعيل MSSQL، عدّل <code>appsettings.json</code> وأعد تشغيل التطبيق.
+                </div>
+            }
+
+            <button id="testBtn" type="button" class="btn btn-lg btn-outline-primary w-100 w-md-auto"
+                    style="border-color:#00192B;color:#00192B;font-weight:700;">
+                <span id="testSpinner" class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
+                <span id="testLabel">اختبر الاتصال بـ Microsoft SQL</span>
+            </button>
+
+            <div id="testPanel" class="mt-3 d-none">
+                <table class="table table-sm" style="max-width:720px;">
+                    <tbody>
+                        <tr>
+                            <th style="width:38%;">حالة العلم UseExternalDb</th>
+                            <td id="resFlag">—</td>
+                        </tr>
+                        <tr>
+                            <th>سلسلة الاتصال (مخفية)</th>
+                            <td><code id="resConn">—</code></td>
+                        </tr>
+                        <tr>
+                            <th>إمكانية الاتصال</th>
+                            <td id="resCanConnect">—</td>
+                        </tr>
+                        <tr>
+                            <th>التصنيف</th>
+                            <td><span id="resCategory" class="badge bg-secondary">—</span></td>
+                        </tr>
+                        <tr id="resErrorRow" class="d-none">
+                            <th>رسالة الخطأ</th>
+                            <td><pre id="resError" class="small mb-0" style="white-space:pre-wrap;word-break:break-word;"></pre></td>
+                        </tr>
+                        <tr>
+                            <th>شرح بالعربي</th>
+                            <td id="resHint">—</td>
+                        </tr>
+                        <tr>
+                            <th>زمن الاستجابة</th>
+                            <td id="resLatency">—</td>
+                        </tr>
+                        <tr id="resVersionRow" class="d-none">
+                            <th>إصدار الخادم</th>
+                            <td><code id="resVersion" class="small"></code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-3">
+                <button type="button" class="btn btn-sm btn-link p-0" data-bs-toggle="collapse" data-bs-target="#connHelp"
+                        aria-expanded="false" aria-controls="connHelp">
+                    عرض صيغة سلسلة الاتصال المتوقعة ▾
+                </button>
+                <div class="collapse mt-2" id="connHelp">
+                    <div class="card card-body bg-light">
+                        <pre class="small mb-2" style="white-space:pre-wrap;word-break:break-word;">Server=hostname,1433;Database=DatabaseName;User Id=username;Password=password;TrustServerCertificate=True;Encrypt=False;Connection Timeout=10;</pre>
+                        <ul class="small mb-0">
+                            <li><strong>Server</strong>: اسم الخادم أو عنوان IP متبوعاً بالمنفذ (1433 افتراضياً) — مثال <code>db.example.com,1433</code></li>
+                            <li><strong>Database</strong>: اسم قاعدة البيانات على الخادم</li>
+                            <li><strong>User Id</strong> و<strong>Password</strong>: بيانات اعتماد مستخدم له صلاحية القراءة</li>
+                            <li><strong>TrustServerCertificate=True</strong>: يتجاوز التحقق من شهادة SSL (مطلوب عادةً للخوادم بدون شهادة موثوقة)</li>
+                            <li><strong>Encrypt=False</strong>: يعطّل التشفير عند عدم توفّر شهادة صالحة</li>
+                            <li><strong>Connection Timeout=10</strong>: مهلة الاتصال بالثواني</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 }
@@ -220,6 +300,122 @@
 
             function init() {
                 var btn = byId('pushBtn');
+                if (btn) { btn.addEventListener('click', onClick); }
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+        })();
+
+        // Phase 19.7 — test the MSSQL connection. iOS Safari-safe: ES5, IIFE,
+        // string concat, var, no template literals, no block scope, try/catch.
+        (function () {
+            function byId(id) { return document.getElementById(id); }
+
+            function setBusy(busy) {
+                var btn = byId('testBtn');
+                var sp = byId('testSpinner');
+                var lbl = byId('testLabel');
+                if (!btn) return;
+                btn.disabled = busy;
+                if (sp) { if (busy) { sp.classList.remove('d-none'); } else { sp.classList.add('d-none'); } }
+                if (lbl) { lbl.textContent = busy ? 'جارٍ الفحص…' : 'اختبر الاتصال بـ Microsoft SQL'; }
+            }
+
+            function categoryBadge(cat) {
+                var map = {
+                    network: 'bg-danger', auth: 'bg-danger', ssl: 'bg-warning text-dark',
+                    database: 'bg-danger', timeout: 'bg-warning text-dark',
+                    config: 'bg-secondary', unknown: 'bg-secondary'
+                };
+                return map[cat] || 'bg-secondary';
+            }
+
+            function render(res) {
+                var panel = byId('testPanel');
+                if (panel) { panel.classList.remove('d-none'); }
+
+                var flag = byId('resFlag');
+                if (flag) { flag.innerHTML = res.useExternalDb ? '✅ مفعل' : '⚠️ معطل'; }
+
+                var conn = byId('resConn');
+                if (conn) { conn.textContent = res.connectionStringMasked || '—'; }
+
+                var cc = byId('resCanConnect');
+                if (cc) { cc.innerHTML = res.canConnect ? '✅ ناجح' : '❌ فاشل'; }
+
+                var cat = byId('resCategory');
+                if (cat) {
+                    cat.className = 'badge ' + categoryBadge(res.errorCategory);
+                    cat.textContent = res.errorCategory || 'unknown';
+                }
+
+                var errRow = byId('resErrorRow');
+                var err = byId('resError');
+                if (res.errorMessage) {
+                    if (err) { err.textContent = res.errorMessage; }
+                    if (errRow) { errRow.classList.remove('d-none'); }
+                } else {
+                    if (errRow) { errRow.classList.add('d-none'); }
+                }
+
+                var hint = byId('resHint');
+                if (hint) { hint.textContent = res.arabicHint || '—'; }
+
+                var lat = byId('resLatency');
+                if (lat) { lat.textContent = res.latencyMs + 'ms'; }
+
+                var verRow = byId('resVersionRow');
+                var ver = byId('resVersion');
+                if (res.serverVersion) {
+                    if (ver) { ver.textContent = res.serverVersion; }
+                    if (verRow) { verRow.classList.remove('d-none'); }
+                } else {
+                    if (verRow) { verRow.classList.add('d-none'); }
+                }
+            }
+
+            function renderError(msg) {
+                var panel = byId('testPanel');
+                if (panel) { panel.classList.remove('d-none'); }
+                var hint = byId('resHint');
+                if (hint) { hint.textContent = msg; }
+                var cc = byId('resCanConnect');
+                if (cc) { cc.innerHTML = '❌ فاشل'; }
+            }
+
+            function onClick() {
+                setBusy(true);
+                try {
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('GET', '/Admin/ExternalData/TestConnection', true);
+                    xhr.setRequestHeader('Accept', 'application/json');
+                    xhr.onreadystatechange = function () {
+                        if (xhr.readyState !== 4) return;
+                        setBusy(false);
+                        try {
+                            var res = JSON.parse(xhr.responseText);
+                            render(res);
+                        } catch (e) {
+                            renderError('تعذّر قراءة استجابة الخادم. حاول مرة أخرى.');
+                        }
+                    };
+                    xhr.onerror = function () {
+                        setBusy(false);
+                        renderError('تعذّر الاتصال بالخادم. حاول مرة أخرى.');
+                    };
+                    xhr.send();
+                } catch (e) {
+                    setBusy(false);
+                    renderError('تعذّر بدء عملية الفحص.');
+                }
+            }
+
+            function init() {
+                var btn = byId('testBtn');
                 if (btn) { btn.addEventListener('click', onClick); }
             }
 
