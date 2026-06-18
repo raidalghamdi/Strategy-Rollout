@@ -45,7 +45,7 @@ else
        state — not a broken-but-styled question — and the noscript fallback
        below tells them what to do. We also send Cache-Control: no-store on the
        view so iOS Safari can't serve a stale HTML snapshot. *@
-    @* build: phase 19.17 *@
+    <!-- build: phase 19.17 -->
     <meta http-equiv="Cache-Control" content="no-store" />
     <div class="quiz-card"
          data-session-id="@(sessionId?.ToString() ?? "")"
