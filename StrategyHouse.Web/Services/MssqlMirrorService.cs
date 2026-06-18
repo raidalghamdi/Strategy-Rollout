@@ -15,6 +15,7 @@ public class MirrorPushResult
 {
     public bool Success { get; set; }
     public int RecordCount { get; set; }
+    public int SkippedCount { get; set; }
     public double DurationSeconds { get; set; }
     public string? ErrorMessage { get; set; }
 }
@@ -74,6 +75,8 @@ public class MssqlMirrorService : IMssqlMirrorService
             var initiatives = await _external.Initiatives.AsNoTracking().ToListAsync(ct);
             var projects = await _external.Projects.AsNoTracking().ToListAsync(ct);
 
+            var skippedKpis = 0;
+
             // Phase 19.8 — guard against wiping a good mirror with an empty source.
             // If MSSQL is reachable but has no pillars, abort BEFORE touching the
             // mirror so the previous offline copy is preserved.
@@ -125,32 +128,47 @@ public class MssqlMirrorService : IMssqlMirrorService
                     EndDates = o.EndDates,
                     ObjPeriod = o.ObjPeriod,
                 }));
-                _db.MirrorKpis.AddRange(kpis.Select(k => new MirrorKpi
+                // Phase 19.19 — project KPI rows defensively: one malformed source
+                // row (e.g. an unexpected null/overflow) shouldn't abort the whole
+                // sync. Bad rows are counted and logged; good rows still mirror.
+                foreach (var k in kpis)
                 {
-                    KpiCode = k.KpiCode,
-                    KpiName = k.KpiName,
-                    ActivationStatus = k.ActivationStatus,
-                    KpiType = k.KpiType,
-                    ObjectiveCode = k.ObjectiveCode,
-                    PlrCode = k.PlrCode,
-                    Division = k.Division,
-                    Frequency = k.Frequency,
-                    // Phase 19.18 — source now exposes the four real MSSQL columns
-                    // (Unit, Direction, Minimum, Maximum). The mirror keeps a single
-                    // combined Unit/Direction string and one Minimum-Maximum decimal,
-                    // so fold the split source columns back together here. Null-safe:
-                    // CombineText drops blanks; the decimal prefers Minimum, else Maximum.
-                    UnitDirection = CombineText(k.Unit, k.Direction),
-                    IndexWeight = k.IndexWeight,
-                    MinimumMaximum = k.Minimum ?? k.Maximum,
-                    Target2025 = k.Target2025,
-                    Target2026 = k.Target2026,
-                    Target2027 = k.Target2027,
-                    Target2028 = k.Target2028,
-                    Target2029 = k.Target2029,
-                    Target2030 = k.Target2030,
-                    AutomationStatus = k.AutomationStatus,
-                }));
+                    try
+                    {
+                        _db.MirrorKpis.Add(new MirrorKpi
+                        {
+                            KpiCode = k.KpiCode,
+                            KpiName = k.KpiName,
+                            ActivationStatus = k.ActivationStatus,
+                            KpiType = k.KpiType,
+                            ObjectiveCode = k.ObjectiveCode,
+                            PlrCode = k.PlrCode,
+                            Division = k.Division,
+                            Frequency = k.Frequency,
+                            // Source exposes the four real MSSQL columns (Unit,
+                            // Direction, Minimum, Maximum). The mirror keeps a single
+                            // combined Unit/Direction string and one Minimum-Maximum
+                            // decimal, so fold the split source columns back together.
+                            UnitDirection = CombineText(k.Unit, k.Direction),
+                            // Index_Weight is now decimal? in the source; the mirror
+                            // column is a string, so format it without trailing zeros.
+                            IndexWeight = k.IndexWeight?.ToString("0.####"),
+                            MinimumMaximum = k.Minimum ?? k.Maximum,
+                            Target2025 = k.Target2025,
+                            Target2026 = k.Target2026,
+                            Target2027 = k.Target2027,
+                            Target2028 = k.Target2028,
+                            Target2029 = k.Target2029,
+                            Target2030 = k.Target2030,
+                            AutomationStatus = k.AutomationStatus,
+                        });
+                    }
+                    catch (Exception rowEx)
+                    {
+                        skippedKpis++;
+                        _log.LogWarning(rowEx, "Skipped malformed KPI row {KpiCode} during mirror push.", k.KpiCode);
+                    }
+                }
                 _db.MirrorInitiatives.AddRange(initiatives.Select(i => new MirrorInitiative
                 {
                     InitiativeCode = i.InitiativeCode,
@@ -194,13 +212,20 @@ public class MssqlMirrorService : IMssqlMirrorService
                 throw;
             }
 
-            var total = pillars.Count + objectives.Count + kpis.Count + initiatives.Count + projects.Count;
-            await FinishAsync(meta, true, total, startedAt, null, ct);
-            _log.LogInformation("Mirror push succeeded: {Count} records in {Seconds:F1}s.", total, meta.DurationSeconds);
+            // Mirror count reflects rows actually written (skipped KPI rows excluded).
+            var total = pillars.Count + objectives.Count + (kpis.Count - skippedKpis) + initiatives.Count + projects.Count;
+            // Phase 19.19 — surface skipped rows in the saved status note so the admin
+            // UI can show "تم دفع N سجلاً، تخطّى K سجلاً" without a separate field.
+            var note = skippedKpis > 0
+                ? $"تم دفع {total} سجلاً، تخطّى {skippedKpis} سجلاً غير صالح."
+                : null;
+            await FinishAsync(meta, true, total, startedAt, note, ct);
+            _log.LogInformation("Mirror push succeeded: {Count} records ({Skipped} KPI rows skipped) in {Seconds:F1}s.", total, skippedKpis, meta.DurationSeconds);
             return new MirrorPushResult
             {
                 Success = true,
                 RecordCount = total,
+                SkippedCount = skippedKpis,
                 DurationSeconds = meta.DurationSeconds,
             };
         }

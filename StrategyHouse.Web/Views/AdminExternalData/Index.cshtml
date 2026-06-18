@@ -298,8 +298,12 @@
                         try {
                             var res = JSON.parse(xhr.responseText);
                             if (xhr.status >= 200 && xhr.status < 300 && res.success) {
-                                showAlert('success', 'تم دفع ' + res.recordCount + ' سجلاً بنجاح خلال '
-                                    + res.durationSeconds + ' ثانية.');
+                                var okMsg = 'تم دفع ' + res.recordCount + ' سجلاً بنجاح خلال '
+                                    + res.durationSeconds + ' ثانية.';
+                                if (res.skippedCount && res.skippedCount > 0) {
+                                    okMsg += ' (تخطّى ' + res.skippedCount + ' سجلاً غير صالح.)';
+                                }
+                                showAlert('success', okMsg);
                                 updateStatus(true, res.recordCount);
                             } else {
                                 var err = (res && res.errorMessage) ? res.errorMessage : 'حدث خطأ غير متوقع.';

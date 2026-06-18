@@ -44,8 +44,11 @@ public class ExternalKpi
     [Column("Direction"), MaxLength(255)]
     public string? Direction { get; set; }
 
-    [Column("Index_Weight"), MaxLength(5)]
-    public string? IndexWeight { get; set; }
+    // Phase 19.19 — Index_Weight is NUMERIC in MSSQL, not text. Declaring it as
+    // string? made EF throw "Unable to cast 'System.Decimal' to 'System.String'"
+    // while materialising the row. Map it to decimal? to match the real column.
+    [Column("Index_Weight", TypeName = "decimal(18,4)")]
+    public decimal? IndexWeight { get; set; }
 
     [Column("Minimum", TypeName = "decimal(18,4)")]
     public decimal? Minimum { get; set; }

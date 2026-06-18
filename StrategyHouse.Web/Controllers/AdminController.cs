@@ -140,7 +140,9 @@ public class AdminController : Controller
                 PlrCode = k.PlrCode,
                 Division = k.Division,
                 Frequency = k.Frequency,
-                IndexWeight = k.IndexWeight,
+                // Phase 19.19 — external IndexWeight is now decimal?; the local Kpi
+                // view-model column is a string, so format without trailing zeros.
+                IndexWeight = k.IndexWeight?.ToString("0.####"),
                 Target2025 = k.Target2025,
                 Target2026 = k.Target2026,
                 Target2027 = k.Target2027,
