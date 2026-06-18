@@ -1,0 +1,43 @@
+@{
+    ViewData["Title"] = "استيراد قاعدة البيانات من Excel";
+}
+
+@section Styles {
+    <style>
+        .dbi-card { background:#fff;border-radius:14px;box-shadow:0 4px 16px rgba(40,51,74,.08);padding:18px;margin-bottom:20px; }
+        .sec-title { color:#00192B;font-weight:800;border-inline-start:5px solid #FAC126;padding-inline-start:12px;margin-bottom:14px; }
+        .dbi-warn { background:#fff4d6;border:1px solid #FAC126;color:#5a4500;border-radius:12px;padding:16px;margin-bottom:20px;font-weight:600;line-height:1.9; }
+    </style>
+}
+
+<div class="container py-3" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 style="color:#00192B;">استيراد قاعدة البيانات من Excel</h1>
+        <a class="btn btn-outline-secondary btn-sm" href="/Admin">رجوع</a>
+    </div>
+
+    @if (TempData["Success"] != null) { <div class="alert" style="background:#067647;color:#fff;border:none;">@TempData["Success"]</div> }
+    @if (TempData["Error"] != null) { <div class="alert alert-danger">@TempData["Error"]</div> }
+
+    <div class="dbi-warn">
+        ⚠️ هذه العملية تستبدل محتوى قاعدة البيانات بالكامل بما في Excel. الصفوف غير الموجودة في الملف ستُحذف. سيتم إنشاء نسخة احتياطية تلقائيًا قبل التطبيق.
+    </div>
+
+    <div class="dbi-card">
+        <h4 class="sec-title">رفع ملف التصدير (.xlsx)</h4>
+        <p class="text-muted" style="font-size:.9rem;">
+            ارفع ملف Excel بصيغة تصدير قاعدة البيانات (ورقة لكل جدول، الصف الأول أسماء الأعمدة).
+            ستظهر معاينة بعدد الإضافات والتحديثات والحذف لكل جدول قبل أي تغيير فعلي. لن تُكتب أي بيانات في هذه الخطوة.
+        </p>
+        <form method="post" action="/Admin/DbImport/Preview" enctype="multipart/form-data" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-12 col-md-8">
+                <label class="form-label">ملف Excel</label>
+                <input type="file" name="file" accept=".xlsx" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-4">
+                <button type="submit" class="btn btn-primary w-100" style="background:#00192B;border-color:#00192B;">معاينة التغييرات</button>
+            </div>
+        </form>
+    </div>
+</div>
