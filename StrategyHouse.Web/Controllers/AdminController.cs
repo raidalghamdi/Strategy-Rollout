@@ -114,7 +114,8 @@ public class AdminController : Controller
                 PlrCode = p.PlrCode,
                 ProjectType = p.ProjectType,
                 ProjectStatus = p.ProjectStatus,
-                Liquidity = p.BudgetLiquidity,
+                Budget = p.Budget,
+                Liquidity = p.Liquidity,
                 GacBudget = p.GacBudget,
                 ProjectSponsor = p.ProjectSponsor,
                 ProjectManager = p.ProjectManager,
@@ -140,9 +141,9 @@ public class AdminController : Controller
                 PlrCode = k.PlrCode,
                 Division = k.Division,
                 Frequency = k.Frequency,
-                // Phase 19.19 — external IndexWeight is now decimal?; the local Kpi
-                // view-model column is a string, so format without trailing zeros.
-                IndexWeight = k.IndexWeight?.ToString("0.####"),
+                // Phase 19.21 (Fix 1) — external IndexWeight is string? again (the
+                // real column is nvarchar(5)); copy it straight across.
+                IndexWeight = k.IndexWeight,
                 Target2025 = k.Target2025,
                 Target2026 = k.Target2026,
                 Target2027 = k.Target2027,
