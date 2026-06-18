@@ -33,14 +33,25 @@ public class ExternalKpi
     [Column("Frequency"), MaxLength(50)]
     public string? Frequency { get; set; }
 
-    [Column("Unit_Direction"), MaxLength(255)]
-    public string? UnitDirection { get; set; }
+    // Phase 19.18 — the real MSSQL "KPIs" table has four separate columns
+    // (Unit, Direction, Minimum, Maximum). The old combined Unit_Direction /
+    // Minimum_Maximum columns never existed, so EF's auto-generated SELECT failed
+    // with "Invalid column name". These map the genuine columns; the SQLite mirror
+    // still stores the combined shapes (see MssqlMirrorService projection).
+    [Column("Unit"), MaxLength(255)]
+    public string? Unit { get; set; }
+
+    [Column("Direction"), MaxLength(255)]
+    public string? Direction { get; set; }
 
     [Column("Index_Weight"), MaxLength(5)]
     public string? IndexWeight { get; set; }
 
-    [Column("Minimum_Maximum", TypeName = "decimal(18,4)")]
-    public decimal? MinimumMaximum { get; set; }
+    [Column("Minimum", TypeName = "decimal(18,4)")]
+    public decimal? Minimum { get; set; }
+
+    [Column("Maximum", TypeName = "decimal(18,4)")]
+    public decimal? Maximum { get; set; }
 
     [Column("Target_2025"), MaxLength(50)]
     public string? Target2025 { get; set; }

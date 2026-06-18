@@ -135,9 +135,14 @@ public class MssqlMirrorService : IMssqlMirrorService
                     PlrCode = k.PlrCode,
                     Division = k.Division,
                     Frequency = k.Frequency,
-                    UnitDirection = k.UnitDirection,
+                    // Phase 19.18 — source now exposes the four real MSSQL columns
+                    // (Unit, Direction, Minimum, Maximum). The mirror keeps a single
+                    // combined Unit/Direction string and one Minimum-Maximum decimal,
+                    // so fold the split source columns back together here. Null-safe:
+                    // CombineText drops blanks; the decimal prefers Minimum, else Maximum.
+                    UnitDirection = CombineText(k.Unit, k.Direction),
                     IndexWeight = k.IndexWeight,
-                    MinimumMaximum = k.MinimumMaximum,
+                    MinimumMaximum = k.Minimum ?? k.Maximum,
                     Target2025 = k.Target2025,
                     Target2026 = k.Target2026,
                     Target2027 = k.Target2027,
@@ -210,6 +215,15 @@ public class MssqlMirrorService : IMssqlMirrorService
                 DurationSeconds = (DateTime.UtcNow - startedAt).TotalSeconds,
             };
         }
+    }
+
+    // Joins two optional source columns into one mirror string, skipping blanks so
+    // a missing Unit or Direction doesn't leave stray separators (" / ").
+    private static string? CombineText(string? a, string? b)
+    {
+        var parts = new[] { a, b }.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s!.Trim());
+        var joined = string.Join(" / ", parts);
+        return joined.Length == 0 ? null : joined;
     }
 
     private async Task FinishAsync(MirrorMetadata meta, bool success, int count, DateTime startedAt, string? error, CancellationToken ct)
