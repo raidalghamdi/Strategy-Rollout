@@ -93,9 +93,15 @@ public class StrategyDataProvider : IStrategyDataProvider
             links.Add(new { source, target, value = 1 });
         }
 
-        var pillarByCode = data.Pillars.ToDictionary(p => p.Code, p => p.Name, StringComparer.Ordinal);
-        var objByCode = data.Objectives.ToDictionary(o => o.Code, o => o, StringComparer.Ordinal);
-        var initByCode = data.Initiatives.ToDictionary(i => i.Code, i => i, StringComparer.Ordinal);
+        // Phase 19.20 (Fix 2/3) — group-by-first so duplicate codes in the source data
+        // can't throw an ArgumentException here (which previously surfaced in the UI as
+        // "تعذّر تحميل مخطط التدفق").
+        var pillarByCode = data.Pillars.GroupBy(p => p.Code, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First().Name, StringComparer.Ordinal);
+        var objByCode = data.Objectives.GroupBy(o => o.Code, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        var initByCode = data.Initiatives.GroupBy(i => i.Code, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
 
         // Phase 19.13 — add the Vision as the left-most root node so the flow
         // reads end-to-end: Vision → Pillars → Objectives → Initiatives → Projects.
