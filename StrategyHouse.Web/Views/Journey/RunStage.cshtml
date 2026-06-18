@@ -54,6 +54,16 @@
             background: #00192B; color: #FFFFFF; font-weight: 700;
             border-color: #00192B;
         }
+        /* Phase 19.17 — guarantee white text (number + title) on the dark
+           navy/green pip states for WCAG-AA contrast, even when the pip is an
+           <a> (global `a { color }` rules must not bleed through). */
+        a.journey-stepper .pip.done,
+        .journey-stepper a.pip.done,
+        .journey-stepper a.pip.done:link,
+        .journey-stepper a.pip.done:visited,
+        .journey-stepper a.pip.done:hover {
+            color: #FFFFFF !important;
+        }
         .journey-stepper .pip.locked {
             background: #EFEFEF; color: #8a96a8; opacity: 1; pointer-events: none;
             border-color: #E1E5EB;

@@ -499,19 +499,24 @@ public class JourneyController : Controller
     // stage 5 (الأثر). One value per session. Redirects back to stage 5.
     [HttpPost("Journey/SaveAttendeeCount/{sessionId:guid}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveAttendeeCount(Guid sessionId, int attendeeCount)
+    public async Task<IActionResult> SaveAttendeeCount(Guid sessionId, int? attendeeCount)
     {
         var session = await _db.StrategySessions.FindAsync(sessionId);
         if (session == null) return NotFound();
-        if (attendeeCount < 1 || attendeeCount > 500)
+        // Phase 19.17 — the attendee count is truly optional. An empty submission
+        // (null) or an out-of-range value is a gentle no-op: no red error, no
+        // blocked navigation. Only a valid 1..500 value is persisted.
+        if (attendeeCount.HasValue && attendeeCount.Value >= 1 && attendeeCount.Value <= 500)
         {
-            TempData["Error"] = "أدخل عدداً صحيحاً بين 1 و500.";
-            return RedirectToRun(sessionId, 5);
+            session.AttendeeCount = attendeeCount.Value;
+            session.LastActivityAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            TempData["Saved"] = "تم حفظ عدد الحاضرين.";
         }
-        session.AttendeeCount = attendeeCount;
-        session.LastActivityAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
-        TempData["Saved"] = "تم حفظ عدد الحاضرين.";
+        else
+        {
+            TempData["Saved"] = "تخطّيت حفظ العدد (حقل اختياري).";
+        }
         return RedirectToRun(sessionId, 5);
     }
 
