@@ -2,6 +2,9 @@
 @{
     Layout = "_JourneyLayout";
     ViewData["Title"] = "اختبار الاستراتيجية";
+    // Phase 19.14 — disable HTTP caching so iOS Safari can't serve a stale snapshot.
+    Context.Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
+    Context.Response.Headers["Pragma"] = "no-cache";
     var sessionId = ViewBag.SessionId as Guid?;
     var scope = ViewBag.Scope as string ?? "General";
     var deptCode = ViewBag.DeptCode as string;
@@ -23,49 +26,44 @@
 }
 else
 {
-    @* Phase 19.12 — Quiz reliability fix. Three changes to address repeated reports
-       that the quiz "doesn't work":
+    @* Phase 19.14 — the SSR-disabled-button approach from Phase 19.12 turned
+       out to be a trap: when a user reported "quiz doesn't work" the screenshot
+       showed the SSR placeholder (disabled radios + "جارٍ التحميل…" button) STILL
+       visible, which made the page LOOK functional but actually do nothing on
+       click. That's because if JS fails to boot for any reason (cached old HTML,
+       proxy stripping inline script, etc.) the user is stuck on a fake question.
 
-       1. Server-side render the FIRST question into #quizArea so the page is never
-          blank if JS is still loading. Subsequent questions are re-rendered by JS.
-       2. Move the quiz script INLINE inside the quiz-card (not in @@section Scripts
-          at the bottom of body). This makes it run BEFORE the CDN scripts
-          (bootstrap/d3/konva) so a slow/failed CDN can no longer delay or block
-          the quiz boot.
-       3. Add a visible status line under the progress bar that says "جارٍ التحميل…"
-          on render and is cleared once JS boots — so the user always knows whether
-          something is happening. *@
+       New strategy: do NOT server-render any question. Show only a small
+       "جارٍ تحميل الاسئلة…" spinner inside #quizArea. JS replaces the whole
+       block on boot. If JS doesn't boot, the user clearly sees the loading
+       state — not a broken-but-styled question — and the noscript fallback
+       below tells them what to do. We also send Cache-Control: no-store on the
+       view so iOS Safari can't serve a stale HTML snapshot. *@
     <div class="quiz-card">
         <h1 class="quiz-title">اختبار معرفة الاستراتيجية</h1>
         <div class="quiz-progress"><div id="bar" class="quiz-progress__fill" style="width:0%"></div></div>
-        <div id="quizStatus" class="text-muted small mt-2" style="min-height:1.2em;">جارٍ التحميل…</div>
+        <div id="quizStatus" class="text-muted small mt-2" style="min-height:1.2em;"></div>
         <div id="quizArea">
-            @* SSR fallback: first question rendered server-side so the page is
-               never visually empty even if JS hasn't booted yet. *@
             <noscript>
                 <div class="alert alert-warning">يتطلب الاختبار تشغيل JavaScript في المتصفح. فعّل JavaScript وحدّث الصفحة.</div>
             </noscript>
-            @if (firstQ != null)
-            {
-                <div class="quiz-step">سؤال 1 من @payload.Count</div>
-                <h3 class="quiz-question">@firstQ.text</h3>
-                <div class="quiz-options">
-                    @for (int i = 0; i < firstQ.options.Count; i++)
-                    {
-                        <label class="quiz-option">
-                            <input type="radio" name="opt" value="@i" disabled />
-                            <span>@firstQ.options[i]</span>
-                        </label>
-                    }
-                </div>
-                <div class="quiz-nav sticky-bottom-cta">
-                    <span></span>
-                    <button type="button" class="quiz-btn quiz-btn--primary" disabled>جارٍ التحميل…</button>
-                </div>
-            }
+            <div class="quiz-loading" id="quizLoading">
+                <div class="quiz-loading__spinner" aria-hidden="true"></div>
+                <div class="quiz-loading__text">جارٍ تحميل الأسئلة…</div>
+                <div class="quiz-loading__hint">إذا استمرت هذه الرسالة أكثر من بضع ثوانٍ، حدّث الصفحة أو افتحها في نافذة خفية.</div>
+                <button type="button" class="quiz-btn quiz-btn--ghost" onclick="location.reload()" style="margin-top:14px;">تحديث الصفحة</button>
+            </div>
         </div>
         <div id="resultArea" style="display:none;"></div>
     </div>
+
+    <style>
+        .quiz-loading { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px 16px; gap:8px; }
+        .quiz-loading__spinner { width:36px; height:36px; border-radius:50%; border:3px solid #e7edf5; border-top-color:#067647; animation:quizSpin 1s linear infinite; }
+        .quiz-loading__text { font-weight:700; color:#28334A; font-size:1rem; }
+        .quiz-loading__hint { color:#5a6b80; font-size:.85rem; text-align:center; line-height:1.6; max-width:340px; }
+        @@keyframes quizSpin { to { transform: rotate(360deg); } }
+    </style>
 
     @* INLINE script — runs immediately as the parser reaches it, BEFORE the
        CDN scripts at the bottom of _JourneyLayout. This is the key reliability
