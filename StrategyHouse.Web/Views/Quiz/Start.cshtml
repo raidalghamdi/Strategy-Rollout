@@ -45,7 +45,12 @@ else
        state — not a broken-but-styled question — and the noscript fallback
        below tells them what to do. We also send Cache-Control: no-store on the
        view so iOS Safari can't serve a stale HTML snapshot. *@
-    <div class="quiz-card">
+    @* build: phase 19.17 *@
+    <meta http-equiv="Cache-Control" content="no-store" />
+    <div class="quiz-card"
+         data-session-id="@(sessionId?.ToString() ?? "")"
+         data-scope="@scope"
+         data-dept-code="@(deptCode ?? "")">
         <h1 class="quiz-title">اختبار معرفة الاستراتيجية</h1>
         <div class="quiz-progress"><div id="bar" class="quiz-progress__fill" style="width:0%"></div></div>
         <div id="quizStatus" class="text-muted small mt-2" style="min-height:1.2em;"></div>
@@ -58,10 +63,23 @@ else
                 <div class="quiz-loading__text">جارٍ تحميل الأسئلة…</div>
                 <div class="quiz-loading__hint">إذا استمرت هذه الرسالة أكثر من بضع ثوانٍ، حدّث الصفحة أو افتحها في نافذة خفية.</div>
                 <button type="button" class="quiz-btn quiz-btn--ghost" onclick="location.reload()" style="margin-top:14px;">تحديث الصفحة</button>
+                <a href="/Quiz/Start" class="quiz-btn quiz-btn--ghost" style="margin-top:8px;display:inline-block;">إعادة فتح الاختبار</a>
             </div>
         </div>
         <div id="resultArea" style="display:none;"></div>
     </div>
+
+    @* Quiz data — parsed by /js/quiz-page.js via JSON.parse. Kept as a typed JSON
+       script block (not inline JS) so the external script has no Razor coupling. *@
+    <script type="application/json" id="quiz-data">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(new {
+        questions = payload,
+        survey = new {
+            url = surveyUrl,
+            title = surveyTitle,
+            body = surveyBody,
+            qr = surveyQrDataUri ?? ""
+        }
+    }))</script>
 
     <style>
         /* Phase 19.15 — thank-you screen shown after «إنهاء» on quiz results. */
@@ -80,181 +98,11 @@ else
         @@keyframes quizSpin { to { transform: rotate(360deg); } }
     </style>
 
-    @* INLINE script — runs immediately as the parser reaches it, BEFORE the
-       CDN scripts at the bottom of _JourneyLayout. This is the key reliability
-       fix: the quiz no longer depends on bootstrap/d3/konva downloading first. *@
-    <script>
-    (function () {
-        var questions = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(payload));
-        // Phase 19.15 — survey QR + thank-you payload (admin-editable via /Admin/Content).
-        var SURVEY = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new {
-            url = surveyUrl,
-            title = surveyTitle,
-            body = surveyBody,
-            qr = surveyQrDataUri ?? ""
-        }));
-        var sessionId = @(sessionId != null ? $"\"{sessionId}\"" : "null");
-        var scope = "@scope";
-        var deptCode = @(deptCode != null ? $"\"{deptCode}\"" : "null");
-        var answers = new Array(questions.length);
-        for (var k = 0; k < questions.length; k++) answers[k] = -1;
-        var cur = 0;
-
-        function $(id) { return document.getElementById(id); }
-        function esc(s) {
-            return String(s).replace(/[&<>"']/g, function (c) {
-                return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c];
-            });
-        }
-
-        function setStatus(t) { var s = $('quizStatus'); if (s) s.textContent = t || ''; }
-
-        function render() {
-            var area = $('quizArea');
-            var bar = $('bar');
-            if (!area) { setStatus('تعذّر العثور على منطقة الأسئلة'); return; }
-            if (!questions || questions.length === 0) {
-                area.innerHTML = '<div class="alert alert-warning">لا توجد أسئلة متاحة الآن.</div>';
-                setStatus('');
-                return;
-            }
-            var q = questions[cur];
-            if (bar) bar.style.width = Math.round((cur) / questions.length * 100) + '%';
-            var html = '';
-            html += '<div class="quiz-step">سؤال ' + (cur + 1) + ' من ' + questions.length + '</div>';
-            html += '<h3 class="quiz-question">' + esc(q.text) + '</h3>';
-            html += '<div class="quiz-options">';
-            for (var i = 0; i < q.options.length; i++) {
-                var checkedAttr = answers[cur] === i ? 'checked' : '';
-                var activeCls = answers[cur] === i ? ' is-selected' : '';
-                html += '<label class="quiz-option' + activeCls + '">'
-                     + '<input type="radio" name="opt" value="' + i + '" ' + checkedAttr + ' onclick="quizPick(' + i + ')">'
-                     + '<span>' + esc(q.options[i]) + '</span></label>';
-            }
-            html += '</div>';
-            html += '<div class="quiz-nav sticky-bottom-cta">';
-            html += cur > 0
-                ? '<button type="button" class="quiz-btn quiz-btn--ghost" onclick="quizPrev()">السابق</button>'
-                : '<span></span>';
-            html += cur < questions.length - 1
-                ? '<button type="button" class="quiz-btn quiz-btn--primary" onclick="quizNext()">التالي</button>'
-                : '<button type="button" class="quiz-btn quiz-btn--primary" onclick="quizSubmit()">إرسال الإجابات</button>';
-            html += '</div>';
-            area.innerHTML = html;
-            setStatus('');
-        }
-
-        function pick(i) { answers[cur] = i; render(); }
-        function next() { if (cur < questions.length - 1) { cur++; render(); } }
-        function prev() { if (cur > 0) { cur--; render(); } }
-
-        function submit() {
-            setStatus('جارٍ إرسال الإجابات…');
-            var body = {
-                sessionId: sessionId,
-                scope: scope,
-                deptCode: deptCode,
-                answers: questions.map(function (q, i) { return { qid: q.id, picked: answers[i] }; })
-            };
-            fetch('/Quiz/Submit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            }).then(function (res) { return res.json(); }).then(function (data) {
-                var bar = $('bar'); if (bar) bar.style.width = '100%';
-                var area = $('quizArea'); if (area) area.style.display = 'none';
-                var r = $('resultArea'); if (!r) return;
-                r.style.display = 'block';
-                var html = '<div class="quiz-score"><div class="quiz-score__label">نتيجتك</div>'
-                         + '<div class="quiz-score__value">' + data.score + ' / ' + data.total + '</div></div>';
-                for (var i = 0; i < data.detail.length; i++) {
-                    var d = data.detail[i];
-                    var q = null;
-                    for (var j = 0; j < questions.length; j++) { if (questions[j].id === d.qid) { q = questions[j]; break; } }
-                    if (!q) continue;
-                    var picked = d.picked >= 0 ? esc(q.options[d.picked]) : '— لم تتم الإجابة —';
-                    var correct = esc(q.options[d.correctIndex]);
-                    html += '<div class="quiz-review ' + (d.correct ? 'is-correct' : 'is-wrong') + '">'
-                          + '<div class="quiz-review__q">' + esc(q.text) + '</div>'
-                          + '<div class="quiz-review__a">إجابتك: ' + picked + ' ' + (d.correct ? '✓' : '✗') + '</div>'
-                          + (d.correct ? '' : '<div class="quiz-review__correct">الصحيح: ' + correct + '</div>')
-                          + (d.explanation ? '<div class="quiz-muted">' + esc(d.explanation) + '</div>' : '')
-                          + '</div>';
-                }
-                // Phase 19.15 — «إعادة المحاولة» تحولت إلى «إنهاء». عند الضغط
-                // تُستبدل بطاقة النتيجة ببطاقة شكر تعرض رمز QR للاستبيان.
-                html += '<div class="quiz-nav quiz-nav--center"><button type="button" class="quiz-btn quiz-btn--primary" onclick="quizFinish()">إنهاء</button></div>';
-                r.innerHTML = html;
-                setStatus('');
-            }).catch(function (err) {
-                setStatus('');
-                var area = $('quizArea');
-                if (area) area.innerHTML = '<div class="alert alert-danger">تعذّر إرسال الإجابات. حاول مرة أخرى.</div>';
-            });
-        }
-
-        // Phase 19.15 — «إنهاء» handler: swap the result card for a thank-you
-        // screen with the survey QR + tappable link. All content is supplied
-        // by the server (admin-editable via /Admin/Content) and embedded in
-        // the global SURVEY object below — the JS does no string templating
-        // of unsafe content, just textContent swaps.
-        function finish() {
-            var card = document.querySelector('.quiz-card');
-            if (!card) return;
-            var s = (typeof SURVEY !== 'undefined') ? SURVEY : { url: '', title: 'شكراً لمشاركتك', body: '', qr: '' };
-            var html = ''
-                + '<div class="quiz-thanks">'
-                +   '<div class="quiz-thanks__icon" aria-hidden="true">'
-                +     '<svg width="56" height="56" viewBox="0 0 24 24" fill="none">'
-                +       '<circle cx="12" cy="12" r="11" fill="#067647" />'
-                +       '<path d="M7 12.5l3.5 3.5L17 9" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none" />'
-                +     '</svg>'
-                +   '</div>'
-                +   '<h2 class="quiz-thanks__title"></h2>'
-                +   '<p class="quiz-thanks__body"></p>';
-            if (s.qr) {
-                html += '<div class="quiz-thanks__qr"><img alt="رمز الاستبيان" src="' + s.qr + '" /></div>';
-            }
-            if (s.url) {
-                html += '<a class="quiz-thanks__link quiz-btn quiz-btn--primary" target="_blank" rel="noopener" href="' + s.url + '">افتح الاستبيان</a>';
-            }
-            html += '<button type="button" class="quiz-btn quiz-btn--ghost" style="margin-top:10px;" onclick="location.href=\'/\'">العودة للرئيسية</button>';
-            html += '</div>';
-            card.innerHTML = html;
-            // Set the title/body via textContent to keep admin-editable strings
-            // safe even if they contain HTML-meaningful characters.
-            var t = card.querySelector('.quiz-thanks__title');
-            var b = card.querySelector('.quiz-thanks__body');
-            if (t) t.textContent = s.title || 'شكراً لمشاركتك';
-            if (b) b.textContent = s.body || '';
-        }
-
-        // Expose to global scope so iOS Safari inline onclick can resolve them.
-        window.quizPick = pick;
-        window.quizNext = next;
-        window.quizPrev = prev;
-        window.quizFinish = finish;
-        window.quizSubmit = submit;
-
-        function boot() {
-            try {
-                render();
-            } catch (e) {
-                setStatus('');
-                var a = $('quizArea');
-                if (a) a.innerHTML = '<div class="alert alert-danger">تعذّر تحميل الاختبار: ' + esc(String(e)) + '. حدّث الصفحة.</div>';
-            }
-        }
-
-        // Phase 19.13 — call boot() unconditionally. The script tag sits right
-        // after the quiz-card markup in the DOM, so document.getElementById will
-        // find the elements at parse time. Waiting for DOMContentLoaded turned
-        // out to be a trap: on iOS Safari that event is held back until ALL the
-        // CDN <script src> tags later in the body have loaded (bootstrap/d3/d3-sankey/konva
-        // — together ~600KB). On a flaky network or CDN hiccup the quiz never
-        // booted. Running boot() right here, before the parser even sees the
-        // CDN scripts, makes the quiz independent of them.
-        boot();
-    })();
-    </script>
+    @* Phase 19.17 — the quiz logic now lives in /js/quiz-page.js (moved out of
+       this view to avoid Razor/inline-script edge cases that left iPad Safari
+       stuck on the loading spinner). The script reads its data from the
+       #quiz-data JSON block and the data-* attributes on .quiz-card above, and
+       boots with a bfcache re-init + 2s watchdog. Cache-busting query so devices
+       always pull the new build. *@
+    <script src="/js/quiz-page.js?v=19.17"></script>
 }

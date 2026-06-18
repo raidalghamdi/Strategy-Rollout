@@ -61,7 +61,6 @@
         <textarea id="impactText" class="form-control" rows="3" maxlength="4000" style="max-width:100%;"
                   placeholder="اكتب الأثر الذي تراه… (اختياري)">@savedImpact</textarea>
         <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
-            <button type="button" id="showLinkBtn" class="btn gac-btn-primary text-white" style="min-height:44px;">إظهار الربط ⟵</button>
             <span id="contribStatus" class="small text-muted"></span>
         </div>
     </div>
@@ -154,6 +153,11 @@
                     selectedCode = it.code; selectedName = it.name || it.code;
                     selectedObj = it.objectiveName || ''; selectedPillar = it.pillarName || '';
                     if (el('impactBlock')) el('impactBlock').removeAttribute('hidden');
+                    // Phase 19.17 — the link tree now appears/updates automatically the
+                    // moment an initiative is chosen (the manual «إظهار الربط» button
+                    // was removed). Changing selection replaces the tree contents in place.
+                    showChain();
+                    saveContribution();
                 });
                 if (savedInit && savedInit === it.code) { radio.checked = true; radio.dispatchEvent(new CustomEvent('change')); }
                 grid.appendChild(label);
@@ -210,10 +214,18 @@
             }
             if (sel.value) loadInitiatives(sel.value);
         }
-        var btn = el('showLinkBtn');
-        if (btn && !btn.__bound) {
-            btn.__bound = true;
-            btn.addEventListener('click', function () { showChain(); saveContribution(); });
+        // Phase 19.17 — autosave the optional impact text on edit (debounced),
+        // since the «إظهار الربط» button that used to trigger the save is gone.
+        // The «تم الحفظ ✓» indicator behavior is preserved.
+        var impact = el('impactText');
+        if (impact && !impact.__bound) {
+            impact.__bound = true;
+            var impactTimer = null;
+            impact.addEventListener('input', function () {
+                if (!selectedCode) return;
+                if (impactTimer) clearTimeout(impactTimer);
+                impactTimer = setTimeout(function () { saveContribution(); }, 800);
+            });
         }
     }
     document.addEventListener('stageReady', function (e) { if (e.detail && e.detail.stage === 3) init(); });
