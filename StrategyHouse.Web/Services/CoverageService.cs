@@ -27,20 +27,28 @@ public class CoverageService
         var pillars = await _db.Pillars.AsNoTracking().OrderBy(p => p.PlrCode).ToListAsync();
 
         // Build the row elements with code+label according to the chosen dimension.
+        // Phase 19.20 (Fix 2) — dedup by code so duplicate seed/import rows collapse to a
+        // single matrix row. This also guards the rowIndex dictionary below, which would
+        // otherwise throw on a duplicate code key.
         var rows = dimension switch
         {
-            ElementDimension.Pillar => pillars.Select(p => new CoverageRow(p.PlrCode, p.PillarName ?? p.PlrCode)).ToList(),
-            ElementDimension.Objective => objectives.OrderBy(o => o.ObjectiveCode)
+            ElementDimension.Pillar => StrategyDedup.ByPillarCode(pillars)
+                .Select(p => new CoverageRow(p.PlrCode, p.PillarName ?? p.PlrCode)).ToList(),
+            ElementDimension.Objective => StrategyDedup.ByObjectiveCode(objectives)
                 .Select(o => new CoverageRow(o.ObjectiveCode, o.ObjectiveName ?? o.ObjectiveCode)).ToList(),
-            _ => initiatives.OrderBy(i => i.InitiativeCode)
+            _ => StrategyDedup.ByInitiativeCode(initiatives)
                 .Select(i => new CoverageRow(i.InitiativeCode, i.InitiativeName ?? i.InitiativeCode)).ToList(),
         };
 
         // Lookups for rolling KPIs/Projects up to the chosen dimension.
-        var objToPlr = objectives.ToDictionary(o => o.ObjectiveCode, o => o.PlrCode ?? "");
-        var initToObj = initiatives.ToDictionary(i => i.InitiativeCode, i => i.ObjectiveCode ?? "");
+        // Phase 19.20 (Fix 2) — group-by-then-first so duplicate codes don't throw.
+        var objToPlr = objectives.GroupBy(o => o.ObjectiveCode)
+            .ToDictionary(g => g.Key, g => g.First().PlrCode ?? "");
+        var initToObj = initiatives.GroupBy(i => i.InitiativeCode)
+            .ToDictionary(g => g.Key, g => g.First().ObjectiveCode ?? "");
         var prjToInit = projects.Where(p => p.InitiativeCode != null)
-            .ToDictionary(p => p.ProjectCode, p => p.InitiativeCode!);
+            .GroupBy(p => p.ProjectCode)
+            .ToDictionary(g => g.Key, g => g.First().InitiativeCode!);
 
         // Resolve which row-code a KPI / Project / Pledge belongs to under the dimension.
         string? KpiRowCode(Kpi k) => dimension switch

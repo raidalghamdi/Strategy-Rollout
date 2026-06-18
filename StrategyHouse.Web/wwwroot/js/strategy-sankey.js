@@ -85,7 +85,10 @@
             fetch('/api/strategy/sankey', { headers: { 'Accept': 'application/json' } })
                 .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
                 .then(function (data) {
-                    if (!data || !data.nodes || !data.nodes.length) { fail(el); return; }
+                    // Phase 19.20 (Fix 3) — a successful response with an empty graph means
+                    // "no data yet", not a load error. Show a gentle empty-state message and
+                    // reserve the red error message for genuine network/HTTP failures (catch).
+                    if (!data || !data.nodes || !data.nodes.length) { empty(el); return; }
                     loadEcharts(function (err) {
                         if (err || !window.echarts) { fail(el); return; }
                         el.innerHTML = '';
@@ -111,6 +114,12 @@
     function fail(el) {
         el.__sankeyRendered = false;
         el.innerHTML = '<div class="alert alert-warning">تعذّر تحميل مخطط التدفق. حاول مرة أخرى لاحقاً.</div>';
+    }
+
+    // Phase 19.20 (Fix 3) — empty-state (valid response, no nodes). Not an error.
+    function empty(el) {
+        el.__sankeyRendered = false;
+        el.innerHTML = '<div class="text-muted" style="padding:18px;text-align:center;">لا توجد بيانات لعرضها حالياً.</div>';
     }
 
     window.StrategySankey = window.StrategySankey || {};

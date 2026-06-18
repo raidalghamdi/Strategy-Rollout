@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StrategyHouse.Infrastructure.Persistence;
+using StrategyHouse.Web.Services;
 
 namespace StrategyHouse.Web.Controllers;
 
@@ -11,10 +12,19 @@ public class HomeController : Controller
 
     public async Task<IActionResult> Index()
     {
+        // Phase 19.20 (Fix 2) — count DISTINCT strategy elements. Seed/import data can
+        // contain duplicate rows (same code appearing more than once); the home tiles
+        // should reflect the real number of unique pillars/objectives/initiatives, not
+        // the raw row count. Dedup by code, falling back to the Arabic name when the
+        // code is blank.
+        var pillars = await _db.Pillars.AsNoTracking().ToListAsync();
+        var objectives = await _db.Objectives.AsNoTracking().ToListAsync();
+        var initiatives = await _db.Initiatives.AsNoTracking().ToListAsync();
+
         var stats = new HomeStats(
-            await _db.Pillars.CountAsync(),
-            await _db.Objectives.CountAsync(),
-            await _db.Initiatives.CountAsync(),
+            StrategyDedup.ByPillarCode(pillars).Count,
+            StrategyDedup.ByObjectiveCode(objectives).Count,
+            StrategyDedup.ByInitiativeCode(initiatives).Count,
             await _db.Projects.CountAsync(),
             await _db.Kpis.CountAsync());
         ViewBag.Stats = stats;

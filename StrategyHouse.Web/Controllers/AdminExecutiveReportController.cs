@@ -23,19 +23,22 @@ public class AdminExecutiveReportController : Controller
     private readonly ExecutiveReportExcelBuilder _excel;
     private readonly ExecutiveReportPowerPointBuilder _pptx;
     private readonly ReportEmailService _email;
+    private readonly ILogger<AdminExecutiveReportController> _logger;
 
     public AdminExecutiveReportController(
         ExecutiveReportService service,
         ExecutiveReportPdfDocument pdf,
         ExecutiveReportExcelBuilder excel,
         ExecutiveReportPowerPointBuilder pptx,
-        ReportEmailService email)
+        ReportEmailService email,
+        ILogger<AdminExecutiveReportController> logger)
     {
         _service = service;
         _pdf = pdf;
         _excel = excel;
         _pptx = pptx;
         _email = email;
+        _logger = logger;
     }
 
     private static string FileBase => $"Executive_Report_{DateTime.UtcNow:yyyy-MM-dd}";
@@ -74,32 +77,79 @@ public class AdminExecutiveReportController : Controller
         return Json(new { success = true, message = "تم حفظ الأقسام المختارة كافتراضي." });
     }
 
+    // Phase 19.20 (Fix 5) — every export builds its bytes inside a guard so a builder
+    // failure (or empty dataset) yields a valid downloadable file with a friendly Arabic
+    // placeholder instead of a 500 error page. The HTML report itself already tolerates an
+    // empty dataset (all counts default to zero), so the only remaining risk is a builder
+    // exception — this is where we catch it.
     [HttpGet("ExecutiveReport.pdf")]
     public async Task<IActionResult> ExecutiveReportPdf(string? sections = null)
     {
-        var vm = await _service.BuildAsync(ResolveSections(sections));
-        return File(_pdf.Generate(vm), PdfMime, $"{FileBase}.pdf");
+        try
+        {
+            var vm = await _service.BuildAsync(ResolveSections(sections));
+            return File(_pdf.Generate(vm), PdfMime, $"{FileBase}.pdf");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Executive report PDF export failed.");
+            return File(PlaceholderCsv(), CsvMime, $"{FileBase}.csv");
+        }
     }
 
     [HttpGet("ExecutiveReport.pptx")]
     public async Task<IActionResult> ExecutiveReportPptx(string? sections = null)
     {
-        var vm = await _service.BuildAsync(ResolveSections(sections));
-        return File(_pptx.Build(vm), PptxMime, $"{FileBase}.pptx");
+        try
+        {
+            var vm = await _service.BuildAsync(ResolveSections(sections));
+            return File(_pptx.Build(vm), PptxMime, $"{FileBase}.pptx");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Executive report PowerPoint export failed.");
+            return File(PlaceholderCsv(), CsvMime, $"{FileBase}.csv");
+        }
     }
 
     [HttpGet("ExecutiveReport.xlsx")]
     public async Task<IActionResult> ExecutiveReportXlsx(string? sections = null)
     {
-        var vm = await _service.BuildAsync(ResolveSections(sections));
-        return File(_excel.Build(vm), XlsxMime, $"{FileBase}.xlsx");
+        try
+        {
+            var vm = await _service.BuildAsync(ResolveSections(sections));
+            return File(_excel.Build(vm), XlsxMime, $"{FileBase}.xlsx");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Executive report Excel export failed.");
+            return File(PlaceholderCsv(), CsvMime, $"{FileBase}.csv");
+        }
     }
 
     [HttpGet("ExecutiveReport.csv")]
     public async Task<IActionResult> ExecutiveReportCsv(string? sections = null)
     {
-        var vm = await _service.BuildAsync(ResolveSections(sections));
-        return File(BuildCsv(vm), CsvMime, $"{FileBase}.csv");
+        try
+        {
+            var vm = await _service.BuildAsync(ResolveSections(sections));
+            return File(BuildCsv(vm), CsvMime, $"{FileBase}.csv");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Executive report CSV export failed.");
+            return File(PlaceholderCsv(), CsvMime, $"{FileBase}.csv");
+        }
+    }
+
+    // Minimal valid CSV used when a richer export can't be produced.
+    private static byte[] PlaceholderCsv()
+    {
+        var sb = new StringBuilder();
+        sb.Append('﻿'); // UTF-8 BOM so Excel renders Arabic correctly.
+        sb.AppendLine("القسم,المؤشر,القيمة");
+        sb.AppendLine("تنبيه,تعذّر إنشاء التقرير حالياً,لا توجد بيانات كافية");
+        return Encoding.UTF8.GetBytes(sb.ToString());
     }
 
     [HttpPost("ExecutiveReport/Email")]
@@ -109,14 +159,25 @@ public class AdminExecutiveReportController : Controller
         if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
             return Json(new { success = false, message = "يرجى إدخال بريد إلكتروني صحيح." });
 
-        var vm = await _service.BuildAsync(ResolveSections(sections));
+        // Phase 19.20 (Fix 5) — guard report assembly + attachment building. The email
+        // service already returns a friendly message when SMTP isn't configured; here we
+        // additionally ensure a builder failure produces a friendly JSON, never a 500.
         byte[] bytes; string mime, ext;
-        switch ((format ?? "pdf").ToLowerInvariant())
+        try
         {
-            case "pptx": bytes = _pptx.Build(vm); mime = PptxMime; ext = "pptx"; break;
-            case "xlsx": bytes = _excel.Build(vm); mime = XlsxMime; ext = "xlsx"; break;
-            case "csv": bytes = BuildCsv(vm); mime = CsvMime; ext = "csv"; break;
-            default: bytes = _pdf.Generate(vm); mime = PdfMime; ext = "pdf"; break;
+            var vm = await _service.BuildAsync(ResolveSections(sections));
+            switch ((format ?? "pdf").ToLowerInvariant())
+            {
+                case "pptx": bytes = _pptx.Build(vm); mime = PptxMime; ext = "pptx"; break;
+                case "xlsx": bytes = _excel.Build(vm); mime = XlsxMime; ext = "xlsx"; break;
+                case "csv": bytes = BuildCsv(vm); mime = CsvMime; ext = "csv"; break;
+                default: bytes = _pdf.Generate(vm); mime = PdfMime; ext = "pdf"; break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Executive report email build failed for format {Format}.", format);
+            return Json(new { success = false, message = "تعذّر إنشاء التقرير للإرسال حالياً. يرجى المحاولة لاحقاً." });
         }
 
         var fileName = $"{FileBase}.{ext}";
