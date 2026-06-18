@@ -25,6 +25,11 @@ public class PageContentService
         ("home.hero.cta", "ابدأ رحلة إدارتك"),
         ("home.about.title", "عن المنصة"),
         ("home.about.body", "منصة رقمية تفاعلية لإطلاق الاستراتيجية المؤسسية على مستوى الإدارات الثماني عشرة، تُعرّف الموظفين بالرؤية والرسالة والقيم، وتبني الخريطة الاستراتيجية لكل إدارة بشكل جماعي، وتُسجّل الالتزامات الطوعية على الجدار الرقمي للالتزامات."),
+        // Phase 19.19 — authoritative home stat totals, admin-editable at /Admin/Content
+        // (so they can change without a redeploy). Shown on the home page stat tiles
+        // instead of a live DB count.
+        ("home.stats.projects.total", "172"),
+        ("home.stats.kpis.total", "121"),
         ("home.objectives.title", "أهداف الرحلة"),
         ("home.objectives.body", "ترسيخ فهم مشترك للاستراتيجية، وربط عمل كل إدارة بالركائز والأهداف المؤسسية، وتحفيز الالتزام الجماعي بتحقيق المستهدفات، وبناء ثقافة تنفيذ موحّدة عبر الهيئة."),
         ("home.cta.title", "ابدأ رحلة إدارتك الاستراتيجية"),

@@ -204,6 +204,7 @@ public class AdminExternalDataController : Controller
         {
             success = result.Success,
             recordCount = result.RecordCount,
+            skippedCount = result.SkippedCount,
             durationSeconds = result.DurationSeconds,
             errorMessage = result.ErrorMessage,
         });
