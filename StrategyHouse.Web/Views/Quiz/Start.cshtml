@@ -14,6 +14,12 @@
         options = System.Text.Json.JsonSerializer.Deserialize<List<string>>(q.OptionsJson) ?? new List<string>()
     }).ToList();
     var firstQ = payload.FirstOrDefault();
+
+    // Phase 19.15 — survey QR + thank-you content (admin-editable via /Admin/Content).
+    var surveyUrl = (ViewBag.SurveyUrl as string) ?? "";
+    var surveyTitle = (ViewBag.SurveyTitle as string) ?? "شكراً لمشاركتك";
+    var surveyBody = (ViewBag.SurveyBody as string) ?? "";
+    var surveyQrDataUri = ViewBag.SurveyQrDataUri as string;
 }
 
 @if (!Model.Any())
@@ -58,6 +64,15 @@ else
     </div>
 
     <style>
+        /* Phase 19.15 — thank-you screen shown after «إنهاء» on quiz results. */
+        .quiz-thanks { display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px 8px; text-align:center; }
+        .quiz-thanks__icon { line-height:0; }
+        .quiz-thanks__title { color:#28334A; font-size:1.5rem; font-weight:800; margin:4px 0 0; }
+        .quiz-thanks__body { color:#5a6b80; font-size:1rem; line-height:1.7; max-width:480px; margin:0; }
+        .quiz-thanks__qr { background:#fff; padding:14px; border-radius:14px; border:1px solid #E1E5EB; box-shadow:0 2px 14px rgba(40,51,74,.08); }
+        .quiz-thanks__qr img { display:block; width:200px; height:200px; max-width:60vw; image-rendering: pixelated; }
+        .quiz-thanks__link { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:.6rem 1.6rem; border-radius:999px; text-decoration:none; }
+
         .quiz-loading { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px 16px; gap:8px; }
         .quiz-loading__spinner { width:36px; height:36px; border-radius:50%; border:3px solid #e7edf5; border-top-color:#067647; animation:quizSpin 1s linear infinite; }
         .quiz-loading__text { font-weight:700; color:#28334A; font-size:1rem; }
@@ -71,6 +86,13 @@ else
     <script>
     (function () {
         var questions = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(payload));
+        // Phase 19.15 — survey QR + thank-you payload (admin-editable via /Admin/Content).
+        var SURVEY = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new {
+            url = surveyUrl,
+            title = surveyTitle,
+            body = surveyBody,
+            qr = surveyQrDataUri ?? ""
+        }));
         var sessionId = @(sessionId != null ? $"\"{sessionId}\"" : "null");
         var scope = "@scope";
         var deptCode = @(deptCode != null ? $"\"{deptCode}\"" : "null");
@@ -159,7 +181,9 @@ else
                           + (d.explanation ? '<div class="quiz-muted">' + esc(d.explanation) + '</div>' : '')
                           + '</div>';
                 }
-                html += '<div class="quiz-nav quiz-nav--center"><button type="button" class="quiz-btn quiz-btn--ghost" onclick="location.reload()">إعادة المحاولة</button></div>';
+                // Phase 19.15 — «إعادة المحاولة» تحولت إلى «إنهاء». عند الضغط
+                // تُستبدل بطاقة النتيجة ببطاقة شكر تعرض رمز QR للاستبيان.
+                html += '<div class="quiz-nav quiz-nav--center"><button type="button" class="quiz-btn quiz-btn--primary" onclick="quizFinish()">إنهاء</button></div>';
                 r.innerHTML = html;
                 setStatus('');
             }).catch(function (err) {
@@ -169,10 +193,47 @@ else
             });
         }
 
+        // Phase 19.15 — «إنهاء» handler: swap the result card for a thank-you
+        // screen with the survey QR + tappable link. All content is supplied
+        // by the server (admin-editable via /Admin/Content) and embedded in
+        // the global SURVEY object below — the JS does no string templating
+        // of unsafe content, just textContent swaps.
+        function finish() {
+            var card = document.querySelector('.quiz-card');
+            if (!card) return;
+            var s = (typeof SURVEY !== 'undefined') ? SURVEY : { url: '', title: 'شكراً لمشاركتك', body: '', qr: '' };
+            var html = ''
+                + '<div class="quiz-thanks">'
+                +   '<div class="quiz-thanks__icon" aria-hidden="true">'
+                +     '<svg width="56" height="56" viewBox="0 0 24 24" fill="none">'
+                +       '<circle cx="12" cy="12" r="11" fill="#067647" />'
+                +       '<path d="M7 12.5l3.5 3.5L17 9" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none" />'
+                +     '</svg>'
+                +   '</div>'
+                +   '<h2 class="quiz-thanks__title"></h2>'
+                +   '<p class="quiz-thanks__body"></p>';
+            if (s.qr) {
+                html += '<div class="quiz-thanks__qr"><img alt="رمز الاستبيان" src="' + s.qr + '" /></div>';
+            }
+            if (s.url) {
+                html += '<a class="quiz-thanks__link quiz-btn quiz-btn--primary" target="_blank" rel="noopener" href="' + s.url + '">افتح الاستبيان</a>';
+            }
+            html += '<button type="button" class="quiz-btn quiz-btn--ghost" style="margin-top:10px;" onclick="location.href=\'/\'">العودة للرئيسية</button>';
+            html += '</div>';
+            card.innerHTML = html;
+            // Set the title/body via textContent to keep admin-editable strings
+            // safe even if they contain HTML-meaningful characters.
+            var t = card.querySelector('.quiz-thanks__title');
+            var b = card.querySelector('.quiz-thanks__body');
+            if (t) t.textContent = s.title || 'شكراً لمشاركتك';
+            if (b) b.textContent = s.body || '';
+        }
+
         // Expose to global scope so iOS Safari inline onclick can resolve them.
         window.quizPick = pick;
         window.quizNext = next;
         window.quizPrev = prev;
+        window.quizFinish = finish;
         window.quizSubmit = submit;
 
         function boot() {

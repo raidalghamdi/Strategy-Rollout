@@ -15,8 +15,15 @@ namespace StrategyHouse.Web.Controllers;
 public class QuizController : Controller
 {
     private readonly ApplicationDbContext _db;
+    private readonly PageContentService _pageContent;
+    private readonly QrService _qr;
 
-    public QuizController(ApplicationDbContext db) { _db = db; }
+    public QuizController(ApplicationDbContext db, PageContentService pageContent, QrService qr)
+    {
+        _db = db;
+        _pageContent = pageContent;
+        _qr = qr;
+    }
 
     // GET /Quiz — landing alias so the bare /Quiz URL never 404s. Sends visitors
     // into the standalone quiz; admins manage the bank at /Admin/Quiz.
@@ -49,6 +56,27 @@ public class QuizController : Controller
         ViewBag.SessionId = sessionGuid;
         ViewBag.Scope = "General";
         ViewBag.DeptCode = deptCode;
+
+        // Phase 19.15 — surface the admin-editable survey URL plus a pre-rendered
+        // QR code (base64 PNG data URI) so the thank-you screen shown after the
+        // user finishes the quiz can be 100% offline-friendly. PageContentService
+        // returns either the saved value or the seeded default, so this is safe
+        // even before an admin has customized the URL.
+        var surveyUrl = _pageContent.Get("quiz.survey.url");
+        ViewBag.SurveyUrl = surveyUrl;
+        ViewBag.SurveyTitle = _pageContent.Get("quiz.survey.title");
+        ViewBag.SurveyBody = _pageContent.Get("quiz.survey.body");
+        try
+        {
+            ViewBag.SurveyQrDataUri = _qr.GenerateBase64Png(surveyUrl, pixelsPerModule: 6);
+        }
+        catch
+        {
+            // QR generation is best-effort — if it fails the view falls back to
+            // the link-only layout. Never let it block the quiz from rendering.
+            ViewBag.SurveyQrDataUri = null;
+        }
+
         return View(picked);
     }
 
