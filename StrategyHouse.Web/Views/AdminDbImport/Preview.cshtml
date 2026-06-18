@@ -1,0 +1,122 @@
+@model StrategyHouse.Web.Models.DbImport.DbImportPreview
+@{
+    ViewData["Title"] = "معاينة استيراد قاعدة البيانات";
+}
+
+@section Styles {
+    <style>
+        .dbi-card { background:#fff;border-radius:14px;box-shadow:0 4px 16px rgba(40,51,74,.08);padding:18px;margin-bottom:20px; }
+        .sec-title { color:#00192B;font-weight:800;border-inline-start:5px solid #FAC126;padding-inline-start:12px;margin-bottom:14px; }
+        .dbi-table th { color:#00192B; }
+        .dbi-ins { color:#067647;font-weight:700; }
+        .dbi-upd { color:#00192B;font-weight:700; }
+        .dbi-del { color:#b42318;font-weight:700; }
+        .dbi-apply { background:#b42318;border-color:#b42318;font-weight:800; }
+        .dbi-warn { background:#fff4d6;border:1px solid #FAC126;color:#5a4500;border-radius:12px;padding:14px;margin-bottom:16px;line-height:1.8; }
+    </style>
+}
+
+<div class="container py-3" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 style="color:#00192B;">معاينة استيراد قاعدة البيانات</h1>
+        <a class="btn btn-outline-secondary btn-sm" href="/Admin/DbImport">رجوع</a>
+    </div>
+
+    <div class="dbi-card">
+        <h4 class="sec-title">ملخّص التغييرات</h4>
+        <p class="text-muted" style="font-size:.9rem;">
+            الملف: <strong>@Model.FileName</strong> ·
+            الإجمالي: <span class="dbi-ins">+@Model.TotalInserts</span> إضافة ·
+            <span class="dbi-upd">~@Model.TotalUpdates</span> تحديث ·
+            <span class="dbi-del">-@Model.TotalDeletes</span> حذف
+        </p>
+
+        @if (Model.Sheets.Count == 0)
+        {
+            <p class="text-muted mb-0">لا توجد جداول قابلة للمزامنة في هذا الملف.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table dbi-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>الجدول</th>
+                            <th>إضافة</th>
+                            <th>تحديث</th>
+                            <th>حذف</th>
+                            <th>صفوف الملف</th>
+                            <th>صفوف القاعدة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model.Sheets)
+                        {
+                            <tr>
+                                <td><strong>@s.Table</strong>
+                                    @foreach (var note in s.Notes)
+                                    {
+                                        <div class="text-muted" style="font-size:.78rem;">@note</div>
+                                    }
+                                </td>
+                                <td class="dbi-ins">+@s.Inserts</td>
+                                <td class="dbi-upd">~@s.Updates</td>
+                                <td class="dbi-del">-@s.Deletes</td>
+                                <td>@s.ExcelRows</td>
+                                <td>@s.DbRows</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    @if (Model.SkippedSheets.Count > 0 || Model.Warnings.Count > 0)
+    {
+        <div class="dbi-card">
+            <h4 class="sec-title">ملاحظات وتنبيهات</h4>
+            @foreach (var w in Model.Warnings)
+            {
+                <div class="dbi-warn">@w</div>
+            }
+            @if (Model.SkippedSheets.Count > 0)
+            {
+                <p class="text-muted mb-0" style="font-size:.85rem;">أوراق تم تجاهلها: @string.Join("، ", Model.SkippedSheets)</p>
+            }
+        </div>
+    }
+
+    <div class="dbi-card">
+        <h4 class="sec-title">تطبيق التغييرات</h4>
+        <div class="dbi-warn">
+            ⚠️ سيتم استبدال محتوى الجداول أعلاه بالكامل بما في الملف، وحذف الصفوف غير الموجودة فيه.
+            تُنشأ نسخة احتياطية تلقائيًا قبل الكتابة، وتُنفَّذ جميع التغييرات ضمن معاملة واحدة (تُلغى كلها عند أي خطأ).
+        </div>
+        <form method="post" action="/Admin/DbImport/Apply" onsubmit="return dbiConfirm();">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="pendingId" value="@Model.PendingId" />
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-6">
+                    <label class="form-label">كلمة مرور الأدمن</label>
+                    <input type="password" name="adminPassword" class="form-control" autocomplete="current-password" required />
+                </div>
+                <div class="col-12 col-md-3">
+                    <button type="submit" class="btn dbi-apply text-white w-100">تطبيق التغييرات</button>
+                </div>
+                <div class="col-12 col-md-3">
+                    <a href="/Admin/DbImport" class="btn btn-outline-secondary w-100">إلغاء</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // ES5 only (iOS Safari): no template literals, no block scope, no arrow functions.
+        function dbiConfirm() {
+            return window.confirm('سيتم استبدال محتوى قاعدة البيانات بالكامل بما في الملف وحذف الصفوف غير الموجودة. هل أنت متأكد من المتابعة؟');
+        }
+    </script>
+}

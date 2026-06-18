@@ -148,6 +148,8 @@ builder.Services.AddScoped<SurveyReportPowerPointBuilder>();
 builder.Services.AddScoped<ReportEmailService>();
 // Phase 6 — DB-only chatbot
 builder.Services.AddScoped<ChatbotService>();
+// Phase 19.22 — Excel round-trip DB import (full mirror, admin-gated, backup + transaction)
+builder.Services.AddScoped<DbImportService>();
 
 var app = builder.Build();
 
