@@ -74,6 +74,17 @@ public class PageContentService
         ("quiz.survey.body", "ساعدنا على تحسين الجلسة — امسح الرمز أو اضغط الرابط لتعبئة استبيان قصير (دقيقتان)."),
         ("survey.thank_you", "شكراً لمشاركتك! تم استلام إجابتك بنجاح."),
         ("footer.copyright", "الهيئة العامة للمنافسة · منصة إطلاق استراتيجية الهيئة"),
+
+        // Phase 19.21 (Fix 6) — strategy house core content (Vision/Mission/Values),
+        // previously sourced only from appsettings StrategyContent and therefore not
+        // editable without a redeploy. These keys are now admin-editable at
+        // /Admin/Content; StrategyContentService overlays any stored value on top of the
+        // appsettings default, so the journey "بيت الاستراتيجية" stages pick up edits
+        // immediately with no per-view changes. The seeded defaults below mirror the
+        // current appsettings copy verbatim.
+        ("strategy.vision.ar", "بيئة منافسة رائدة عالمياً تسهم في الازدهار الاقتصادي"),
+        ("strategy.mission.ar", "تمكين المنافسة العادلة من خلال تطبيق أحكام النظام بفعالية ودعم السياسات ورفع مستويات الوعي والامتثال بما يسهم في تحسين كفاءة الأسواق وتعزيز مصلحة المستهلك"),
+        ("strategy.values.ar", "الشفافية، التعاون، التميز، العدالة، الابتكار"),
     };
 
     private static readonly Dictionary<string, string> DefaultMap =

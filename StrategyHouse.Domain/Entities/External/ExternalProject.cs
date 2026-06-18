@@ -25,8 +25,15 @@ public class ExternalProject
     [Column("Project_Status"), MaxLength(50)]
     public string? ProjectStatus { get; set; }
 
-    [Column("Budget_Liquidity", TypeName = "decimal(18,2)")]
-    public decimal? BudgetLiquidity { get; set; }
+    // Phase 19.21 (Fix 1) — the real MSSQL "Projects" table has TWO separate
+    // money columns: Budget and Liquidity. A combined "Budget_Liquidity" column
+    // never existed, so EF's generated SELECT failed with "Invalid column name".
+    // Map the genuine columns 1:1.
+    [Column("Budget", TypeName = "decimal(18,2)")]
+    public decimal? Budget { get; set; }
+
+    [Column("Liquidity", TypeName = "decimal(18,2)")]
+    public decimal? Liquidity { get; set; }
 
     [Column("Liquidity_2025", TypeName = "decimal(18,2)")]
     public decimal? Liquidity2025 { get; set; }

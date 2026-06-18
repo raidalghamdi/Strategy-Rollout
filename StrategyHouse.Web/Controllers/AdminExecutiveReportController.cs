@@ -23,6 +23,7 @@ public class AdminExecutiveReportController : Controller
     private readonly ExecutiveReportExcelBuilder _excel;
     private readonly ExecutiveReportPowerPointBuilder _pptx;
     private readonly ReportEmailService _email;
+    private readonly StrategyDataReportService _strategyReport;
     private readonly ILogger<AdminExecutiveReportController> _logger;
 
     public AdminExecutiveReportController(
@@ -31,6 +32,7 @@ public class AdminExecutiveReportController : Controller
         ExecutiveReportExcelBuilder excel,
         ExecutiveReportPowerPointBuilder pptx,
         ReportEmailService email,
+        StrategyDataReportService strategyReport,
         ILogger<AdminExecutiveReportController> logger)
     {
         _service = service;
@@ -38,6 +40,7 @@ public class AdminExecutiveReportController : Controller
         _excel = excel;
         _pptx = pptx;
         _email = email;
+        _strategyReport = strategyReport;
         _logger = logger;
     }
 
@@ -59,6 +62,25 @@ public class AdminExecutiveReportController : Controller
     {
         var vm = await _service.BuildAsync(ResolveSections(sections));
         return View(vm);
+    }
+
+    // Phase 19.21 (Fix 4) — strategy-data executive report, rebuilt on the Survey
+    // analysis pattern: an on-page summary of the External strategy entities plus a
+    // one-click .xlsx export. Robust: the service never throws and the summary
+    // degrades to zeros if no data is available.
+    [HttpGet("StrategyReport")]
+    public async Task<IActionResult> StrategyReport()
+    {
+        var report = await _strategyReport.BuildSummaryAsync();
+        return View(report);
+    }
+
+    [HttpGet("StrategyReport.xlsx")]
+    public async Task<IActionResult> StrategyReportXlsx()
+    {
+        var report = new StrategyDataReportService.Report();
+        var bytes = await _strategyReport.BuildExcelAsync(report);
+        return File(bytes, XlsxMime, $"Strategy_Report_{DateTime.UtcNow:yyyy-MM-dd}.xlsx");
     }
 
     // "حفظ كافتراضي" — persist the current selection in a cookie for future visits.

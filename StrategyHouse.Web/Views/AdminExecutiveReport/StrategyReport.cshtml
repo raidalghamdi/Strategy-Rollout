@@ -1,0 +1,58 @@
+@using StrategyHouse.Web.Services
+@model StrategyDataReportService.Report
+@{
+    ViewData["Title"] = "التقرير التنفيذي — بيانات الاستراتيجية";
+    string Money(decimal v) => v.ToString("#,##0");
+}
+
+@section Styles {
+    <style>
+        .rep-card { background:#fff;border-radius:14px;box-shadow:0 4px 16px rgba(40,51,74,.08);padding:18px;margin-bottom:20px; }
+        .rep-card.center { text-align:center; }
+        .rep-card .num { font-size:2.2rem;font-weight:800;color:#00192B; }
+        .rep-card .lbl { color:#5a6b80;font-size:.9rem; }
+        .sec-title { color:#00192B;font-weight:800;border-inline-start:5px solid #FAC126;padding-inline-start:12px;margin-bottom:14px; }
+    </style>
+}
+
+<div class="container py-3" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 style="color:#00192B;">التقرير التنفيذي — بيانات الاستراتيجية</h1>
+        <div>
+            <a class="btn btn-success btn-sm" href="/Admin/StrategyReport.xlsx" style="background:#067647;border-color:#067647;">تنزيل التقرير (Excel)</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/Admin/ExecutiveReport">التقرير الشامل</a>
+        </div>
+    </div>
+
+    <div class="rep-card">
+        <h4 class="sec-title">ملخص بيانات الاستراتيجية</h4>
+        <p class="text-muted" style="font-size:.9rem;">
+            المصدر: <strong>@Model.Source</strong> ·
+            تاريخ الإنشاء: @Model.GeneratedAt.ToString("yyyy-MM-dd HH:mm")
+            @if (Model.SkippedRows > 0)
+            {
+                <span> · تم تخطّي <strong>@Model.SkippedRows</strong> صفاً غير صالح.</span>
+            }
+        </p>
+        <div class="row g-3">
+            <div class="col-6 col-md"><div class="rep-card center"><div class="num">@Model.PillarCount</div><div class="lbl">المرتكزات</div></div></div>
+            <div class="col-6 col-md"><div class="rep-card center"><div class="num">@Model.ObjectiveCount</div><div class="lbl">الأهداف</div></div></div>
+            <div class="col-6 col-md"><div class="rep-card center"><div class="num">@Model.InitiativeCount</div><div class="lbl">المبادرات</div></div></div>
+            <div class="col-6 col-md"><div class="rep-card center"><div class="num">@Model.ProjectCount</div><div class="lbl">المشاريع</div></div></div>
+            <div class="col-6 col-md"><div class="rep-card center"><div class="num">@Model.KpiCount</div><div class="lbl">المؤشرات</div></div></div>
+        </div>
+    </div>
+
+    <div class="rep-card">
+        <h4 class="sec-title">المؤشرات المالية للمشاريع</h4>
+        <div class="row g-3">
+            <div class="col-12 col-md-6"><div class="rep-card center"><div class="num">@Money(Model.TotalProjectBudget)</div><div class="lbl">إجمالي ميزانية المشاريع</div></div></div>
+            <div class="col-12 col-md-6"><div class="rep-card center"><div class="num">@Money(Model.TotalProjectLiquidity)</div><div class="lbl">إجمالي سيولة المشاريع</div></div></div>
+        </div>
+    </div>
+
+    @if (Model.PillarCount == 0 && Model.ProjectCount == 0 && Model.KpiCount == 0)
+    {
+        <div class="alert alert-warning">لا توجد بيانات استراتيجية متاحة حالياً. تأكد من تفعيل مصدر البيانات أو دفع البيانات من صفحة البيانات الخارجية.</div>
+    }
+</div>

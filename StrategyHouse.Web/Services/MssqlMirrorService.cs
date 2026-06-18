@@ -75,7 +75,10 @@ public class MssqlMirrorService : IMssqlMirrorService
             var initiatives = await _external.Initiatives.AsNoTracking().ToListAsync(ct);
             var projects = await _external.Projects.AsNoTracking().ToListAsync(ct);
 
-            var skippedKpis = 0;
+            // Phase 19.21 (Fix 1) — every entity type is now projected defensively:
+            // one malformed source row (unexpected null/overflow/cast) is logged,
+            // counted, and skipped instead of aborting the whole sync.
+            var skipped = 0;
 
             // Phase 19.8 — guard against wiping a good mirror with an empty source.
             // If MSSQL is reachable but has no pillars, abort BEFORE touching the
@@ -107,30 +110,49 @@ public class MssqlMirrorService : IMssqlMirrorService
                 _db.MirrorProjects.RemoveRange(_db.MirrorProjects);
                 await _db.SaveChangesAsync(ct);
 
-                _db.MirrorPillars.AddRange(pillars.Select(p => new MirrorPillar
+                foreach (var p in pillars)
                 {
-                    PlrCode = p.PlrCode,
-                    PillarName = p.PillarName,
-                    Budget = p.Budget,
-                    Liquidity = p.Liquidity,
-                    StartDates = p.StartDates,
-                    EndDates = p.EndDates,
-                    PlrPeriods = p.PlrPeriods,
-                }));
-                _db.MirrorObjectives.AddRange(objectives.Select(o => new MirrorObjective
+                    try
+                    {
+                        _db.MirrorPillars.Add(new MirrorPillar
+                        {
+                            PlrCode = p.PlrCode,
+                            PillarName = p.PillarName,
+                            Budget = p.Budget,
+                            Liquidity = p.Liquidity,
+                            StartDates = p.StartDates,
+                            EndDates = p.EndDates,
+                            PlrPeriods = p.PlrPeriods,
+                        });
+                    }
+                    catch (Exception rowEx)
+                    {
+                        skipped++;
+                        _log.LogWarning(rowEx, "Skipped malformed Pillar row {Code} during mirror push.", p.PlrCode);
+                    }
+                }
+                foreach (var o in objectives)
                 {
-                    ObjectiveCode = o.ObjectiveCode,
-                    ObjectiveName = o.ObjectiveName,
-                    PlrCode = o.PlrCode,
-                    Budget = o.Budget,
-                    Liquidity = o.Liquidity,
-                    StartDates = o.StartDates,
-                    EndDates = o.EndDates,
-                    ObjPeriod = o.ObjPeriod,
-                }));
-                // Phase 19.19 — project KPI rows defensively: one malformed source
-                // row (e.g. an unexpected null/overflow) shouldn't abort the whole
-                // sync. Bad rows are counted and logged; good rows still mirror.
+                    try
+                    {
+                        _db.MirrorObjectives.Add(new MirrorObjective
+                        {
+                            ObjectiveCode = o.ObjectiveCode,
+                            ObjectiveName = o.ObjectiveName,
+                            PlrCode = o.PlrCode,
+                            Budget = o.Budget,
+                            Liquidity = o.Liquidity,
+                            StartDates = o.StartDates,
+                            EndDates = o.EndDates,
+                            ObjPeriod = o.ObjPeriod,
+                        });
+                    }
+                    catch (Exception rowEx)
+                    {
+                        skipped++;
+                        _log.LogWarning(rowEx, "Skipped malformed Objective row {Code} during mirror push.", o.ObjectiveCode);
+                    }
+                }
                 foreach (var k in kpis)
                 {
                     try
@@ -150,9 +172,9 @@ public class MssqlMirrorService : IMssqlMirrorService
                             // combined Unit/Direction string and one Minimum-Maximum
                             // decimal, so fold the split source columns back together.
                             UnitDirection = CombineText(k.Unit, k.Direction),
-                            // Index_Weight is now decimal? in the source; the mirror
-                            // column is a string, so format it without trailing zeros.
-                            IndexWeight = k.IndexWeight?.ToString("0.####"),
+                            // Phase 19.21 (Fix 1) — Index_Weight is nvarchar(5) again;
+                            // the mirror column is also a string, so copy it straight.
+                            IndexWeight = k.IndexWeight,
                             MinimumMaximum = k.Minimum ?? k.Maximum,
                             Target2025 = k.Target2025,
                             Target2026 = k.Target2026,
@@ -165,44 +187,70 @@ public class MssqlMirrorService : IMssqlMirrorService
                     }
                     catch (Exception rowEx)
                     {
-                        skippedKpis++;
+                        skipped++;
                         _log.LogWarning(rowEx, "Skipped malformed KPI row {KpiCode} during mirror push.", k.KpiCode);
                     }
                 }
-                _db.MirrorInitiatives.AddRange(initiatives.Select(i => new MirrorInitiative
+                foreach (var i in initiatives)
                 {
-                    InitiativeCode = i.InitiativeCode,
-                    InitiativeName = i.InitiativeName,
-                    ObjectiveCode = i.ObjectiveCode,
-                    ObjectiveName = i.ObjectiveName,
-                    Owners = i.Owners,
-                    Budget = i.Budget,
-                    Liquidity = i.Liquidity,
-                    StartDates = i.StartDates,
-                    EndDates = i.EndDates,
-                }));
-                _db.MirrorProjects.AddRange(projects.Select(p => new MirrorProject
+                    try
+                    {
+                        _db.MirrorInitiatives.Add(new MirrorInitiative
+                        {
+                            InitiativeCode = i.InitiativeCode,
+                            InitiativeName = i.InitiativeName,
+                            ObjectiveCode = i.ObjectiveCode,
+                            ObjectiveName = i.ObjectiveName,
+                            Owners = i.Owners,
+                            Budget = i.Budget,
+                            Liquidity = i.Liquidity,
+                            StartDates = i.StartDates,
+                            EndDates = i.EndDates,
+                        });
+                    }
+                    catch (Exception rowEx)
+                    {
+                        skipped++;
+                        _log.LogWarning(rowEx, "Skipped malformed Initiative row {Code} during mirror push.", i.InitiativeCode);
+                    }
+                }
+                foreach (var p in projects)
                 {
-                    ProjectCode = p.ProjectCode,
-                    ProjectName = p.ProjectName,
-                    InitiativeCode = p.InitiativeCode,
-                    PlrCode = p.PlrCode,
-                    ProjectType = p.ProjectType,
-                    ProjectStatus = p.ProjectStatus,
-                    BudgetLiquidity = p.BudgetLiquidity,
-                    Liquidity2025 = p.Liquidity2025,
-                    Liquidity2026 = p.Liquidity2026,
-                    Liquidity2027 = p.Liquidity2027,
-                    Liquidity2028 = p.Liquidity2028,
-                    Liquidity2029 = p.Liquidity2029,
-                    Liquidity2030 = p.Liquidity2030,
-                    Liquidity2031 = p.Liquidity2031,
-                    GacBudget = p.GacBudget,
-                    ProjectSponsor = p.ProjectSponsor,
-                    ProjectManager = p.ProjectManager,
-                    Division = p.Division,
-                    ProjectPhase = p.ProjectPhase,
-                }));
+                    try
+                    {
+                        _db.MirrorProjects.Add(new MirrorProject
+                        {
+                            ProjectCode = p.ProjectCode,
+                            ProjectName = p.ProjectName,
+                            InitiativeCode = p.InitiativeCode,
+                            PlrCode = p.PlrCode,
+                            ProjectType = p.ProjectType,
+                            ProjectStatus = p.ProjectStatus,
+                            // Phase 19.21 (Fix 1) — source now has separate Budget and
+                            // Liquidity columns; the mirror keeps a single combined
+                            // money column, so fold them (prefer Budget, fall back to
+                            // Liquidity) to preserve the mirror schema (no migration).
+                            BudgetLiquidity = p.Budget ?? p.Liquidity,
+                            Liquidity2025 = p.Liquidity2025,
+                            Liquidity2026 = p.Liquidity2026,
+                            Liquidity2027 = p.Liquidity2027,
+                            Liquidity2028 = p.Liquidity2028,
+                            Liquidity2029 = p.Liquidity2029,
+                            Liquidity2030 = p.Liquidity2030,
+                            Liquidity2031 = p.Liquidity2031,
+                            GacBudget = p.GacBudget,
+                            ProjectSponsor = p.ProjectSponsor,
+                            ProjectManager = p.ProjectManager,
+                            Division = p.Division,
+                            ProjectPhase = p.ProjectPhase,
+                        });
+                    }
+                    catch (Exception rowEx)
+                    {
+                        skipped++;
+                        _log.LogWarning(rowEx, "Skipped malformed Project row {Code} during mirror push.", p.ProjectCode);
+                    }
+                }
                 await _db.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);
             }
@@ -212,20 +260,21 @@ public class MssqlMirrorService : IMssqlMirrorService
                 throw;
             }
 
-            // Mirror count reflects rows actually written (skipped KPI rows excluded).
-            var total = pillars.Count + objectives.Count + (kpis.Count - skippedKpis) + initiatives.Count + projects.Count;
-            // Phase 19.19 — surface skipped rows in the saved status note so the admin
-            // UI can show "تم دفع N سجلاً، تخطّى K سجلاً" without a separate field.
-            var note = skippedKpis > 0
-                ? $"تم دفع {total} سجلاً، تخطّى {skippedKpis} سجلاً غير صالح."
-                : null;
+            // Mirror count reflects rows actually written (all skipped rows excluded).
+            var sourceTotal = pillars.Count + objectives.Count + kpis.Count + initiatives.Count + projects.Count;
+            var total = sourceTotal - skipped;
+            // Phase 19.21 (Fix 1) — surface skipped rows in the saved status note so the
+            // admin UI can show "تم دفع N سجل، تخطّى K سجل" without a separate field.
+            var note = skipped > 0
+                ? $"تم دفع {total} سجل، تخطّى {skipped} سجل."
+                : $"تم دفع {total} سجل.";
             await FinishAsync(meta, true, total, startedAt, note, ct);
-            _log.LogInformation("Mirror push succeeded: {Count} records ({Skipped} KPI rows skipped) in {Seconds:F1}s.", total, skippedKpis, meta.DurationSeconds);
+            _log.LogInformation("Mirror push succeeded: {Count} records ({Skipped} rows skipped) in {Seconds:F1}s.", total, skipped, meta.DurationSeconds);
             return new MirrorPushResult
             {
                 Success = true,
                 RecordCount = total,
-                SkippedCount = skippedKpis,
+                SkippedCount = skipped,
                 DurationSeconds = meta.DurationSeconds,
             };
         }

@@ -135,6 +135,8 @@ builder.Services.AddScoped<SurveyReportPdfService>();
 // Phase 12 — official survey analytics + final report
 builder.Services.AddScoped<SurveyAnalyticsService>();
 builder.Services.AddScoped<SurveyFinalReportPdfService>();
+// Phase 19.21 (Fix 4) — strategy-data executive report (External entities → xlsx + summary)
+builder.Services.AddScoped<StrategyDataReportService>();
 // Phase 13 — executive report
 builder.Services.AddScoped<ExecutiveReportService>();
 builder.Services.AddScoped<ExecutiveReportPdfDocument>();

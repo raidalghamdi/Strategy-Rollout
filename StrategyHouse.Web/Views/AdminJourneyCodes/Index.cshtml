@@ -1,0 +1,135 @@
+@using StrategyHouse.Web.Controllers
+@model List<AdminJourneyCodesController.JourneyCodeRow>
+@{
+    ViewData["Title"] = "إدارة رموز الرحلة";
+    var depts = ViewBag.Departments as List<(string DeptCode, string DeptName)> ?? new();
+}
+
+@section Styles {
+    <style>
+        .jc-card { background:#fff;border-radius:14px;box-shadow:0 4px 16px rgba(40,51,74,.08);padding:18px;margin-bottom:20px; }
+        .sec-title { color:#00192B;font-weight:800;border-inline-start:5px solid #FAC126;padding-inline-start:12px;margin-bottom:14px; }
+        .jc-table th { color:#00192B; }
+        .badge-on { background:#067647; }
+        .badge-off { background:#9aa6b2; }
+    </style>
+}
+
+<div class="container py-3" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 style="color:#00192B;">إدارة رموز الرحلة</h1>
+        <a class="btn btn-outline-secondary btn-sm" href="/Admin">رجوع</a>
+    </div>
+
+    @if (TempData["Saved"] != null) { <div class="alert" style="background:#067647;color:#fff;border:none;">@TempData["Saved"]</div> }
+    @if (TempData["Error"] != null) { <div class="alert alert-danger">@TempData["Error"]</div> }
+
+    <!-- Create -->
+    <div class="jc-card">
+        <h4 class="sec-title">إضافة رمز جديد</h4>
+        <p class="text-muted" style="font-size:.9rem;">أدخل رمزاً فريداً (مثال: GAC210) واختر الإدارة المرتبطة به. يُستخدم الرمز للدخول إلى الرحلة عبر <code>/Journey?code=الرمز</code>.</p>
+        <form method="post" action="/Admin/JourneyCodes/Create" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-12 col-md-4">
+                <label class="form-label">الرمز</label>
+                <input type="text" name="code" class="form-control" maxlength="15" placeholder="GAC210" required />
+            </div>
+            <div class="col-12 col-md-5">
+                <label class="form-label">الإدارة</label>
+                <select name="deptCode" class="form-select" required>
+                    <option value="">— اختر الإدارة —</option>
+                    @foreach (var d in depts)
+                    {
+                        <option value="@d.DeptCode">@d.DeptName (@d.DeptCode)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-primary w-100" style="background:#00192B;border-color:#00192B;">إضافة</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- List -->
+    <div class="jc-card">
+        <h4 class="sec-title">الرموز الحالية</h4>
+        @if (Model.Count == 0)
+        {
+            <p class="text-muted mb-0">لا توجد رموز بعد. أضف رمزاً من الأعلى.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table jc-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>الرمز</th>
+                            <th>الإدارة</th>
+                            <th>الحالة</th>
+                            <th>مرات الاستخدام</th>
+                            <th>أُنشئ في</th>
+                            <th>إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in Model)
+                        {
+                            <tr>
+                                <td><strong>@row.Code</strong></td>
+                                <td>
+                                    <form method="post" action="/Admin/JourneyCodes/Edit" class="row g-1 align-items-center">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="code" value="@row.Code" />
+                                        <div class="col-auto">
+                                            <select name="deptCode" class="form-select form-select-sm">
+                                                @foreach (var d in depts)
+                                                {
+                                                    if (d.DeptCode == row.DeptCode)
+                                                    {
+                                                        <option value="@d.DeptCode" selected>@d.DeptName (@d.DeptCode)</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@d.DeptCode">@d.DeptName (@d.DeptCode)</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-auto">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="isActive" value="true" id="act-@row.Code" @(row.IsActive ? "checked" : "") />
+                                                <label class="form-check-label" for="act-@row.Code" style="font-size:.85rem;">مفعّل</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <button type="submit" class="btn btn-sm btn-outline-primary">حفظ</button>
+                                        </div>
+                                    </form>
+                                </td>
+                                <td>
+                                    @if (row.IsActive)
+                                    {
+                                        <span class="badge badge-on">مفعّل</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-off">معطّل</span>
+                                    }
+                                </td>
+                                <td>@row.UsedCount</td>
+                                <td>@row.CreatedAt.ToString("yyyy-MM-dd")</td>
+                                <td>
+                                    <form method="post" action="/Admin/JourneyCodes/Delete" onsubmit="return confirm('سيتم حذف الرمز @row.Code نهائياً. هل أنت متأكد؟');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="code" value="@row.Code" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

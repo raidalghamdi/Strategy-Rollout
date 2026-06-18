@@ -22,6 +22,7 @@ public class AdminInsightsController : Controller
     private readonly ProgrammePosterPdfService _poster;
     private readonly StrategyContentService _content;
     private readonly PageContentService _pageContent;
+    private readonly QrService _qr;
     private readonly SignInManager<AppUser> _signInManager;
     private readonly UserManager<AppUser> _userManager;
     private readonly IWebHostEnvironment _env;
@@ -33,6 +34,7 @@ public class AdminInsightsController : Controller
         ProgrammePosterPdfService poster,
         StrategyContentService content,
         PageContentService pageContent,
+        QrService qr,
         SignInManager<AppUser> signInManager,
         UserManager<AppUser> userManager,
         IWebHostEnvironment env)
@@ -43,6 +45,7 @@ public class AdminInsightsController : Controller
         _poster = poster;
         _content = content;
         _pageContent = pageContent;
+        _qr = qr;
         _signInManager = signInManager;
         _userManager = userManager;
         _env = env;
@@ -51,6 +54,13 @@ public class AdminInsightsController : Controller
     private const string SurveyUploadFileName = "survey-upload.xlsx";
     private string SurveyUploadDir => Path.Combine(_env.ContentRootPath, "App_Data", "survey");
     private string SurveyUploadPath => Path.Combine(SurveyUploadDir, SurveyUploadFileName);
+
+    // Phase 19.21 (Fix 2) — parsed survey responses are persisted as a JSON blob in
+    // PageContent (DB) so the analysis survives container restarts / redeploys where
+    // the App_Data file would be lost (Railway has an ephemeral filesystem). The raw
+    // .xlsx is still written to disk for the "download original" action, but the DB
+    // blob is the authoritative source for the on-page analysis (auto-loaded on GET).
+    private const string SurveyResponsesKey = "survey.responses.json";
 
     public class SurveySummary
     {
@@ -63,85 +73,137 @@ public class AdminInsightsController : Controller
         public string FileName { get; set; } = SurveyUploadFileName;
     }
 
-    private SurveySummary? LoadSurveySummary()
+    // Phase 19.21 (Fix 2) — the serializable shape persisted in PageContent. Holds
+    // only the parsed answers (header + data rows) plus upload metadata; the analysis
+    // (averages / value counts) is recomputed on read so the persisted blob stays
+    // small and the analysis logic can evolve without re-uploading.
+    public class SurveyData
     {
-        if (!System.IO.File.Exists(SurveyUploadPath)) return null;
-        try
+        public List<string> Columns { get; set; } = new();
+        public List<List<string>> Rows { get; set; } = new();
+        public DateTime UploadedAt { get; set; }
+        public long FileSizeBytes { get; set; }
+    }
+
+    // Parse a Microsoft Forms .xlsx export into the persistable SurveyData shape.
+    private static SurveyData? ParseWorkbook(string path)
+    {
+        using var wb = new XLWorkbook(path);
+        var ws = wb.Worksheets.First();
+        var rows = ws.RangeUsed()?.RowsUsed().ToList();
+        if (rows == null || rows.Count == 0) return null;
+
+        var headerRow = rows[0];
+        var columns = headerRow.Cells().Select(c => c.GetString().Trim()).ToList();
+        while (columns.Count > 0 && string.IsNullOrWhiteSpace(columns[^1]))
+            columns.RemoveAt(columns.Count - 1);
+        if (columns.Count == 0) return null;
+
+        var data = new SurveyData { Columns = columns };
+        for (var r = 1; r < rows.Count; r++)
         {
-            using var wb = new XLWorkbook(SurveyUploadPath);
-            var ws = wb.Worksheets.First();
-            var rows = ws.RangeUsed()?.RowsUsed().ToList();
-            if (rows == null || rows.Count == 0) return null;
-
-            var headerRow = rows[0];
-            var columns = headerRow.Cells().Select(c => c.GetString().Trim()).ToList();
-            // Trim trailing empty header names.
-            while (columns.Count > 0 && string.IsNullOrWhiteSpace(columns[^1]))
-                columns.RemoveAt(columns.Count - 1);
-            if (columns.Count == 0) return null;
-
-            var numericCount = new int[columns.Count];
-            var numericSum = new double[columns.Count];
-            var nonEmptyCount = new int[columns.Count];
-            var freq = new Dictionary<string, int>[columns.Count];
-            for (var i = 0; i < columns.Count; i++) freq[i] = new Dictionary<string, int>();
-
-            var dataRows = 0;
-            for (var r = 1; r < rows.Count; r++)
-            {
-                var row = rows[r];
-                var any = false;
-                for (var i = 0; i < columns.Count; i++)
-                {
-                    var cell = row.Cell(i + 1);
-                    var text = cell.GetString().Trim();
-                    if (string.IsNullOrEmpty(text)) continue;
-                    any = true;
-                    nonEmptyCount[i]++;
-                    if (double.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out var num))
-                    {
-                        numericCount[i]++;
-                        numericSum[i] += num;
-                    }
-                    freq[i][text] = freq[i].TryGetValue(text, out var c) ? c + 1 : 1;
-                }
-                if (any) dataRows++;
-            }
-
-            var summary = new SurveySummary
-            {
-                RowCount = dataRows,
-                Columns = columns,
-            };
-
+            var row = rows[r];
+            var values = new List<string>(columns.Count);
+            var any = false;
             for (var i = 0; i < columns.Count; i++)
             {
-                var col = columns[i];
-                if (string.IsNullOrWhiteSpace(col)) continue;
-                if (numericCount[i] >= 1 && nonEmptyCount[i] > 0 &&
-                    (double)numericCount[i] / nonEmptyCount[i] >= 0.8)
-                {
-                    summary.Averages[col] = numericSum[i] / numericCount[i];
-                }
-                else if (nonEmptyCount[i] > 0)
-                {
-                    summary.ValueCounts[col] = freq[i]
-                        .OrderByDescending(kv => kv.Value)
-                        .ThenBy(kv => kv.Key)
-                        .Take(8)
-                        .ToList();
-                }
+                var text = row.Cell(i + 1).GetString().Trim();
+                if (!string.IsNullOrEmpty(text)) any = true;
+                values.Add(text);
             }
+            if (any) data.Rows.Add(values);
+        }
+        return data;
+    }
 
-            var fi = new FileInfo(SurveyUploadPath);
-            summary.UploadedAt = fi.LastWriteTime;
-            summary.FileSizeBytes = fi.Length;
-            return summary;
-        }
-        catch
+    // Compute the on-page analysis from the parsed responses (averages for numeric
+    // columns, top value counts for categorical ones).
+    private static SurveySummary Summarize(SurveyData data)
+    {
+        var columns = data.Columns;
+        var numericCount = new int[columns.Count];
+        var numericSum = new double[columns.Count];
+        var nonEmptyCount = new int[columns.Count];
+        var freq = new Dictionary<string, int>[columns.Count];
+        for (var i = 0; i < columns.Count; i++) freq[i] = new Dictionary<string, int>();
+
+        foreach (var values in data.Rows)
         {
-            return null;
+            for (var i = 0; i < columns.Count && i < values.Count; i++)
+            {
+                var text = values[i];
+                if (string.IsNullOrEmpty(text)) continue;
+                nonEmptyCount[i]++;
+                if (double.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out var num))
+                {
+                    numericCount[i]++;
+                    numericSum[i] += num;
+                }
+                freq[i][text] = freq[i].TryGetValue(text, out var c) ? c + 1 : 1;
+            }
         }
+
+        var summary = new SurveySummary
+        {
+            RowCount = data.Rows.Count,
+            Columns = columns,
+            UploadedAt = data.UploadedAt,
+            FileSizeBytes = data.FileSizeBytes,
+        };
+        for (var i = 0; i < columns.Count; i++)
+        {
+            var col = columns[i];
+            if (string.IsNullOrWhiteSpace(col)) continue;
+            if (numericCount[i] >= 1 && nonEmptyCount[i] > 0 &&
+                (double)numericCount[i] / nonEmptyCount[i] >= 0.8)
+            {
+                summary.Averages[col] = numericSum[i] / numericCount[i];
+            }
+            else if (nonEmptyCount[i] > 0)
+            {
+                summary.ValueCounts[col] = freq[i]
+                    .OrderByDescending(kv => kv.Value)
+                    .ThenBy(kv => kv.Key)
+                    .Take(8)
+                    .ToList();
+            }
+        }
+        return summary;
+    }
+
+    // Load the persisted survey analysis. Prefers the PageContent JSON blob (survives
+    // restarts); falls back to re-parsing the on-disk .xlsx for backward compatibility
+    // with uploads made before Fix 2 (and persists them forward on first read).
+    private SurveyData? LoadSurveyData()
+    {
+        var json = _pageContent.Get(SurveyResponsesKey, "");
+        if (!string.IsNullOrWhiteSpace(json))
+        {
+            try { return System.Text.Json.JsonSerializer.Deserialize<SurveyData>(json); }
+            catch { /* fall through to file */ }
+        }
+        if (System.IO.File.Exists(SurveyUploadPath))
+        {
+            try
+            {
+                var data = ParseWorkbook(SurveyUploadPath);
+                if (data != null)
+                {
+                    var fi = new FileInfo(SurveyUploadPath);
+                    data.UploadedAt = fi.LastWriteTime;
+                    data.FileSizeBytes = fi.Length;
+                }
+                return data;
+            }
+            catch { return null; }
+        }
+        return null;
+    }
+
+    private SurveySummary? LoadSurveySummary()
+    {
+        var data = LoadSurveyData();
+        return data == null ? null : Summarize(data);
     }
 
     // GET /Admin/Insights/Survey — survey analysis dashboard.
@@ -150,7 +212,13 @@ public class AdminInsightsController : Controller
     {
         var summary = LoadSurveySummary();
         ViewBag.Summary = summary;
-        ViewBag.SurveyUrl = _pageContent.Get("quiz.survey.url");
+        var surveyUrl = _pageContent.Get("quiz.survey.url");
+        ViewBag.SurveyUrl = surveyUrl;
+        // Phase 19.21 (Fix 3) — render a QR for the current survey URL at the top of
+        // the page; it auto-refreshes because it's regenerated from the live
+        // PageContent value on every GET. Best-effort: link-only fallback on failure.
+        try { ViewBag.SurveyQrDataUri = string.IsNullOrWhiteSpace(surveyUrl) ? null : _qr.GenerateBase64Png(surveyUrl, pixelsPerModule: 6); }
+        catch { ViewBag.SurveyQrDataUri = null; }
         return View();
     }
 
@@ -176,13 +244,29 @@ public class AdminInsightsController : Controller
         {
             await file.CopyToAsync(fs);
         }
-        try { using var wb = new XLWorkbook(SurveyUploadPath); _ = wb.Worksheets.First(); }
+        // Phase 19.21 (Fix 2) — parse the workbook and persist the answers as a JSON
+        // blob in PageContent so the analysis survives container restarts/redeploys
+        // and auto-renders on the next GET without re-uploading.
+        SurveyData? data;
+        try { data = ParseWorkbook(SurveyUploadPath); }
         catch
         {
             System.IO.File.Delete(SurveyUploadPath);
             TempData["Error"] = "تعذرت قراءة ملف Excel. تأكد من أنه ملف صحيح من Microsoft Forms.";
             return RedirectToAction(nameof(Survey));
         }
+        if (data == null || data.Columns.Count == 0)
+        {
+            System.IO.File.Delete(SurveyUploadPath);
+            TempData["Error"] = "الملف لا يحتوي على بيانات صالحة للتحليل.";
+            return RedirectToAction(nameof(Survey));
+        }
+        var fi = new FileInfo(SurveyUploadPath);
+        data.UploadedAt = fi.LastWriteTime;
+        data.FileSizeBytes = fi.Length;
+        var json = System.Text.Json.JsonSerializer.Serialize(data);
+        await _pageContent.SaveAsync(_db, SurveyResponsesKey, json);
+
         TempData["Success"] = "تم رفع ملف الاستبيان وتحليله بنجاح.";
         return RedirectToAction(nameof(Survey));
     }
@@ -205,6 +289,9 @@ public class AdminInsightsController : Controller
             return RedirectToAction(nameof(Survey));
         }
         if (System.IO.File.Exists(SurveyUploadPath)) System.IO.File.Delete(SurveyUploadPath);
+        // Phase 19.21 (Fix 2) — clear the persisted responses blob so the analysis
+        // disappears across restarts too (not just the on-disk file).
+        await _pageContent.SaveAsync(_db, SurveyResponsesKey, "");
         var def = PageContentService.Defaults.FirstOrDefault(d => d.Key == "quiz.survey.url");
         if (!string.IsNullOrEmpty(def.Key))
         {

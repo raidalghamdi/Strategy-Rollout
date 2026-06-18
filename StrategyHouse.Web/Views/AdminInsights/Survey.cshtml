@@ -3,6 +3,7 @@
     ViewData["Title"] = "تحليل الاستبيان";
     var summary = ViewBag.Summary as AdminInsightsController.SurveySummary;
     var surveyUrl = ViewBag.SurveyUrl as string;
+    var surveyQr = ViewBag.SurveyQrDataUri as string;
     string FmtSize(long b)
     {
         if (b < 1024) return b + " B";
@@ -47,18 +48,29 @@
         <div class="alert alert-danger">@TempData["Error"]</div>
     }
 
-    <!-- Section 1 — current survey link -->
+    <!-- Section 1 — current survey link + QR (auto-refreshes from quiz.survey.url) -->
     <div class="ins-card mb-4">
         <h4 class="sec-title">رابط الاستبيان الحالي</h4>
-        @if (!string.IsNullOrEmpty(surveyUrl))
-        {
-            <div class="url-box mb-2"><a href="@surveyUrl" target="_blank" rel="noopener">@surveyUrl</a></div>
-        }
-        else
-        {
-            <p class="text-muted">لا يوجد رابط محدد.</p>
-        }
-        <p class="text-muted mb-0" style="font-size:.9rem;">يمكن للمدير تعديل هذا الرابط من <a href="/Admin/Content">إدارة المحتوى</a> (المفتاح <code>quiz.survey.url</code>).</p>
+        <div class="row g-3 align-items-center">
+            <div class="col-12 col-md-8">
+                @if (!string.IsNullOrEmpty(surveyUrl))
+                {
+                    <div class="url-box mb-2"><a href="@surveyUrl" target="_blank" rel="noopener">@surveyUrl</a></div>
+                }
+                else
+                {
+                    <p class="text-muted">لا يوجد رابط محدد.</p>
+                }
+                <p class="text-muted mb-0" style="font-size:.9rem;">يمكن للمدير تعديل هذا الرابط من <a href="/Admin/Content">إدارة المحتوى</a> (المفتاح <code>quiz.survey.url</code>)، ويتحدّث رمز QR تلقائياً.</p>
+            </div>
+            @if (!string.IsNullOrEmpty(surveyQr))
+            {
+                <div class="col-12 col-md-4 text-center">
+                    <img src="@surveyQr" alt="رمز QR للاستبيان" style="width:160px;height:160px;border:1px solid #e2e8f0;border-radius:12px;padding:6px;background:#fff;" />
+                    <div class="lbl" style="color:#5a6b80;font-size:.85rem;margin-top:6px;">امسح الرمز لفتح الاستبيان</div>
+                </div>
+            }
+        </div>
     </div>
 
     <!-- Section 2 — upload xlsx -->
