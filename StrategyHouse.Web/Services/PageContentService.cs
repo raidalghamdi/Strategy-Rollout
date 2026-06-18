@@ -58,6 +58,15 @@ public class PageContentService
         ("journey.stage5.intro", "ارسم خريطة إدارتك ووقّعها مع فريقك."),
         ("journey.stage6.intro", "تهانينا على إتمام رحلة الاستراتيجية."),
         ("quiz.intro", "اختبار قصير لتعزيز فهم الفريق للاستراتيجية المؤسسية."),
+        // Phase 19.15 — end-of-quiz survey link. Admin-editable at /Admin/Content.
+        // The value is rendered as a QR code on the thank-you screen shown after
+        // the user taps «إنهاء» on the quiz results page, and also surfaced
+        // as a tappable link beneath the QR (so mobile users don't have to scan
+        // their own phone). Replace the default with the real Microsoft Forms /
+        // Google Forms URL from /Admin/Content.
+        ("quiz.survey.url", "https://forms.office.com/r/replace-with-real-survey-id"),
+        ("quiz.survey.title", "شكراً لمشاركتك"),
+        ("quiz.survey.body", "ساعدنا على تحسين الجلسة — امسح الرمز أو اضغط الرابط لتعبئة استبيان قصير (دقيقتان)."),
         ("survey.thank_you", "شكراً لمشاركتك! تم استلام إجابتك بنجاح."),
         ("footer.copyright", "الهيئة العامة للمنافسة · منصة إطلاق استراتيجية الهيئة"),
     };
