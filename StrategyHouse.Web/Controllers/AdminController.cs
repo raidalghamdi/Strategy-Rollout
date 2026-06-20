@@ -16,6 +16,7 @@ public class AdminController : Controller
     private readonly KpisService _kpis;
     private readonly InitiativesService _initiatives;
     private readonly ProjectsService _projects;
+    private readonly IStrategyDataSource _source;
 
     public AdminController(
         ApplicationDbContext db,
@@ -23,7 +24,8 @@ public class AdminController : Controller
         ObjectivesService objectives,
         KpisService kpis,
         InitiativesService initiatives,
-        ProjectsService projects)
+        ProjectsService projects,
+        IStrategyDataSource source)
     {
         _db = db;
         _pillars = pillars;
@@ -31,6 +33,7 @@ public class AdminController : Controller
         _kpis = kpis;
         _initiatives = initiatives;
         _projects = projects;
+        _source = source;
     }
 
     public IActionResult Index() => View();
@@ -153,6 +156,20 @@ public class AdminController : Controller
                 AutomationStatus = k.AutomationStatus,
             }).ToList());
         }
-        return View(await _db.Kpis.OrderBy(k => k.KpiCode).ToListAsync());
+        // Phase 19.23 — when the live external warehouse is off, read through the unified
+        // source (MSSQL mirror → SQLite → empty) instead of querying SQLite directly.
+        var kpis = (await _source.GetKpisAsync())
+            .Select(k => new Kpi
+            {
+                KpiCode = k.Code,
+                KpiName = k.Name,
+                KpiType = k.Type,
+                ObjectiveCode = k.ObjectiveCode,
+                Division = k.Division,
+                ActivationStatus = k.Active ? "Active" : "Inactive",
+            })
+            .OrderBy(k => k.KpiCode)
+            .ToList();
+        return View(kpis);
     }
 }

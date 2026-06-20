@@ -1,33 +1,20 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using StrategyHouse.Infrastructure.Persistence;
 using StrategyHouse.Web.Services;
 
 namespace StrategyHouse.Web.Controllers;
 
 public class HomeController : Controller
 {
-    private readonly ApplicationDbContext _db;
-    public HomeController(ApplicationDbContext db) { _db = db; }
+    private readonly IStrategyDataSource _source;
+    public HomeController(IStrategyDataSource source) { _source = source; }
 
     public async Task<IActionResult> Index()
     {
-        // Phase 19.20 (Fix 2) — count DISTINCT strategy elements. Seed/import data can
-        // contain duplicate rows (same code appearing more than once); the home tiles
-        // should reflect the real number of unique pillars/objectives/initiatives, not
-        // the raw row count. Dedup by code, falling back to the Arabic name when the
-        // code is blank.
-        var pillars = await _db.Pillars.AsNoTracking().ToListAsync();
-        var objectives = await _db.Objectives.AsNoTracking().ToListAsync();
-        var initiatives = await _db.Initiatives.AsNoTracking().ToListAsync();
-
-        var stats = new HomeStats(
-            StrategyDedup.ByPillarCode(pillars).Count,
-            StrategyDedup.ByObjectiveCode(objectives).Count,
-            StrategyDedup.ByInitiativeCode(initiatives).Count,
-            await _db.Projects.CountAsync(),
-            await _db.Kpis.CountAsync());
-        ViewBag.Stats = stats;
+        // Phase 19.23 — home tiles read live counts through the unified source
+        // (MSSQL mirror → SQLite → empty). No PageContent overrides, no dummy data.
+        var counts = await _source.GetCountsAsync(HttpContext.RequestAborted);
+        ViewBag.Stats = new HomeStats(
+            counts.Pillars, counts.Objectives, counts.Initiatives, counts.Projects, counts.Kpis);
         return View();
     }
 

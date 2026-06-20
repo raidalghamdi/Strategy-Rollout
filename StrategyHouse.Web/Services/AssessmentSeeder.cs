@@ -19,7 +19,7 @@ public static class AssessmentSeeder
     // Phase 5: quiz auto-seed removed — production starts with 0 questions until an
     // admin clicks "Regenerate" or adds questions manually. Survey seed remains.
     // Phase 6: seed 5 hand-crafted demo questions so the quiz is never empty.
-    public static async Task RunAsync(ApplicationDbContext db, QuizGeneratorService quiz, string periodLabel = "2026-2030")
+    public static async Task RunAsync(ApplicationDbContext db, string periodLabel = "2026-2030")
     {
         await EnsureDemoQuizAsync(db);
         await SeedProgrammeSurveyAsync(db, periodLabel);

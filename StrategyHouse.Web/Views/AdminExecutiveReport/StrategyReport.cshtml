@@ -2,7 +2,6 @@
 @model StrategyDataReportService.Report
 @{
     ViewData["Title"] = "التقرير التنفيذي — بيانات الاستراتيجية";
-    string Money(decimal v) => v.ToString("#,##0");
 }
 
 @section Styles {
@@ -40,14 +39,6 @@
             <div class="col-6 col-md"><div class="rep-card center"><div class="num">@Model.InitiativeCount</div><div class="lbl">المبادرات</div></div></div>
             <div class="col-6 col-md"><div class="rep-card center"><div class="num">@Model.ProjectCount</div><div class="lbl">المشاريع</div></div></div>
             <div class="col-6 col-md"><div class="rep-card center"><div class="num">@Model.KpiCount</div><div class="lbl">المؤشرات</div></div></div>
-        </div>
-    </div>
-
-    <div class="rep-card">
-        <h4 class="sec-title">المؤشرات المالية للمشاريع</h4>
-        <div class="row g-3">
-            <div class="col-12 col-md-6"><div class="rep-card center"><div class="num">@Money(Model.TotalProjectBudget)</div><div class="lbl">إجمالي ميزانية المشاريع</div></div></div>
-            <div class="col-12 col-md-6"><div class="rep-card center"><div class="num">@Money(Model.TotalProjectLiquidity)</div><div class="lbl">إجمالي سيولة المشاريع</div></div></div>
         </div>
     </div>
 
