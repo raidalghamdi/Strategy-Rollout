@@ -88,6 +88,27 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
             .HasForeignKey(p => p.InitiativeCode)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Phase 19.24 — Department FK on Projects + KPIs.
+        // The Department_Code column already exists in SQLite and is fully populated
+        // (220/220 Projects, 134/134 KPIs, 0 orphans). This relationship configuration
+        // only teaches EF how to JOIN; it does NOT change the database schema.
+        // No HasIndex() because that would require a migration.
+        b.Entity<Project>()
+            .HasOne(p => p.Department)
+            .WithMany()
+            .HasForeignKey(p => p.DepartmentCode)
+            .HasPrincipalKey(d => d.DeptCode)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        b.Entity<Kpi>()
+            .HasOne(k => k.Department)
+            .WithMany()
+            .HasForeignKey(k => k.DepartmentCode)
+            .HasPrincipalKey(d => d.DeptCode)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
         // Phase 1 journey FKs — no cascade deletes, keep all history.
         b.Entity<SessionMember>()
             .HasOne(m => m.Session)

@@ -144,6 +144,9 @@ public class Kpi
 
     [ForeignKey(nameof(PlrCode))]
     public Pillar? Pillar { get; set; }
+
+    [ForeignKey(nameof(DepartmentCode))]
+    public Department? Department { get; set; }
 }
 
 [Table("Initiatives")]
@@ -253,6 +256,9 @@ public class Project
 
     [ForeignKey(nameof(PlrCode))]
     public Pillar? Pillar { get; set; }
+
+    [ForeignKey(nameof(DepartmentCode))]
+    public Department? Department { get; set; }
 }
 
 [Table("Departments")]
