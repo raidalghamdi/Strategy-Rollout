@@ -1,0 +1,173 @@
+@{
+    ViewData["Title"] = "رابط الاستبيان وصورة QR";
+    var surveyUrl = ViewBag.SurveyUrl as string ?? "";
+    var useCustom = ViewBag.UseCustom as bool? ?? false;
+    var customQr = ViewBag.CustomQr as string ?? "";
+    var autoQr = ViewBag.AutoQr as string;
+    var hasCustom = !string.IsNullOrEmpty(customQr);
+    var activeQr = (useCustom && hasCustom) ? customQr : autoQr;
+}
+
+@section Styles {
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
+    <style>
+        .ln-card { background:#fff; border-radius:14px; box-shadow:0 4px 16px rgba(0,25,43,.08); padding:22px; margin-bottom:18px; }
+        .ln-title { color:#00192B; font-weight:800; border-inline-start:5px solid #FAC126; padding-inline-start:12px; margin-bottom:14px; }
+        .ln-qr { background:#fff; padding:12px; border:1px solid #E1E5EB; border-radius:14px; display:inline-block; }
+        .ln-qr img { display:block; width:240px; height:240px; max-width:60vw; image-rendering: pixelated; }
+        .ln-qr.small img { width:160px; height:160px; }
+        .ln-badge-active { background:#067647; color:#fff; padding:4px 12px; border-radius:999px; font-size:.85rem; font-weight:700; }
+        .ln-badge-idle { background:#e2e8f0; color:#5a6b80; padding:4px 12px; border-radius:999px; font-size:.85rem; font-weight:700; }
+        .url-box { background:#f6f8fa; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; word-break:break-all; font-family:monospace; font-size:.9rem; }
+        .gold-btn { background:#FAC126; color:#00192B; border:none; font-weight:700; }
+        .gold-btn:hover { background:#e6ad15; color:#00192B; }
+        .navy-btn { background:#00192B; color:#fff; border:none; font-weight:700; }
+        .navy-btn:hover { background:#001020; color:#fff; }
+    </style>
+}
+
+<div class="container py-3" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 style="color:#00192B;">رابط الاستبيان وصورة QR</h1>
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Index">رجوع</a>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert" style="background:#067647;color:#fff;border:none;">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+
+    <!-- Status banner -->
+    <div class="ln-card">
+        <h4 class="ln-title">الحالة الحالية</h4>
+        <div class="row g-3 align-items-center">
+            <div class="col-12 col-md-7">
+                <div class="mb-2">
+                    <span class="text-muted small">المصدر النشط:</span>
+                    @if (useCustom && hasCustom)
+                    {
+                        <span class="ln-badge-active">صورة QR مخصّصة (مرفوعة)</span>
+                    }
+                    else
+                    {
+                        <span class="ln-badge-active">QR مولّد تلقائياً من الرابط</span>
+                    }
+                </div>
+                <div class="mb-2">
+                    <span class="text-muted small">الرابط:</span>
+                    @if (!string.IsNullOrEmpty(surveyUrl))
+                    {
+                        <div class="url-box mt-1"><a href="@surveyUrl" target="_blank" rel="noopener">@surveyUrl</a></div>
+                    }
+                    else
+                    {
+                        <div class="text-muted">— لا يوجد رابط محدد —</div>
+                    }
+                </div>
+                <p class="text-muted small mb-0">هذه الإعدادات تُستخدم في: شاشة شكر الاختبار، وصفحة /Admin/Insights/Survey.</p>
+            </div>
+            <div class="col-12 col-md-5 text-center">
+                @if (!string.IsNullOrEmpty(activeQr))
+                {
+                    <div class="ln-qr"><img src="@activeQr" alt="QR" /></div>
+                }
+                else
+                {
+                    <div class="text-muted">لا يوجد رمز QR للعرض.</div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Section A: edit URL -->
+    <div class="ln-card">
+        <h4 class="ln-title">١. تعديل رابط الاستبيان</h4>
+        <p class="text-muted small">أدخل أي رابط (Microsoft Forms أو Google Forms أو رابط داخلي يبدأ بـ <code>/</code>) — وسيُولَّد QR منه تلقائياً.</p>
+        <form method="post" asp-action="LinkSaveUrl" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-12 col-md-9">
+                <label class="form-label">الرابط</label>
+                <input type="text" name="surveyUrl" class="form-control" value="@surveyUrl" placeholder="https://forms.office.com/r/..." dir="ltr" style="text-align:left;" required />
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn navy-btn w-100">حفظ الرابط</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Section B: upload custom QR -->
+    <div class="ln-card">
+        <h4 class="ln-title">٢. رفع صورة QR مخصّصة (اختياري)</h4>
+        <p class="text-muted small">ارفع صورة QR جاهزة بدلاً من التوليد التلقائي. الحجم الأقصى: 1 ميغابايت. الأنواع المدعومة: PNG, JPG, GIF, SVG, WEBP.</p>
+        <form method="post" asp-action="LinkUploadQr" enctype="multipart/form-data" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-12 col-md-9">
+                <label class="form-label">اختر الصورة</label>
+                <input type="file" name="file" class="form-control" accept=".png,.jpg,.jpeg,.gif,.svg,.webp,image/*" required />
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn gold-btn w-100">رفع وتفعيل</button>
+            </div>
+        </form>
+
+        @if (hasCustom)
+        {
+            <hr class="my-3" />
+            <div class="row g-3 align-items-center">
+                <div class="col-12 col-md-5 text-center">
+                    <div class="ln-qr small"><img src="@customQr" alt="الصورة المخصّصة" /></div>
+                    <div class="text-muted small mt-2">المعاينة الحالية</div>
+                </div>
+                <div class="col-12 col-md-7">
+                    <p class="mb-3">
+                        <span class="text-muted small">حالة الاستخدام:</span>
+                        @if (useCustom)
+                        {
+                            <span class="ln-badge-active ms-1">مُفعَّلة</span>
+                        }
+                        else
+                        {
+                            <span class="ln-badge-idle ms-1">مرفوعة لكن غير مفعَّلة</span>
+                        }
+                    </p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <form method="post" asp-action="LinkToggleCustom" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="useCustom" value="@(useCustom ? "false" : "true")" />
+                            <button type="submit" class="btn @(useCustom ? "btn-outline-secondary" : "navy-btn")">
+                                @(useCustom ? "إلغاء التفعيل (الرجوع للتوليد التلقائي)" : "تفعيل الصورة المخصّصة")
+                            </button>
+                        </form>
+                        <form method="post" asp-action="LinkClearQr" class="d-inline"
+                              onsubmit="return confirm('سيتم حذف الصورة المخصّصة. هل أنت متأكد؟');">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-outline-danger">حذف الصورة المخصّصة</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Section C: side-by-side preview -->
+    @if (hasCustom && !string.IsNullOrEmpty(autoQr))
+    {
+        <div class="ln-card">
+            <h4 class="ln-title">٣. مقارنة بين المصدرين</h4>
+            <div class="row g-3 text-center">
+                <div class="col-6">
+                    <div class="ln-qr small"><img src="@autoQr" alt="مولّد تلقائياً" /></div>
+                    <div class="small mt-2"><strong>مولّد تلقائياً من الرابط</strong></div>
+                </div>
+                <div class="col-6">
+                    <div class="ln-qr small"><img src="@customQr" alt="مرفوع يدوياً" /></div>
+                    <div class="small mt-2"><strong>مرفوع يدوياً</strong></div>
+                </div>
+            </div>
+        </div>
+    }
+</div>

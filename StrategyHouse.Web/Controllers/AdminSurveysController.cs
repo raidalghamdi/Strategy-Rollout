@@ -17,13 +17,24 @@ public class AdminSurveysController : Controller
     private readonly ApplicationDbContext _db;
     private readonly QrService _qr;
     private readonly SurveyReportPdfService _report;
+    private readonly PageContentService _pageContent;
 
-    public AdminSurveysController(ApplicationDbContext db, QrService qr, SurveyReportPdfService report)
+    public AdminSurveysController(
+        ApplicationDbContext db,
+        QrService qr,
+        SurveyReportPdfService report,
+        PageContentService pageContent)
     {
         _db = db;
         _qr = qr;
         _report = report;
+        _pageContent = pageContent;
     }
+
+    // Phase 19.25 — PageContent keys for the survey link / custom QR feature.
+    private const string KeySurveyUrl = "quiz.survey.url";
+    private const string KeyUseCustom = "quiz.survey.qr.useCustom";
+    private const string KeyCustomQr  = "quiz.survey.qr.custom";
 
     [HttpGet("")]
     public async Task<IActionResult> Index()
@@ -187,6 +198,124 @@ public class AdminSurveysController : Controller
         if (model == null) return NotFound();
         var bytes = _report.Generate(model);
         return File(bytes, "application/pdf", $"survey-report-{id}.pdf");
+    }
+
+    // ----------------------------------------------------------------------
+    // Phase 19.25 — Survey-wide link & custom-QR editor.
+    // Lets admins paste any URL (Microsoft Forms, Google Forms, /s/<token>, ...)
+    // and preview the auto-generated QR; or upload a custom QR image (PNG/JPG/
+    // SVG/GIF/WEBP up to 1 MB) that will be rendered instead. Toggling
+    // "useCustom" off reverts to the URL-generated QR while keeping the upload
+    // for fast re-enable. Storage: 3 PageContents keys (no schema change).
+    //   quiz.survey.url           — the survey link (added in 19.15)
+    //   quiz.survey.qr.useCustom  — "true" | "false"
+    //   quiz.survey.qr.custom     — data:image/<mime>;base64,...
+    // ----------------------------------------------------------------------
+    [HttpGet("Link")]
+    public IActionResult Link()
+    {
+        var url = _pageContent.Get(KeySurveyUrl, "");
+        var useCustom = string.Equals(_pageContent.Get(KeyUseCustom, "false"), "true", StringComparison.OrdinalIgnoreCase);
+        var customQr = _pageContent.Get(KeyCustomQr, "");
+
+        ViewBag.SurveyUrl = url;
+        ViewBag.UseCustom = useCustom;
+        ViewBag.CustomQr = customQr;
+        try { ViewBag.AutoQr = string.IsNullOrWhiteSpace(url) ? null : _qr.GenerateBase64Png(url, 8); }
+        catch { ViewBag.AutoQr = null; }
+        return View();
+    }
+
+    [HttpPost("Link/SaveUrl")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> LinkSaveUrl(string? surveyUrl)
+    {
+        var trimmed = (surveyUrl ?? "").Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            TempData["Error"] = "يرجى إدخال الرابط.";
+            return RedirectToAction(nameof(Link));
+        }
+        var looksLikeUrl = trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                        || trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                        || trimmed.StartsWith("/");
+        if (!looksLikeUrl)
+        {
+            TempData["Error"] = "صيغة الرابط غير صحيحة. يجب أن يبدأ بـ http:// أو https:// أو /.";
+            return RedirectToAction(nameof(Link));
+        }
+        await _pageContent.SaveAsync(_db, KeySurveyUrl, trimmed);
+        TempData["Success"] = "تم حفظ رابط الاستبيان. رمز QR تحدّث تلقائياً.";
+        return RedirectToAction(nameof(Link));
+    }
+
+    [HttpPost("Link/UploadQr")]
+    [ValidateAntiForgeryToken]
+    [RequestSizeLimit(2_000_000)]
+    public async Task<IActionResult> LinkUploadQr(IFormFile? file)
+    {
+        if (file == null || file.Length == 0)
+        {
+            TempData["Error"] = "يرجى اختيار صورة QR للرفع.";
+            return RedirectToAction(nameof(Link));
+        }
+        const long maxBytes = 1_048_576; // 1 MB
+        if (file.Length > maxBytes)
+        {
+            TempData["Error"] = "حجم الصورة يتجاوز 1 ميغابايت. يرجى رفع صورة أصغر.";
+            return RedirectToAction(nameof(Link));
+        }
+        var ext = (Path.GetExtension(file.FileName) ?? "").ToLowerInvariant();
+        string mime;
+        switch (ext)
+        {
+            case ".png":  mime = "image/png";  break;
+            case ".jpg":
+            case ".jpeg": mime = "image/jpeg"; break;
+            case ".gif":  mime = "image/gif";  break;
+            case ".svg":  mime = "image/svg+xml"; break;
+            case ".webp": mime = "image/webp"; break;
+            default:
+                TempData["Error"] = "نوع الملف غير مدعوم. المدعوم: PNG, JPG, GIF, SVG, WEBP.";
+                return RedirectToAction(nameof(Link));
+        }
+        byte[] bytes;
+        using (var ms = new MemoryStream())
+        {
+            await file.CopyToAsync(ms);
+            bytes = ms.ToArray();
+        }
+        var dataUri = "data:" + mime + ";base64," + Convert.ToBase64String(bytes);
+        await _pageContent.SaveAsync(_db, KeyCustomQr, dataUri);
+        await _pageContent.SaveAsync(_db, KeyUseCustom, "true");
+        TempData["Success"] = "تم رفع صورة QR وتفعيلها.";
+        return RedirectToAction(nameof(Link));
+    }
+
+    [HttpPost("Link/ToggleCustom")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> LinkToggleCustom(bool useCustom)
+    {
+        if (useCustom && string.IsNullOrEmpty(_pageContent.Get(KeyCustomQr, "")))
+        {
+            TempData["Error"] = "لا توجد صورة QR مرفوعة. يرجى رفع صورة أولاً.";
+            return RedirectToAction(nameof(Link));
+        }
+        await _pageContent.SaveAsync(_db, KeyUseCustom, useCustom ? "true" : "false");
+        TempData["Success"] = useCustom
+            ? "تم تفعيل صورة QR المخصّصة."
+            : "تم الرجوع إلى رمز QR المولّد تلقائياً من الرابط.";
+        return RedirectToAction(nameof(Link));
+    }
+
+    [HttpPost("Link/ClearQr")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> LinkClearQr()
+    {
+        await _pageContent.SaveAsync(_db, KeyCustomQr, "");
+        await _pageContent.SaveAsync(_db, KeyUseCustom, "false");
+        TempData["Success"] = "تم حذف الصورة المخصّصة وإعادة التوليد التلقائي.";
+        return RedirectToAction(nameof(Link));
     }
 
     private async Task<SurveyReportPdfService.ReportModel?> BuildReportAsync(Guid id)
