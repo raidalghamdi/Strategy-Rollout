@@ -1,19 +1,16 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using StrategyHouse.Infrastructure.Persistence;
+using StrategyHouse.Web.Services.Dtos;
 
 namespace StrategyHouse.Web.Services;
 
-// Phase 19.5 — single source of truth for strategy data (pillars → objectives →
-// initiatives → projects + KPIs) used by views and the Sankey API. Resolves data
-// through a resilient priority chain so the UI never breaks and hardcoded strategy
-// text is eliminated:
-//   1. Live external MSSQL (ExternalDbContext) — when reachable within a short timeout.
-//   2. Local SQLite Mirror_* tables — populated by the admin push button.
-//   3. Hardcoded 3×3 dummy — last resort, flagged so the UI can warn the operator.
-// Survey/quiz/journey-CMS text is out of scope and untouched.
+// Phase 19.5 / 19.23 — single source of truth for strategy data (pillars → objectives
+// → initiatives → projects) used by views and the Sankey API. As of Phase 19.23 it
+// delegates all reads to IStrategyDataSource (MSSQL mirror → SQLite → empty); the
+// hardcoded 3×3 dummy fallback has been removed. When neither source has rows the
+// dataset is Empty and the UI shows an explicit "no data" notice.
 
-public enum StrategyDataSource { Live, Mirror, Dummy }
+// Phase 19.23 — Dummy removed; Empty added. Strategy data resolves
+// Mirror → SQLite, and surfaces Empty when neither has rows (UI warns the operator).
+public enum StrategyDataSource { Live, Mirror, Sqlite, Empty }
 
 public class StrategyNode
 {
@@ -29,7 +26,7 @@ public class StrategyDataSet
     public List<StrategyNode> Objectives { get; set; } = new();
     public List<StrategyNode> Initiatives { get; set; } = new();
     public List<StrategyNode> Projects { get; set; } = new();
-    public bool IsDummy => Source == StrategyDataSource.Dummy;
+    public bool IsEmpty => Source == StrategyDataSource.Empty;
 }
 
 public interface IStrategyDataProvider
@@ -40,38 +37,33 @@ public interface IStrategyDataProvider
 
 public class StrategyDataProvider : IStrategyDataProvider
 {
-    private const string DummyWarning = "البيانات تجريبية — يرجى الضغط على زر دفع البيانات في صفحة الإدارة.";
-    private static readonly TimeSpan LiveTimeout = TimeSpan.FromSeconds(3);
+    private const string EmptyWarning = "لا توجد بيانات استراتيجية. يرجى مزامنة MSSQL أو التواصل مع المسؤول.";
 
-    private readonly ApplicationDbContext _db;
-    private readonly ExternalDbContext? _external;
-    private readonly IConfiguration _config;
-    private readonly ILogger<StrategyDataProvider> _log;
+    private readonly IStrategyDataSource _source;
     private readonly StrategyContentService? _content;
 
-    public StrategyDataProvider(
-        ApplicationDbContext db,
-        IConfiguration config,
-        ILogger<StrategyDataProvider> log,
-        ExternalDbContext? external = null,
-        StrategyContentService? content = null)
+    public StrategyDataProvider(IStrategyDataSource source, StrategyContentService? content = null)
     {
-        _db = db;
-        _config = config;
-        _log = log;
-        _external = external;
+        _source = source;
         _content = content;
     }
 
     public async Task<StrategyDataSet> GetStrategyAsync(CancellationToken ct = default)
     {
-        var live = await TryLiveAsync(ct);
-        if (live != null) return live;
+        var pillars = await _source.GetPillarsAsync(ct);
+        var objectives = await _source.GetObjectivesAsync(ct);
+        var initiatives = await _source.GetInitiativesAsync(null, ct);
+        var projects = await _source.GetProjectsAsync(null, ct);
+        var counts = await _source.GetCountsAsync(ct);
 
-        var mirror = await TryMirrorAsync(ct);
-        if (mirror != null) return mirror;
-
-        return BuildDummy();
+        return new StrategyDataSet
+        {
+            Source = counts.Source,
+            Pillars = pillars.Select(p => new StrategyNode { Code = p.Code, Name = p.Name }).ToList(),
+            Objectives = objectives.Select(o => new StrategyNode { Code = o.Code, Name = o.Name, ParentCode = o.PillarCode }).ToList(),
+            Initiatives = initiatives.Select(i => new StrategyNode { Code = i.Code, Name = i.Name, ParentCode = i.ObjectiveCode }).ToList(),
+            Projects = projects.Select(p => new StrategyNode { Code = p.Code, Name = p.Name, ParentCode = p.InitiativeCode }).ToList(),
+        };
     }
 
     public async Task<object> GetSankeyDataAsync(CancellationToken ct = default)
@@ -136,99 +128,10 @@ public class StrategyDataProvider : IStrategyDataProvider
             ok = true,
             live = data.Source == StrategyDataSource.Live,
             source = data.Source.ToString().ToLowerInvariant(),
-            dummy = data.IsDummy,
-            warning = data.IsDummy ? DummyWarning : null,
+            empty = data.IsEmpty,
+            warning = data.IsEmpty ? EmptyWarning : null,
             nodes,
             links,
         };
-    }
-
-    private async Task<StrategyDataSet?> TryLiveAsync(CancellationToken ct)
-    {
-        var useExternal = _config.GetValue<bool>("Features:UseExternalDb");
-        if (!useExternal || _external == null) return null;
-
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(LiveTimeout);
-            var token = cts.Token;
-
-            if (!await _external.Database.CanConnectAsync(token)) return null;
-
-            var pillars = await _external.Pillars.AsNoTracking().ToListAsync(token);
-            var objectives = await _external.Objectives.AsNoTracking().ToListAsync(token);
-            var initiatives = await _external.Initiatives.AsNoTracking().ToListAsync(token);
-            var projects = await _external.Projects.AsNoTracking().ToListAsync(token);
-
-            // Phase 19.8 — if the live source has no pillars, treat it as "not live"
-            // and fall back to the mirror rather than returning empty live data.
-            if (pillars.Count == 0) return null;
-
-            return new StrategyDataSet
-            {
-                Source = StrategyDataSource.Live,
-                Pillars = pillars.Select(p => new StrategyNode { Code = p.PlrCode, Name = p.PillarName ?? p.PlrCode }).ToList(),
-                Objectives = objectives.Select(o => new StrategyNode { Code = o.ObjectiveCode, Name = o.ObjectiveName ?? o.ObjectiveCode, ParentCode = o.PlrCode }).ToList(),
-                Initiatives = initiatives.Select(i => new StrategyNode { Code = i.InitiativeCode, Name = i.InitiativeName ?? i.InitiativeCode, ParentCode = i.ObjectiveCode }).ToList(),
-                Projects = projects.Select(p => new StrategyNode { Code = p.ProjectCode, Name = p.ProjectName ?? p.ProjectCode, ParentCode = p.InitiativeCode }).ToList(),
-            };
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning(ex, "Live MSSQL strategy read failed; falling back to mirror.");
-            return null;
-        }
-    }
-
-    private async Task<StrategyDataSet?> TryMirrorAsync(CancellationToken ct)
-    {
-        try
-        {
-            var pillars = await _db.MirrorPillars.AsNoTracking().ToListAsync(ct);
-            if (pillars.Count == 0) return null;
-
-            var objectives = await _db.MirrorObjectives.AsNoTracking().ToListAsync(ct);
-            var initiatives = await _db.MirrorInitiatives.AsNoTracking().ToListAsync(ct);
-            var projects = await _db.MirrorProjects.AsNoTracking().ToListAsync(ct);
-
-            return new StrategyDataSet
-            {
-                Source = StrategyDataSource.Mirror,
-                Pillars = pillars.Select(p => new StrategyNode { Code = p.PlrCode, Name = p.PillarName ?? p.PlrCode }).ToList(),
-                Objectives = objectives.Select(o => new StrategyNode { Code = o.ObjectiveCode, Name = o.ObjectiveName ?? o.ObjectiveCode, ParentCode = o.PlrCode }).ToList(),
-                Initiatives = initiatives.Select(i => new StrategyNode { Code = i.InitiativeCode, Name = i.InitiativeName ?? i.InitiativeCode, ParentCode = i.ObjectiveCode }).ToList(),
-                Projects = projects.Select(p => new StrategyNode { Code = p.ProjectCode, Name = p.ProjectName ?? p.ProjectCode, ParentCode = p.InitiativeCode }).ToList(),
-            };
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning(ex, "Mirror strategy read failed; falling back to dummy.");
-            return null;
-        }
-    }
-
-    private static StrategyDataSet BuildDummy()
-    {
-        var set = new StrategyDataSet { Source = StrategyDataSource.Dummy };
-        var pillarNames = new[] { "تمكين المنافسة", "حماية المنافسة", "التميز المؤسسي" };
-        for (var p = 0; p < pillarNames.Length; p++)
-        {
-            var pCode = "P" + (p + 1);
-            set.Pillars.Add(new StrategyNode { Code = pCode, Name = pillarNames[p] });
-            for (var o = 1; o <= 3; o++)
-            {
-                var oCode = pCode + "-O" + o;
-                set.Objectives.Add(new StrategyNode { Code = oCode, Name = "هدف " + (p + 1) + "." + o, ParentCode = pCode });
-                for (var n = 1; n <= 3; n++)
-                {
-                    var iCode = oCode + "-I" + n;
-                    set.Initiatives.Add(new StrategyNode { Code = iCode, Name = "مبادرة " + (p + 1) + "." + o + "." + n, ParentCode = oCode });
-                    var prCode = iCode + "-PR1";
-                    set.Projects.Add(new StrategyNode { Code = prCode, Name = "مشروع " + (p + 1) + "." + o + "." + n, ParentCode = iCode });
-                }
-            }
-        }
-        return set;
     }
 }

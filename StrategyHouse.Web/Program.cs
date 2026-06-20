@@ -57,6 +57,8 @@ builder.Services.AddScoped<ProjectsService>();
 // (live MSSQL → SQLite mirror → dummy fallback).
 builder.Services.AddScoped<IMssqlMirrorService, MssqlMirrorService>();
 builder.Services.AddScoped<IStrategyDataProvider, StrategyDataProvider>();
+// Phase 19.23 — unified strategy data source (MSSQL mirror → SQLite → empty; no dummy).
+builder.Services.AddScoped<IStrategyDataSource, UnifiedStrategyDataSource>();
 // Phase 19.7 — external MSSQL connection diagnostics (startup probe + admin endpoint).
 builder.Services.AddScoped<ExternalDbDiagnostics>();
 
@@ -129,8 +131,8 @@ builder.Services.AddScoped<StrategyMapPdfService>();
 builder.Services.AddScoped<CoverageService>();
 builder.Services.AddScoped<PledgeAggregateService>();
 builder.Services.AddScoped<ProgrammePosterPdfService>();
-// Phase 4 — assessment
-builder.Services.AddScoped<QuizGeneratorService>();
+// Phase 4 — assessment (Phase 19.23 — QuizGeneratorService removed; quiz bank is the
+// hand-crafted demo set via AssessmentSeeder / QuizQuestionsProvider, no table reads).
 builder.Services.AddScoped<SurveyReportPdfService>();
 // Phase 12 — official survey analytics + final report
 builder.Services.AddScoped<SurveyAnalyticsService>();
@@ -163,9 +165,8 @@ using (var scope = app.Services.CreateScope())
 
     // Phase 4 — programme survey (quiz auto-seed removed in Phase 5; admin-controlled).
     // Phase 19.8 — period label comes from StrategyContent:PeriodLabel (default 2026-2030).
-    var quiz = scope.ServiceProvider.GetRequiredService<QuizGeneratorService>();
     var periodLabel = builder.Configuration.GetValue<string>("StrategyContent:PeriodLabel") ?? "2026-2030";
-    await AssessmentSeeder.RunAsync(db, quiz, periodLabel);
+    await AssessmentSeeder.RunAsync(db, periodLabel);
 
     // Phase 12 — replace the survey bank with the 8 official questions (idempotent via hash).
     await Phase12SurveySeeder.SeedAsync(db);

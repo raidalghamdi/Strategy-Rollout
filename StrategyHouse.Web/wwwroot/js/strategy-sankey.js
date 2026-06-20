@@ -92,11 +92,11 @@
                     loadEcharts(function (err) {
                         if (err || !window.echarts) { fail(el); return; }
                         el.innerHTML = '';
-                        if (data.dummy) {
+                        if (data.empty) {
                             var warn = document.createElement('div');
                             warn.className = 'alert alert-warning mb-2';
                             warn.textContent = data.warning
-                                || 'البيانات تجريبية — يرجى الضغط على زر دفع البيانات في صفحة الإدارة.';
+                                || 'لا توجد بيانات استراتيجية. يرجى مزامنة MSSQL أو التواصل مع المسؤول.';
                             el.appendChild(warn);
                         }
                         var chartHost = document.createElement('div');

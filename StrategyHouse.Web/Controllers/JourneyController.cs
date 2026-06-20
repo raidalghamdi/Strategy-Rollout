@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using StrategyHouse.Domain.Entities;
 using StrategyHouse.Infrastructure.Persistence;
 using StrategyHouse.Web.Services;
+using Dtos = StrategyHouse.Web.Services.Dtos;
 
 namespace StrategyHouse.Web.Controllers;
 
@@ -18,37 +19,47 @@ public class JourneyController : Controller
     private readonly ApplicationDbContext _db;
     private readonly StrategyContentService _content;
     private readonly StrategyMapPdfService _pdf;
-    private readonly PillarsService _pillarsSvc;
-    private readonly ObjectivesService _objectivesSvc;
-    private readonly InitiativesService _initiativesSvc;
-    private readonly ProjectsService _projectsSvc;
     private readonly DepartmentDirectoryService _departments;
     private readonly IStrategyDataProvider _strategyData;
+    private readonly IStrategyDataSource _source;
     private readonly ILogger<JourneyController> _logger;
 
     public JourneyController(
         ApplicationDbContext db,
         StrategyContentService content,
         StrategyMapPdfService pdf,
-        PillarsService pillarsSvc,
-        ObjectivesService objectivesSvc,
-        InitiativesService initiativesSvc,
-        ProjectsService projectsSvc,
         DepartmentDirectoryService departments,
         IStrategyDataProvider strategyData,
+        IStrategyDataSource source,
         ILogger<JourneyController> logger)
     {
         _db = db;
         _content = content;
         _pdf = pdf;
-        _pillarsSvc = pillarsSvc;
-        _objectivesSvc = objectivesSvc;
-        _initiativesSvc = initiativesSvc;
-        _projectsSvc = projectsSvc;
         _departments = departments;
         _strategyData = strategyData;
+        _source = source;
         _logger = logger;
     }
+
+    // Phase 19.23 — map unified-source DTOs back to the entity shapes the journey
+    // views, PDF service, and Sankey builder bind to. Only the properties those
+    // consumers actually read are populated. Data flows MSSQL mirror → SQLite → empty
+    // through IStrategyDataSource; nothing here reads tables or hardcodes data.
+    private static List<Pillar> ToPillarEntities(IReadOnlyList<Dtos.StrategyPillarDto> src) =>
+        src.Select(p => new Pillar { PlrCode = p.Code, PillarName = p.Name, Budget = p.Budget, Liquidity = p.Liquidity }).ToList();
+
+    private static List<Objective> ToObjectiveEntities(IReadOnlyList<Dtos.StrategyObjectiveDto> src) =>
+        src.Select(o => new Objective { ObjectiveCode = o.Code, ObjectiveName = o.Name, PlrCode = o.PillarCode, Budget = o.Budget, Liquidity = o.Liquidity }).ToList();
+
+    private static List<Initiative> ToInitiativeEntities(IReadOnlyList<Dtos.StrategyInitiativeDto> src) =>
+        src.Select(i => new Initiative { InitiativeCode = i.Code, InitiativeName = i.Name, ObjectiveCode = i.ObjectiveCode, Owners = i.Owners, Budget = i.Budget, Liquidity = i.Liquidity }).ToList();
+
+    private static List<Kpi> ToKpiEntities(IReadOnlyList<Dtos.StrategyKpiDto> src) =>
+        src.Select(k => new Kpi { KpiCode = k.Code, KpiName = k.Name, ObjectiveCode = k.ObjectiveCode, Division = k.Division, KpiType = k.Type, ActivationStatus = k.Active ? "Active" : "Inactive" }).ToList();
+
+    private static List<Project> ToProjectEntities(IReadOnlyList<Dtos.StrategyProjectDto> src) =>
+        src.Select(p => new Project { ProjectCode = p.Code, ProjectName = p.Name, InitiativeCode = p.InitiativeCode, Division = p.Division, ProjectType = p.Type, ProjectStatus = p.Status, Budget = p.Budget, Liquidity = p.Liquidity, GacBudget = p.GacBudget }).ToList();
 
     // GET /Journey — landing page with code entry.
     [HttpGet("Journey")]
@@ -150,6 +161,13 @@ public class JourneyController : Controller
             .OrderByDescending(r => r.CreatedAt)
             .FirstOrDefaultAsync();
 
+        // Phase 19.23 — all strategy reads route through the unified source
+        // (MSSQL mirror → SQLite → empty). DTOs are mapped to entity shapes for the
+        // views; dedup is preserved at this read layer.
+        var ct = HttpContext.RequestAborted;
+        var deptKpis = ToKpiEntities(await _source.GetKpisAsync(session.DeptCode, ct));
+        var deptProjects = ToProjectEntities(await _source.GetProjectsAsync(session.DeptCode, ct));
+
         return new JourneyRunViewModel
         {
             Session = session,
@@ -158,17 +176,16 @@ public class JourneyController : Controller
             Sankey = await BuildSankeyAsync(session.DeptCode),
             // Phase 19.20 (Fix 2) — dedup strategy elements at the read layer so the
             // journey views never show the same pillar/objective/initiative twice.
-            Pillars = StrategyDedup.ByPillarCode(await _db.Pillars.AsNoTracking().ToListAsync()),
-            Objectives = StrategyDedup.ByObjectiveCode(await _db.Objectives.AsNoTracking().ToListAsync()),
-            DeptObjectiveCodes = await _db.Kpis.Where(k => k.DepartmentCode == session.DeptCode)
-                .Select(k => k.ObjectiveCode).Distinct().ToListAsync(),
-            Initiatives = StrategyDedup.ByInitiativeCode(await _db.Initiatives.AsNoTracking().ToListAsync()).Take(40).ToList(),
+            Pillars = StrategyDedup.ByPillarCode(ToPillarEntities(await _source.GetPillarsAsync(ct))),
+            Objectives = StrategyDedup.ByObjectiveCode(ToObjectiveEntities(await _source.GetObjectivesAsync(ct))),
+            DeptObjectiveCodes = deptKpis.Select(k => k.ObjectiveCode).Distinct().ToList(),
+            Initiatives = StrategyDedup.ByInitiativeCode(ToInitiativeEntities(await _source.GetInitiativesAsync(null, ct))).Take(40).ToList(),
             Roster = await _db.DepartmentRoster
                 .Where(r => r.DeptCode == session.DeptCode && r.IsActive)
                 .OrderBy(r => r.NameAr).ToListAsync(),
             Pledges = await _db.ContributionPledges.Where(p => p.SessionId == sessionId).ToListAsync(),
-            Kpis = await _db.Kpis.Where(k => k.DepartmentCode == session.DeptCode).ToListAsync(),
-            Projects = await _db.Projects.Where(p => p.DepartmentCode == session.DeptCode).ToListAsync(),
+            Kpis = deptKpis,
+            Projects = deptProjects,
             Map = map,
             InkAssets = map == null
                 ? new List<MapInkAsset>()
@@ -179,8 +196,9 @@ public class JourneyController : Controller
                 .Select(t => t.SelectedValueText)
                 .FirstOrDefaultAsync(),
 
-            // Phase 18
-            StrategyDataLive = _pillarsSvc.Available,
+            // Phase 18/19.23 — "live" now means the unified source returned real
+            // strategy data (mirror or SQLite), not whether the external DB is wired.
+            StrategyDataLive = housePillars.Count > 0,
             HousePillars = housePillars,
             DepartmentNames = departmentNames,
             OpeningReflectionText = await _db.OpeningReflections
@@ -195,123 +213,67 @@ public class JourneyController : Controller
         };
     }
 
-    // Phase 18 — vision → pillars → objectives for the strategy-house stage.
-    // External (Phase 17) when UseExternalDb is on; otherwise a 3×3 preview so the
-    // dev/demo screen is never empty. The view shows the "data on connect" notice
-    // whenever StrategyDataLive is false.
+    // Phase 18/19.23 — vision → pillars → objectives for the strategy-house stage.
+    // Sourced through the unified data source (MSSQL mirror → SQLite → empty); never
+    // hardcoded. When empty, the view shows the "no strategy data" notice.
     private async Task<List<StrategyPillarVm>> BuildHousePillarsAsync()
     {
-        if (_pillarsSvc.Available)
+        var ct = HttpContext.RequestAborted;
+        // Phase 19.20 (Fix 2) — dedup pillars/objectives by code before projecting so
+        // the strategy house never renders the same pillar or objective twice.
+        var pillars = StrategyDedup.ByPillarCode(ToPillarEntities(await _source.GetPillarsAsync(ct)))
+            .OrderBy(p => p.PlrCode, StringComparer.Ordinal)
+            .ToList();
+        var objectives = StrategyDedup.ByObjectiveCode(ToObjectiveEntities(await _source.GetObjectivesAsync(ct)))
+            .OrderBy(o => o.ObjectiveCode, StringComparer.Ordinal)
+            .ToList();
+        return pillars.Select(p => new StrategyPillarVm
         {
-            // Phase 19.20 (Fix 2) — dedup pillars/objectives by code before projecting so
-            // the strategy house never renders the same pillar or objective twice.
-            var pillars = (await _pillarsSvc.GetAllAsync())
-                .GroupBy(p => string.IsNullOrWhiteSpace(p.PlrCode) ? (p.PillarName ?? "") : p.PlrCode)
-                .Select(g => g.First())
-                .OrderBy(p => p.PlrCode, StringComparer.Ordinal)
-                .ToList();
-            var objectives = (await _objectivesSvc.GetAllAsync())
-                .GroupBy(o => string.IsNullOrWhiteSpace(o.ObjectiveCode) ? (o.ObjectiveName ?? "") : o.ObjectiveCode)
-                .Select(g => g.First())
-                .OrderBy(o => o.ObjectiveCode, StringComparer.Ordinal)
-                .ToList();
-            return pillars.Select(p => new StrategyPillarVm
-            {
-                Code = p.PlrCode,
-                Name = p.PillarName ?? p.PlrCode,
-                Objectives = objectives
-                    .Where(o => o.PlrCode == p.PlrCode)
-                    .Select(o => new StrategyObjectiveVm { Code = o.ObjectiveCode, Name = o.ObjectiveName ?? o.ObjectiveCode })
-                    .ToList(),
-            }).ToList();
-        }
-
-        return BuildPreviewPillars();
+            Code = p.PlrCode,
+            Name = p.PillarName ?? p.PlrCode,
+            Objectives = objectives
+                .Where(o => o.PlrCode == p.PlrCode)
+                .Select(o => new StrategyObjectiveVm { Code = o.ObjectiveCode, Name = o.ObjectiveName ?? o.ObjectiveCode })
+                .ToList(),
+        }).ToList();
     }
 
-    // Dev preview: 3 pillars × 3 objectives, used when the warehouse is not wired.
-    private static List<StrategyPillarVm> BuildPreviewPillars()
-    {
-        var names = new[] { "تمكين المنافسة", "حماية المنافسة", "التميز المؤسسي" };
-        var list = new List<StrategyPillarVm>();
-        for (var i = 0; i < names.Length; i++)
-        {
-            var objs = new List<StrategyObjectiveVm>();
-            for (var j = 1; j <= 3; j++)
-                objs.Add(new StrategyObjectiveVm { Code = "OBJ" + (i + 1) + j, Name = "هدف توضيحي " + (i + 1) + "." + j });
-            list.Add(new StrategyPillarVm { Code = "PLR" + (i + 1), Name = names[i], Objectives = objs });
-        }
-        return list;
-    }
-
-    // Phase 18 — resolve a chosen initiative to its objective + pillar so the
-    // linkage chain (stages 3 and 4) can be drawn. External when live; otherwise
-    // resolved against the preview pillars by best-effort name lookup.
+    // Phase 18/19.23 — resolve a chosen initiative to its objective + pillar so the
+    // linkage chain (stages 3 and 4) can be drawn. Resolved against the unified source.
     private async Task<StrategyInitiativeVm?> ResolveInitiativeAsync(string initiativeCode)
     {
-        if (_initiativesSvc.Available)
-        {
-            var inits = await _initiativesSvc.GetAllAsync();
-            var init = inits.FirstOrDefault(i => i.InitiativeCode == initiativeCode);
-            // Phase 19.20 (Fix 6) — if the code can't be matched live, don't echo the raw
-            // code as the name; show a generic Arabic label instead.
-            if (init == null) return new StrategyInitiativeVm { Code = initiativeCode, Name = "مبادرتك" };
+        var ct = HttpContext.RequestAborted;
+        var inits = await _source.GetInitiativesAsync(null, ct);
+        var init = inits.FirstOrDefault(i => i.Code == initiativeCode);
+        // Phase 19.20 (Fix 6) — if the code can't be matched, don't echo the raw
+        // code as the name; show a generic Arabic label instead.
+        if (init == null) return new StrategyInitiativeVm { Code = initiativeCode, Name = "مبادرتك" };
 
-            string? pillarCode = null, pillarName = null, objName = init.ObjectiveName;
-            if (!string.IsNullOrEmpty(init.ObjectiveCode))
+        string? pillarCode = null, pillarName = null;
+        string? objName = null;
+        if (!string.IsNullOrEmpty(init.ObjectiveCode))
+        {
+            var objectives = await _source.GetObjectivesAsync(ct);
+            var obj = objectives.FirstOrDefault(o => o.Code == init.ObjectiveCode);
+            if (obj != null)
             {
-                var obj = await _objectivesSvc.GetByCodeAsync(init.ObjectiveCode);
-                if (obj != null)
+                objName = obj.Name;
+                pillarCode = obj.PillarCode;
+                if (!string.IsNullOrEmpty(obj.PillarCode))
                 {
-                    objName ??= obj.ObjectiveName;
-                    pillarCode = obj.PlrCode;
-                    if (!string.IsNullOrEmpty(obj.PlrCode))
-                        pillarName = (await _pillarsSvc.GetByCodeAsync(obj.PlrCode))?.PillarName;
+                    var pillars = await _source.GetPillarsAsync(ct);
+                    pillarName = pillars.FirstOrDefault(p => p.Code == obj.PillarCode)?.Name;
                 }
             }
-            return new StrategyInitiativeVm
-            {
-                Code = init.InitiativeCode,
-                Name = init.InitiativeName ?? init.InitiativeCode,
-                ObjectiveCode = init.ObjectiveCode,
-                ObjectiveName = objName,
-                PillarCode = pillarCode,
-                PillarName = pillarName,
-            };
-        }
-
-        // Phase 19.20 (Fix 6) — preview fallback. Never surface a raw code (e.g.
-        // "INIT-DEMO-2") to the user as the initiative name. Resolve the known demo codes
-        // to their Arabic labels; for any other code, fall back to a generic Arabic label
-        // rather than echoing the code.
-        var preview = BuildPreviewPillars().FirstOrDefault();
-        var firstObj = preview?.Objectives.FirstOrDefault();
-        var demoNames = new Dictionary<string, (string Name, int ObjIndex)>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["INIT-DEMO-1"] = ("مبادرة توضيحية — رفع الوعي بالمنافسة", 0),
-            ["INIT-DEMO-2"] = ("مبادرة توضيحية — تطوير الأنظمة", 1),
-            ["INIT-DEMO-3"] = ("مبادرة توضيحية — تمكين الشراكات", 2),
-        };
-        string resolvedName;
-        StrategyObjectiveVm? previewObj = firstObj;
-        if (demoNames.TryGetValue(initiativeCode, out var demo))
-        {
-            resolvedName = demo.Name;
-            if (preview != null && demo.ObjIndex < preview.Objectives.Count)
-                previewObj = preview.Objectives[demo.ObjIndex];
-        }
-        else
-        {
-            resolvedName = "مبادرتك";
         }
         return new StrategyInitiativeVm
         {
-            Code = initiativeCode,
-            Name = resolvedName,
-            ObjectiveCode = previewObj?.Code,
-            ObjectiveName = previewObj?.Name,
-            PillarCode = preview?.Code,
-            PillarName = preview?.Name,
+            Code = init.Code,
+            Name = init.Name,
+            ObjectiveCode = init.ObjectiveCode,
+            ObjectiveName = objName,
+            PillarCode = pillarCode,
+            PillarName = pillarName,
         };
     }
 
@@ -444,59 +406,48 @@ public class JourneyController : Controller
         division = (division ?? string.Empty).Trim();
         // Phase 19.20 (Fix 4) — an empty department is a valid "no selection" case:
         // return an empty list (HTTP 200), never an error.
-        if (division.Length == 0) return Json(new { ok = true, live = _initiativesSvc.Available, initiatives = Array.Empty<object>() });
+        if (division.Length == 0) return Json(new { ok = true, live = true, initiatives = Array.Empty<object>() });
 
-        // Phase 19.20 (Fix 4) — the whole resolution is wrapped so a data/connection
-        // failure returns an empty list + a friendly error flag with HTTP 200 instead of
-        // surfacing the red "تعذّر تحميل المبادرات" message on every localhost/MSSQL build.
+        // Phase 19.20 (Fix 4) / 19.23 — initiatives + projects come from the unified
+        // source (mirror → SQLite → empty). The whole resolution is wrapped so a data
+        // failure returns an empty list + a friendly flag with HTTP 200 instead of a red
+        // error message.
         try
         {
-            if (_initiativesSvc.Available)
+            var ct = HttpContext.RequestAborted;
+            var inits = await _source.GetInitiativesAsync(null, ct);
+            // The division acts as a department filter for that department's projects.
+            var projects = await _source.GetProjectsAsync(division, ct);
+
+            // Case-insensitive department matching (Fix 4): an initiative belongs to a
+            // department if it lists the division as an owner OR one of the department's
+            // projects rolls up to it.
+            var divLower = division.ToLowerInvariant();
+            var projInitCodes = projects.Where(p => !string.IsNullOrEmpty(p.InitiativeCode))
+                .Select(p => p.InitiativeCode!).ToHashSet();
+            // Phase 19.20 (Fix 2/4) — dedup initiatives by code (case-insensitive).
+            var matched = inits
+                .Where(i => (i.Owners != null && i.Owners.ToLowerInvariant().Contains(divLower))
+                            || projInitCodes.Contains(i.Code))
+                .GroupBy(i => string.IsNullOrWhiteSpace(i.Code) ? i.Name : i.Code,
+                         StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .OrderBy(i => i.Code, StringComparer.Ordinal)
+                .ToList();
+
+            var result = new List<object>();
+            foreach (var i in matched)
             {
-                var inits = await _initiativesSvc.GetAllAsync();
-                var projects = await _projectsSvc.GetByDivisionAsync(division);
-
-                // Case-insensitive department matching (Fix 4): an initiative belongs to a
-                // department if it lists the division as an owner OR one of the department's
-                // projects rolls up to it.
-                var divLower = division.ToLowerInvariant();
-                var projInitCodes = projects.Where(p => !string.IsNullOrEmpty(p.InitiativeCode))
-                    .Select(p => p.InitiativeCode!).ToHashSet();
-                // Phase 19.20 (Fix 2/4) — dedup external initiatives by code (case-insensitive).
-                var matched = inits
-                    .Where(i => (i.Owners != null && i.Owners.ToLowerInvariant().Contains(divLower))
-                                || projInitCodes.Contains(i.InitiativeCode))
-                    .GroupBy(i => string.IsNullOrWhiteSpace(i.InitiativeCode) ? (i.InitiativeName ?? "") : i.InitiativeCode,
-                             StringComparer.OrdinalIgnoreCase)
-                    .Select(g => g.First())
-                    .OrderBy(i => i.InitiativeCode, StringComparer.Ordinal)
-                    .ToList();
-
-                var result = new List<object>();
-                foreach (var i in matched)
+                var vm = await ResolveInitiativeAsync(i.Code);
+                result.Add(new
                 {
-                    var vm = await ResolveInitiativeAsync(i.InitiativeCode);
-                    result.Add(new
-                    {
-                        code = vm!.Code,
-                        name = vm.Name,
-                        objectiveName = vm.ObjectiveName,
-                        pillarName = vm.PillarName,
-                    });
-                }
-                return Json(new { ok = true, live = true, initiatives = result });
+                    code = vm!.Code,
+                    name = vm.Name,
+                    objectiveName = vm.ObjectiveName,
+                    pillarName = vm.PillarName,
+                });
             }
-
-            // Preview fallback — three illustrative initiatives mapped to the preview house.
-            var preview = BuildPreviewPillars();
-            var p0 = preview[0];
-            var sample = new[]
-            {
-                new { code = "INIT-DEMO-1", name = "مبادرة توضيحية — رفع الوعي بالمنافسة", objectiveName = p0.Objectives[0].Name, pillarName = p0.Name },
-                new { code = "INIT-DEMO-2", name = "مبادرة توضيحية — تطوير الأنظمة", objectiveName = p0.Objectives[1].Name, pillarName = p0.Name },
-                new { code = "INIT-DEMO-3", name = "مبادرة توضيحية — تمكين الشراكات", objectiveName = p0.Objectives[2].Name, pillarName = p0.Name },
-            };
-            return Json(new { ok = true, live = false, initiatives = sample });
+            return Json(new { ok = true, live = true, initiatives = result });
         }
         catch (Exception ex)
         {
@@ -558,7 +509,7 @@ public class JourneyController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Sankey endpoint failed; returning empty graph.");
-            return Json(new { ok = true, live = false, source = "error", dummy = false, warning = (string?)null, nodes = Array.Empty<object>(), links = Array.Empty<object>() });
+            return Json(new { ok = true, live = false, source = "error", empty = false, warning = (string?)null, nodes = Array.Empty<object>(), links = Array.Empty<object>() });
         }
     }
 
@@ -724,12 +675,14 @@ public class JourneyController : Controller
         var pledges = await _db.ContributionPledges.Where(p => p.SessionId == sessionId).ToListAsync();
         // Phase 19.20 (Fix 2/6) — dedup the strategy lists so the PDF resolves codes to a
         // single, correct Arabic name and never duplicates entries.
-        var pillars = StrategyDedup.ByPillarCode(await _db.Pillars.AsNoTracking().ToListAsync());
-        var kpis = await _db.Kpis.Where(k => k.DepartmentCode == session.DeptCode).ToListAsync();
-        var projects = await _db.Projects.Where(p => p.DepartmentCode == session.DeptCode).ToListAsync();
+        // Phase 19.23 — strategy lists come from the unified source (mirror → SQLite → empty).
+        var ct = HttpContext.RequestAborted;
+        var pillars = StrategyDedup.ByPillarCode(ToPillarEntities(await _source.GetPillarsAsync(ct)));
+        var kpis = ToKpiEntities(await _source.GetKpisAsync(session.DeptCode, ct));
+        var projects = ToProjectEntities(await _source.GetProjectsAsync(session.DeptCode, ct));
         var inkAssets = await _db.MapInkAssets.Where(a => a.MapId == map.Id).ToListAsync();
-        var objectives = StrategyDedup.ByObjectiveCode(await _db.Objectives.AsNoTracking().ToListAsync());
-        var initiatives = StrategyDedup.ByInitiativeCode(await _db.Initiatives.AsNoTracking().ToListAsync());
+        var objectives = StrategyDedup.ByObjectiveCode(ToObjectiveEntities(await _source.GetObjectivesAsync(ct)));
+        var initiatives = StrategyDedup.ByInitiativeCode(ToInitiativeEntities(await _source.GetInitiativesAsync(null, ct)));
         try
         {
             map.PdfBlob = _pdf.Generate(map, dept, session.Members.ToList(), pledges, pillars, kpis, projects, inkAssets, objectives, initiatives);
@@ -890,12 +843,14 @@ public class JourneyController : Controller
     // KPIs/Projects → Objectives → Pillars → Vision.
     private async Task<object> BuildSankeyAsync(string deptCode)
     {
-        var kpis = await _db.Kpis.Where(k => k.DepartmentCode == deptCode).ToListAsync();
-        var projects = await _db.Projects.Where(p => p.DepartmentCode == deptCode).ToListAsync();
+        // Phase 19.23 — Sankey reads route through the unified source (mirror → SQLite → empty).
+        var ct = HttpContext.RequestAborted;
+        var kpis = ToKpiEntities(await _source.GetKpisAsync(deptCode, ct));
+        var projects = ToProjectEntities(await _source.GetProjectsAsync(deptCode, ct));
         // Phase 19.20 (Fix 2) — dedup so the flow chart doesn't draw duplicate nodes.
-        var objectives = StrategyDedup.ByObjectiveCode(await _db.Objectives.AsNoTracking().ToListAsync());
-        var pillars = StrategyDedup.ByPillarCode(await _db.Pillars.AsNoTracking().ToListAsync());
-        var initiatives = StrategyDedup.ByInitiativeCode(await _db.Initiatives.AsNoTracking().ToListAsync());
+        var objectives = StrategyDedup.ByObjectiveCode(ToObjectiveEntities(await _source.GetObjectivesAsync(ct)));
+        var pillars = StrategyDedup.ByPillarCode(ToPillarEntities(await _source.GetPillarsAsync(ct)));
+        var initiatives = StrategyDedup.ByInitiativeCode(ToInitiativeEntities(await _source.GetInitiativesAsync(null, ct)));
 
         var nodes = new List<object>();
         var nodeIndex = new Dictionary<string, int>();

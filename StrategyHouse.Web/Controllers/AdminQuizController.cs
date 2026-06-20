@@ -13,12 +13,10 @@ namespace StrategyHouse.Web.Controllers;
 public class AdminQuizController : Controller
 {
     private readonly ApplicationDbContext _db;
-    private readonly QuizGeneratorService _generator;
 
-    public AdminQuizController(ApplicationDbContext db, QuizGeneratorService generator)
+    public AdminQuizController(ApplicationDbContext db)
     {
         _db = db;
-        _generator = generator;
     }
 
     // GET /Admin/Quiz?tab=Pending|Approved|Rejected
@@ -104,22 +102,25 @@ public class AdminQuizController : Controller
         return RedirectToAction(nameof(Index), new { tab });
     }
 
+    // Phase 19.23 — the auto-generator (which read strategy tables directly) was removed.
+    // "Generate" now ensures the hand-crafted demo bank exists (idempotent); curated
+    // questions are never overwritten.
     [HttpPost("Generate")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Generate()
     {
-        var n = await _generator.GenerateAllAsync();
-        TempData["Saved"] = n > 0 ? $"تم توليد {n} سؤالاً." : "بنك الأسئلة مكتمل بالفعل.";
+        var seeded = await AssessmentSeeder.EnsureDemoQuizAsync(_db);
+        TempData["Saved"] = seeded ? "تمت إضافة أسئلة الاختبار التجريبية." : "بنك الأسئلة يحتوي على أسئلة بالفعل.";
         return RedirectToAction(nameof(Index));
     }
 
-    // POST /Admin/Quiz/Regenerate — explicit auto-generation (idempotent guard removed).
+    // POST /Admin/Quiz/Regenerate — kept for stale clients → idempotent demo reseed.
     [HttpPost("Regenerate")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Regenerate()
     {
-        var n = await _generator.GenerateAllAsync();
-        TempData["Saved"] = n > 0 ? $"تم توليد {n} سؤالاً تلقائياً." : "بنك الأسئلة مكتمل بالفعل (لم تتم إضافة أسئلة جديدة).";
+        var seeded = await AssessmentSeeder.EnsureDemoQuizAsync(_db);
+        TempData["Saved"] = seeded ? "تمت إضافة أسئلة الاختبار التجريبية." : "بنك الأسئلة يحتوي على أسئلة بالفعل (لم تتم إضافة أسئلة جديدة).";
         return RedirectToAction(nameof(Index));
     }
 

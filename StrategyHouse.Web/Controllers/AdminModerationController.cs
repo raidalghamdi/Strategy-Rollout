@@ -16,12 +16,14 @@ public class AdminModerationController : Controller
     private readonly ApplicationDbContext _db;
     private readonly StrategyMapPdfService _pdf;
     private readonly StrategyContentService _content;
+    private readonly IStrategyDataSource _source;
 
-    public AdminModerationController(ApplicationDbContext db, StrategyMapPdfService pdf, StrategyContentService content)
+    public AdminModerationController(ApplicationDbContext db, StrategyMapPdfService pdf, StrategyContentService content, IStrategyDataSource source)
     {
         _db = db;
         _pdf = pdf;
         _content = content;
+        _source = source;
     }
 
     [HttpGet("")]
@@ -160,9 +162,13 @@ public class AdminModerationController : Controller
         var members = session?.Members.ToList() ?? new List<SessionMember>();
         var dept = await _db.Departments.FindAsync(map.DeptCode) ?? new Department { DeptCode = map.DeptCode };
         var pledges = await _db.ContributionPledges.Where(p => p.SessionId == map.SessionId).ToListAsync();
-        var pillars = await _db.Pillars.OrderBy(p => p.PlrCode).ToListAsync();
-        var kpis = await _db.Kpis.Where(k => k.DepartmentCode == map.DeptCode).ToListAsync();
-        var projects = await _db.Projects.Where(p => p.DepartmentCode == map.DeptCode).ToListAsync();
+        // Phase 19.23 — strategy reads route through the unified source (mirror → SQLite → empty).
+        var pillars = (await _source.GetPillarsAsync())
+            .Select(p => new Pillar { PlrCode = p.Code, PillarName = p.Name }).ToList();
+        var kpis = (await _source.GetKpisAsync(map.DeptCode))
+            .Select(k => new Kpi { KpiCode = k.Code, KpiName = k.Name, ObjectiveCode = k.ObjectiveCode, KpiType = k.Type }).ToList();
+        var projects = (await _source.GetProjectsAsync(map.DeptCode))
+            .Select(p => new Project { ProjectCode = p.Code, ProjectName = p.Name, InitiativeCode = p.InitiativeCode }).ToList();
         var assets = await _db.MapInkAssets.Where(a => a.MapId == mapId).ToListAsync();
 
         try
