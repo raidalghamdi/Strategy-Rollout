@@ -11,7 +11,15 @@
 <div class="container py-3" dir="rtl">
     <div class="d-flex justify-content-between align-items-center">
         <h1 style="color:#28334A;">الاستبيانات</h1>
-        <a class="btn btn-outline-secondary btn-sm" href="/Admin">رجوع</a>
+        <div>
+            <a class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border:none;" asp-action="Link">رابط وصورة QR</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/Admin">رجوع</a>
+        </div>
+    </div>
+    <div class="alert alert-info mt-3 mb-0" style="background:#fff8e1;border:1px solid #FAC126;color:#00192B;">
+        <strong>جديد — إدارة رابط الاستبيان:</strong>
+        يمكنك الآن تغيير رابط الاستبيان المعروض على شاشة شكر الاختبار وصفحة تحليل الاستبيان، أو رفع صورة QR مخصّصة بديلاً عن التوليد التلقائي —
+        <a asp-action="Link" class="alert-link">افتح الصفحة</a>.
     </div>
 
     <form method="post" asp-action="Create" class="card card-body my-3">

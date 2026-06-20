@@ -69,6 +69,13 @@ public class PageContentService
         ("quiz.survey.url", "https://forms.office.com/r/replace-with-real-survey-id"),
         ("quiz.survey.title", "شكراً لمشاركتك"),
         ("quiz.survey.body", "ساعدنا على تحسين الجلسة — امسح الرمز أو اضغط الرابط لتعبئة استبيان قصير (دقيقتان)."),
+        // Phase 19.25 — custom QR image upload. If quiz.survey.qr.useCustom == "true"
+        // AND quiz.survey.qr.custom contains a non-empty data URI (data:image/png;base64,...
+        // or similar), the admin-uploaded image is rendered in place of the auto-generated
+        // QR from the URL. Toggling useCustom back to "false" instantly reverts to the
+        // generated QR without losing the uploaded image (kept for fast re-enable).
+        ("quiz.survey.qr.useCustom", "false"),
+        ("quiz.survey.qr.custom", ""),
         ("survey.thank_you", "شكراً لمشاركتك! تم استلام إجابتك بنجاح."),
         ("footer.copyright", "الهيئة العامة للمنافسة · منصة إطلاق استراتيجية الهيئة"),
 

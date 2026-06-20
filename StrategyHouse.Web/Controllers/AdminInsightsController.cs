@@ -217,8 +217,22 @@ public class AdminInsightsController : Controller
         // Phase 19.21 (Fix 3) — render a QR for the current survey URL at the top of
         // the page; it auto-refreshes because it's regenerated from the live
         // PageContent value on every GET. Best-effort: link-only fallback on failure.
-        try { ViewBag.SurveyQrDataUri = string.IsNullOrWhiteSpace(surveyUrl) ? null : _qr.GenerateBase64Png(surveyUrl, pixelsPerModule: 6); }
-        catch { ViewBag.SurveyQrDataUri = null; }
+        //
+        // Phase 19.25 — honour the custom QR image upload if useCustom == "true" and
+        // a non-empty data URI is stored under quiz.survey.qr.custom.
+        var useCustomQr = string.Equals(
+            _pageContent.Get("quiz.survey.qr.useCustom", "false"),
+            "true", StringComparison.OrdinalIgnoreCase);
+        var customQr = _pageContent.Get("quiz.survey.qr.custom", "");
+        if (useCustomQr && !string.IsNullOrEmpty(customQr))
+        {
+            ViewBag.SurveyQrDataUri = customQr;
+        }
+        else
+        {
+            try { ViewBag.SurveyQrDataUri = string.IsNullOrWhiteSpace(surveyUrl) ? null : _qr.GenerateBase64Png(surveyUrl, pixelsPerModule: 6); }
+            catch { ViewBag.SurveyQrDataUri = null; }
+        }
         return View();
     }
 

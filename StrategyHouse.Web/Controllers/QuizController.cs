@@ -66,15 +66,30 @@ public class QuizController : Controller
         ViewBag.SurveyUrl = surveyUrl;
         ViewBag.SurveyTitle = _pageContent.Get("quiz.survey.title");
         ViewBag.SurveyBody = _pageContent.Get("quiz.survey.body");
-        try
+
+        // Phase 19.25 — if an admin has uploaded a custom QR image AND toggled it
+        // on (quiz.survey.qr.useCustom == "true"), use that data URI instead of
+        // auto-generating from the URL. Falls back gracefully to the generated QR.
+        var useCustom = string.Equals(
+            _pageContent.Get("quiz.survey.qr.useCustom", "false"),
+            "true", StringComparison.OrdinalIgnoreCase);
+        var customQr = _pageContent.Get("quiz.survey.qr.custom", "");
+        if (useCustom && !string.IsNullOrEmpty(customQr))
         {
-            ViewBag.SurveyQrDataUri = _qr.GenerateBase64Png(surveyUrl, pixelsPerModule: 6);
+            ViewBag.SurveyQrDataUri = customQr;
         }
-        catch
+        else
         {
-            // QR generation is best-effort — if it fails the view falls back to
-            // the link-only layout. Never let it block the quiz from rendering.
-            ViewBag.SurveyQrDataUri = null;
+            try
+            {
+                ViewBag.SurveyQrDataUri = _qr.GenerateBase64Png(surveyUrl, pixelsPerModule: 6);
+            }
+            catch
+            {
+                // QR generation is best-effort — if it fails the view falls back to
+                // the link-only layout. Never let it block the quiz from rendering.
+                ViewBag.SurveyQrDataUri = null;
+            }
         }
 
         return View(picked);
