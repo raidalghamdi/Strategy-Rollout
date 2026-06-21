@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -253,6 +254,17 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Phase 19.28 (hotfix) — Railway (and most PaaS proxies) terminate TLS at the
+// edge and forward plain HTTP internally with X-Forwarded-* headers. Honour
+// those so Request.Scheme reflects the original "https" and HSTS / cookie
+// security work correctly without redirect loops.
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+    KnownNetworks = { },
+    KnownProxies = { },
+});
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -262,6 +274,8 @@ if (!app.Environment.IsDevelopment())
 // Phase 19.27 (security) — baseline response-hardening headers applied to every
 // response: deny framing, block MIME sniffing, tighten the referrer, lock down
 // powerful features we don't use, and constrain script/style/image sources.
+// Phase 19.28 (hotfix) — widen CSP fonts/connect sources so QuestPDF fonts,
+// inline data: images, and same-origin fetches keep working in production.
 app.Use(async (ctx, next) =>
 {
     ctx.Response.Headers["X-Frame-Options"] = "DENY";
@@ -270,12 +284,20 @@ app.Use(async (ctx, next) =>
     ctx.Response.Headers["Permissions-Policy"] = "geolocation=(), microphone=()";
     ctx.Response.Headers["Content-Security-Policy"] =
         "default-src 'self'; script-src 'self' 'unsafe-inline'; " +
-        "style-src 'self' 'unsafe-inline'; img-src 'self' data:;";
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; " +
+        "font-src 'self' data:; connect-src 'self';";
     await next();
 });
 
-// Phase 19.27 (security) — force HTTPS for all traffic (HSTS is already on in prod).
-app.UseHttpsRedirection();
+// Phase 19.28 (hotfix) — only force HTTPS redirection in development. In
+// production behind Railway's proxy, requests already arrive as HTTPS from the
+// client; the proxy forwards them as HTTP internally, and a redirect here
+// would either loop or break the health check. HSTS above already pins HTTPS
+// for browsers.
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseStaticFiles();
 app.UseRouting();

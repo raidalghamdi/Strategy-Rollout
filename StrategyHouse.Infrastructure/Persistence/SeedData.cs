@@ -56,13 +56,19 @@ public static class SeedData
 
         if (await userManager.FindByEmailAsync("admin@gac.gov.sa") == null)
         {
-            // Phase 19.27 (security) — the seed admin password is no longer hardcoded.
-            // It must be supplied via the SEED_ADMIN_PASSWORD environment variable so
-            // production secrets never live in source. Fail fast (and loudly) if the
-            // variable is missing instead of silently falling back to a known value.
-            var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD")
-                ?? throw new InvalidOperationException(
-                    "SEED_ADMIN_PASSWORD environment variable is required.");
+            // Phase 19.27 (security) — prefer SEED_ADMIN_PASSWORD env var; the secret
+            // lives in Railway/host config rather than source. Phase 19.28 (hotfix) —
+            // if the env var is missing we fall back to the historical demo password
+            // and emit a Console warning instead of crashing startup. The admin user is
+            // only created on a fresh database, so in steady-state production the
+            // existing user already exists and this branch is skipped entirely.
+            var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD");
+            if (string.IsNullOrWhiteSpace(seedPassword))
+            {
+                seedPassword = "Demo@123";
+                Console.WriteLine(
+                    "[SeedData] WARNING: SEED_ADMIN_PASSWORD is not set. Falling back to the default demo password. Set this environment variable in production.");
+            }
 
             var admin = new AppUser
             {
