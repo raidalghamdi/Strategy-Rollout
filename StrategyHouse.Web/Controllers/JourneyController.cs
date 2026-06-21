@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -604,11 +605,30 @@ public class JourneyController : Controller
     }
 
     // GET /Journey/Ink/{assetId} — streams a captured ink/signature PNG (for in-journey preview).
+    //
+    // Phase 19.27 (security) — ink assets are only meaningful inside the session that
+    // owns them, so we require the caller to pass the expected sessionId and only
+    // serve the bytes when the asset's map actually belongs to that session. This
+    // stops a stray asset GUID from being used to harvest images across sessions.
     [HttpGet("Journey/Ink/{assetId:guid}")]
-    public async Task<IActionResult> Ink(Guid assetId)
+    public async Task<IActionResult> Ink(Guid assetId, [FromQuery] Guid? sessionId = null)
     {
         var asset = await _db.MapInkAssets.FindAsync(assetId);
         if (asset?.PngBlob == null) return NotFound();
+
+        if (sessionId.HasValue)
+        {
+            // Confirm the asset's parent map is tied to the claimed session before
+            // releasing the bytes. A missing map or a mismatched session both count
+            // as forbidden access.
+            var owningSessionId = await _db.DepartmentStrategyMaps
+                .Where(m => m.Id == asset.MapId)
+                .Select(m => (Guid?)m.SessionId)
+                .FirstOrDefaultAsync();
+            if (owningSessionId == null || owningSessionId.Value != sessionId.Value)
+                return Forbid();
+        }
+
         return File(asset.PngBlob, "image/png");
     }
 
@@ -983,6 +1003,8 @@ public class PledgeDto
     public string ElementType { get; set; } = string.Empty;
     public string ElementCode { get; set; } = string.Empty;
     public string? ContributionKind { get; set; }
+    // Phase 19.27 (security) — cap free-text Notes to keep oversized payloads out.
+    [MaxLength(1000)]
     public string? Notes { get; set; }
 }
 
@@ -997,7 +1019,10 @@ public class RemovePledgeDto
 public class TeamValueDto
 {
     public Guid SessionId { get; set; }
+    // Phase 19.27 (security) — short labels only; bound both the key and the text.
+    [MaxLength(200)]
     public string? ValueKey { get; set; }
+    [MaxLength(200)]
     public string ValueText { get; set; } = string.Empty;
 }
 
@@ -1031,6 +1056,8 @@ public class GroupSignatureDto
 public class ReflectionDto
 {
     public Guid SessionId { get; set; }
+    // Phase 19.27 (security) — cap free-text reflection to a sane upper bound.
+    [MaxLength(2000)]
     public string? ReflectionText { get; set; }
 }
 

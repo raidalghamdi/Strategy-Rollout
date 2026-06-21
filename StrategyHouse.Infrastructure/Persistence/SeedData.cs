@@ -56,6 +56,14 @@ public static class SeedData
 
         if (await userManager.FindByEmailAsync("admin@gac.gov.sa") == null)
         {
+            // Phase 19.27 (security) — the seed admin password is no longer hardcoded.
+            // It must be supplied via the SEED_ADMIN_PASSWORD environment variable so
+            // production secrets never live in source. Fail fast (and loudly) if the
+            // variable is missing instead of silently falling back to a known value.
+            var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD")
+                ?? throw new InvalidOperationException(
+                    "SEED_ADMIN_PASSWORD environment variable is required.");
+
             var admin = new AppUser
             {
                 UserName = "admin@gac.gov.sa",
@@ -64,7 +72,7 @@ public static class SeedData
                 FullNameAr = "مدير المنصة",
                 AppRole = UserRole.Admin,
             };
-            await userManager.CreateAsync(admin, "Demo@123");
+            await userManager.CreateAsync(admin, seedPassword);
             await userManager.AddToRoleAsync(admin, "Admin");
         }
     }

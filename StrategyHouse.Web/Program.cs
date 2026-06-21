@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using StrategyHouse.Domain.Entities;
 using StrategyHouse.Infrastructure.Persistence;
@@ -45,6 +46,22 @@ if (!string.IsNullOrWhiteSpace(externalConn))
     builder.Services.AddDbContext<ExternalDbContext>(options => options.UseSqlServer(externalConn));
 }
 builder.Services.AddMemoryCache();
+
+// Phase 19.27 (security) — fixed-window rate limit on the login endpoint:
+// up to 5 attempts per minute per request partition. Anything over that is
+// rejected immediately (QueueLimit = 0) so we don't pile up brute-force tries.
+builder.Services.AddRateLimiter(o =>
+{
+    o.AddFixedWindowLimiter("login", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder =
+            System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+    });
+});
+
 builder.Services.AddScoped<DepartmentDirectoryService>();
 // Phase 17 — read services for the Option A strategy tables (external MSSQL).
 // When UseExternalDb is off these return empty lists with a logged warning.
@@ -63,15 +80,22 @@ builder.Services.AddScoped<IStrategyDataSource, UnifiedStrategyDataSource>();
 builder.Services.AddScoped<ExternalDbDiagnostics>();
 
 // Identity — three roles: Admin, Facilitator, Viewer.
+// Phase 19.27 (security) — stronger password rules (length 12, mixed-case,
+// digits and a symbol) and account lockout after 5 failed attempts for 15
+// minutes, applied to new users too.
 builder.Services
     .AddIdentity<AppUser, IdentityRole<int>>(options =>
     {
-        options.Password.RequireDigit = false;
-        options.Password.RequireLowercase = false;
-        options.Password.RequireUppercase = false;
-        options.Password.RequireNonAlphanumeric = false;
-        options.Password.RequiredLength = 4;
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = true;
+        options.Password.RequiredLength = 12;
         options.User.RequireUniqueEmail = true;
+
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+        options.Lockout.AllowedForNewUsers = true;
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
@@ -235,8 +259,31 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// Phase 19.27 (security) — baseline response-hardening headers applied to every
+// response: deny framing, block MIME sniffing, tighten the referrer, lock down
+// powerful features we don't use, and constrain script/style/image sources.
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.Headers["X-Frame-Options"] = "DENY";
+    ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    ctx.Response.Headers["Permissions-Policy"] = "geolocation=(), microphone=()";
+    ctx.Response.Headers["Content-Security-Policy"] =
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; " +
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data:;";
+    await next();
+});
+
+// Phase 19.27 (security) — force HTTPS for all traffic (HSTS is already on in prod).
+app.UseHttpsRedirection();
+
 app.UseStaticFiles();
 app.UseRouting();
+
+// Phase 19.27 (security) — must sit after UseRouting so the [EnableRateLimiting]
+// attribute on AccountController.Login(POST) is honoured.
+app.UseRateLimiter();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
