@@ -152,6 +152,7 @@ builder.Services.AddScoped<ReportEmailService>();
 builder.Services.AddScoped<ChatbotService>();
 // Phase 19.22 — Excel round-trip DB import (full mirror, admin-gated, backup + transaction)
 builder.Services.AddScoped<DbImportService>();
+builder.Services.AddScoped<DbExportService>();  // Phase 19.26 — export DB to xlsx + raw .db
 
 var app = builder.Build();
 

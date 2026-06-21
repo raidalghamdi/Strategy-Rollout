@@ -23,6 +23,34 @@
         ⚠️ هذه العملية تستبدل محتوى قاعدة البيانات بالكامل بما في Excel. الصفوف غير الموجودة في الملف ستُحذف. سيتم إنشاء نسخة احتياطية تلقائيًا قبل التطبيق.
     </div>
 
+    <!-- Phase 19.26 — DB Export buttons -->
+    <div class="dbi-card" style="background:#f0fdf4;border:2px solid #067647;">
+        <h4 class="sec-title" style="border-inline-start-color:#067647;">
+            📥 تصدير قاعدة البيانات (جديد)
+        </h4>
+        <p class="text-muted" style="font-size:.9rem;">
+            حمّل نسخة كاملة من بيانات المنصة للمراجعة أو النسخ الاحتياطي أو التعديل الجماعي.
+            تتوفر صيغتان: <strong>Excel</strong> (للتعديل وإعادة الرفع) أو <strong>SQLite</strong> (لفتحه في DB Browser
+            أو تحويله إلى Microsoft SQL Server).
+        </p>
+        <div class="row g-2">
+            <div class="col-12 col-md-6">
+                <a href="/Admin/DbImport/Export.xlsx" class="btn w-100"
+                   style="background:#067647;color:#fff;font-weight:700;padding:12px;">
+                    📊 تصدير إلى Excel (.xlsx)
+                </a>
+                <div class="text-muted small mt-1 text-center">ورقة لكل جدول + فهرس</div>
+            </div>
+            <div class="col-12 col-md-6">
+                <a href="/Admin/DbImport/Export.db" class="btn w-100"
+                   style="background:#00192B;color:#FAC126;font-weight:700;padding:12px;">
+                    💾 تصدير إلى SQLite (.db)
+                </a>
+                <div class="text-muted small mt-1 text-center">نسخة بايت-بايت للـ DB بالكامل</div>
+            </div>
+        </div>
+    </div>
+
     <div class="dbi-card">
         <h4 class="sec-title">رفع ملف التصدير (.xlsx)</h4>
         <p class="text-muted" style="font-size:.9rem;">
