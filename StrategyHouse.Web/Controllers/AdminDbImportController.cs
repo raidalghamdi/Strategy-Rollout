@@ -17,20 +17,46 @@ namespace StrategyHouse.Web.Controllers;
 public class AdminDbImportController : Controller
 {
     private readonly DbImportService _import;
+    private readonly DbExportService _export;  // Phase 19.26
     private readonly UserManager<AppUser> _userManager;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<AdminDbImportController> _log;
 
     public AdminDbImportController(
         DbImportService import,
+        DbExportService export,
         UserManager<AppUser> userManager,
         IWebHostEnvironment env,
         ILogger<AdminDbImportController> log)
     {
         _import = import;
+        _export = export;
         _userManager = userManager;
         _env = env;
         _log = log;
+    }
+
+    // ---------- Phase 19.26 — DB export endpoints ----------
+    // Both endpoints stream the full live database in a read-only fashion.
+    //   /Admin/DbImport/Export.xlsx  — mirror of DbImport format (round-trip ready)
+    //   /Admin/DbImport/Export.db    — byte-perfect SQLite snapshot via VACUUM INTO
+    private const string XlsxMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    private const string SqliteMime = "application/vnd.sqlite3";
+
+    [HttpGet("Export.xlsx")]
+    public async Task<IActionResult> ExportXlsx(CancellationToken ct)
+    {
+        var bytes = await _export.ExportXlsxAsync(ct);
+        var name = $"StrategyHouse_DB_Export_{DateTime.UtcNow:yyyy-MM-dd_HHmm}.xlsx";
+        return File(bytes, XlsxMime, name);
+    }
+
+    [HttpGet("Export.db")]
+    public async Task<IActionResult> ExportSqlite(CancellationToken ct)
+    {
+        var bytes = await _export.ExportSqliteAsync(ct);
+        var name = $"StrategyHouse_DB_Export_{DateTime.UtcNow:yyyy-MM-dd_HHmm}.db";
+        return File(bytes, SqliteMime, name);
     }
 
     private string PendingDir => Path.Combine(_env.ContentRootPath, "App_Data", "import-pending");
