@@ -58,16 +58,18 @@ public static class SeedData
         {
             // Phase 19.27 (security) — prefer SEED_ADMIN_PASSWORD env var; the secret
             // lives in Railway/host config rather than source. Phase 19.28 (hotfix) —
-            // if the env var is missing we fall back to the historical demo password
-            // and emit a Console warning instead of crashing startup. The admin user is
-            // only created on a fresh database, so in steady-state production the
-            // existing user already exists and this branch is skipped entirely.
+            // if the env var is missing we fall back to a built-in default and emit a
+            // Console warning instead of crashing startup. Phase 19.29 — the fallback
+            // is now "Demo@123!Strong" so it satisfies the new password policy (length
+            // 12, mixed case, digit, symbol). In steady-state production the admin
+            // user already exists from the previous deploy and this branch is skipped
+            // entirely; the env var is only consulted on a fresh database.
             var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD");
             if (string.IsNullOrWhiteSpace(seedPassword))
             {
-                seedPassword = "Demo@123";
+                seedPassword = "Demo@123!Strong";
                 Console.WriteLine(
-                    "[SeedData] WARNING: SEED_ADMIN_PASSWORD is not set. Falling back to the default demo password. Set this environment variable in production.");
+                    "[SeedData] WARNING: SEED_ADMIN_PASSWORD is not set. Falling back to the built-in default. Set this environment variable in production.");
             }
 
             var admin = new AppUser
@@ -78,8 +80,20 @@ public static class SeedData
                 FullNameAr = "مدير المنصة",
                 AppRole = UserRole.Admin,
             };
-            await userManager.CreateAsync(admin, seedPassword);
-            await userManager.AddToRoleAsync(admin, "Admin");
+            var createResult = await userManager.CreateAsync(admin, seedPassword);
+            if (createResult.Succeeded)
+            {
+                await userManager.AddToRoleAsync(admin, "Admin");
+            }
+            else
+            {
+                // Don't take the whole app down if Identity rejects the seed password;
+                // log loudly so the operator can fix it. The site keeps running for
+                // anonymous journeys even without an admin account.
+                Console.WriteLine(
+                    "[SeedData] WARNING: admin seed failed: " +
+                    string.Join("; ", createResult.Errors.Select(e => e.Description)));
+            }
         }
     }
 

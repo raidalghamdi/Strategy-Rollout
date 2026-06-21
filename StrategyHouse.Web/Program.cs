@@ -1,6 +1,4 @@
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using StrategyHouse.Domain.Entities;
 using StrategyHouse.Infrastructure.Persistence;
@@ -47,22 +45,6 @@ if (!string.IsNullOrWhiteSpace(externalConn))
     builder.Services.AddDbContext<ExternalDbContext>(options => options.UseSqlServer(externalConn));
 }
 builder.Services.AddMemoryCache();
-
-// Phase 19.27 (security) — fixed-window rate limit on the login endpoint:
-// up to 5 attempts per minute per request partition. Anything over that is
-// rejected immediately (QueueLimit = 0) so we don't pile up brute-force tries.
-builder.Services.AddRateLimiter(o =>
-{
-    o.AddFixedWindowLimiter("login", opt =>
-    {
-        opt.PermitLimit = 5;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueProcessingOrder =
-            System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
-        opt.QueueLimit = 0;
-    });
-});
-
 builder.Services.AddScoped<DepartmentDirectoryService>();
 // Phase 17 — read services for the Option A strategy tables (external MSSQL).
 // When UseExternalDb is off these return empty lists with a logged warning.
@@ -83,7 +65,9 @@ builder.Services.AddScoped<ExternalDbDiagnostics>();
 // Identity — three roles: Admin, Facilitator, Viewer.
 // Phase 19.27 (security) — stronger password rules (length 12, mixed-case,
 // digits and a symbol) and account lockout after 5 failed attempts for 15
-// minutes, applied to new users too.
+// minutes, applied to new users too. Phase 19.29 — kept; the rest of the
+// 19.27 pipeline-level changes were reverted because they broke the Railway
+// proxy chain (502 application-failed-to-respond).
 builder.Services
     .AddIdentity<AppUser, IdentityRole<int>>(options =>
     {
@@ -254,58 +238,14 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Phase 19.28 (hotfix) — Railway (and most PaaS proxies) terminate TLS at the
-// edge and forward plain HTTP internally with X-Forwarded-* headers. Honour
-// those so Request.Scheme reflects the original "https" and HSTS / cookie
-// security work correctly without redirect loops.
-app.UseForwardedHeaders(new ForwardedHeadersOptions
-{
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-    KnownNetworks = { },
-    KnownProxies = { },
-});
-
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
 
-// Phase 19.27 (security) — baseline response-hardening headers applied to every
-// response: deny framing, block MIME sniffing, tighten the referrer, lock down
-// powerful features we don't use, and constrain script/style/image sources.
-// Phase 19.28 (hotfix) — widen CSP fonts/connect sources so QuestPDF fonts,
-// inline data: images, and same-origin fetches keep working in production.
-app.Use(async (ctx, next) =>
-{
-    ctx.Response.Headers["X-Frame-Options"] = "DENY";
-    ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
-    ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-    ctx.Response.Headers["Permissions-Policy"] = "geolocation=(), microphone=()";
-    ctx.Response.Headers["Content-Security-Policy"] =
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; " +
-        "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; " +
-        "font-src 'self' data:; connect-src 'self';";
-    await next();
-});
-
-// Phase 19.28 (hotfix) — only force HTTPS redirection in development. In
-// production behind Railway's proxy, requests already arrive as HTTPS from the
-// client; the proxy forwards them as HTTP internally, and a redirect here
-// would either loop or break the health check. HSTS above already pins HTTPS
-// for browsers.
-if (app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
-
 app.UseStaticFiles();
 app.UseRouting();
-
-// Phase 19.27 (security) — must sit after UseRouting so the [EnableRateLimiting]
-// attribute on AccountController.Login(POST) is honoured.
-app.UseRateLimiter();
-
 app.UseAuthentication();
 app.UseAuthorization();
 

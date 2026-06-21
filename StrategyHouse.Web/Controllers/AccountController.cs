@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.RateLimiting;
 using StrategyHouse.Domain.Entities;
 
 namespace StrategyHouse.Web.Controllers;
@@ -23,20 +22,19 @@ public class AccountController : Controller
         return View();
     }
 
-    // Phase 19.27 (security) — the "login" policy throttles brute-force attempts;
-    // see AddRateLimiter() in Program.cs for the actual limit.
+    // Phase 19.27 (security) — keep:
+    //   * isPersistent=false: no automatic "remember me" cookie.
+    //   * lockoutOnFailure=true: failed attempts feed Identity's lockout counter.
+    //   * LocalRedirect + Url.IsLocalUrl: blocks open-redirect via returnUrl.
+    // Phase 19.29 — removed [EnableRateLimiting("login")] because the rate-limiter
+    // pipeline in 19.27 broke the Railway deploy; we'll reintroduce it carefully
+    // later. The lockout policy still throttles brute-force attempts.
     [HttpPost, ValidateAntiForgeryToken]
-    [EnableRateLimiting("login")]
     public async Task<IActionResult> Login(string email, string password, string? returnUrl = null)
     {
-        // Phase 19.27 (security):
-        //   3rd arg (isPersistent) — false: do not issue a "remember me" cookie by default.
-        //   4th arg (lockoutOnFailure) — true: feed failed attempts into the Identity lockout counter.
         var result = await _signInManager.PasswordSignInAsync(email, password, false, true);
         if (result.Succeeded)
         {
-            // Phase 19.27 (security) — only honour returnUrl if it points to our own site;
-            // anything off-site is silently rewritten to "/" to block open-redirect abuse.
             return LocalRedirect(Url.IsLocalUrl(returnUrl) ? returnUrl : "/");
         }
         ModelState.AddModelError("", "البريد الإلكتروني أو كلمة المرور غير صحيحة");
