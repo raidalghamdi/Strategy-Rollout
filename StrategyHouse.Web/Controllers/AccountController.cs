@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using StrategyHouse.Domain.Entities;
 
 namespace StrategyHouse.Web.Controllers;
@@ -22,12 +23,22 @@ public class AccountController : Controller
         return View();
     }
 
+    // Phase 19.27 (security) — the "login" policy throttles brute-force attempts;
+    // see AddRateLimiter() in Program.cs for the actual limit.
     [HttpPost, ValidateAntiForgeryToken]
+    [EnableRateLimiting("login")]
     public async Task<IActionResult> Login(string email, string password, string? returnUrl = null)
     {
-        var result = await _signInManager.PasswordSignInAsync(email, password, true, false);
+        // Phase 19.27 (security):
+        //   3rd arg (isPersistent) — false: do not issue a "remember me" cookie by default.
+        //   4th arg (lockoutOnFailure) — true: feed failed attempts into the Identity lockout counter.
+        var result = await _signInManager.PasswordSignInAsync(email, password, false, true);
         if (result.Succeeded)
-            return Redirect(returnUrl ?? "/");
+        {
+            // Phase 19.27 (security) — only honour returnUrl if it points to our own site;
+            // anything off-site is silently rewritten to "/" to block open-redirect abuse.
+            return LocalRedirect(Url.IsLocalUrl(returnUrl) ? returnUrl : "/");
+        }
         ModelState.AddModelError("", "البريد الإلكتروني أو كلمة المرور غير صحيحة");
         return View();
     }
