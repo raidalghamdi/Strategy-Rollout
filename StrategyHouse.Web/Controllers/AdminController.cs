@@ -36,7 +36,24 @@ public class AdminController : Controller
         _source = source;
     }
 
-    public IActionResult Index() => View();
+    public async Task<IActionResult> Index()
+    {
+        // Phase 20 — dashboard counters come straight from the DB; no hardcoded numbers.
+        var model = new AdminDashboardCounters
+        {
+            PillarCount = await _db.Pillars.CountAsync(),
+            ObjectiveCount = await _db.Objectives.CountAsync(),
+            DepartmentCount = await _db.Departments.CountAsync(),
+            InitiativeCount = await _db.Initiatives.CountAsync(),
+            ProjectCount = await _db.Projects.CountAsync(),
+            StrategicProjectCount = await _db.Projects.CountAsync(p => p.ProjectType == "استراتيجي"),
+            OperationalProjectCount = await _db.Projects.CountAsync(p => p.ProjectType == "تشغيلي"),
+            KpiCount = await _db.Kpis.CountAsync(),
+            StrategicKpiCount = await _db.Kpis.CountAsync(k => k.KpiType == "استراتيجي"),
+            OperationalKpiCount = await _db.Kpis.CountAsync(k => k.KpiType == "تشغيلي"),
+        };
+        return View(model);
+    }
 
     // Phase 17 — these strategy listings prefer the external MSSQL warehouse (Option A)
     // when UseExternalDb is on, projecting external rows onto the local entity shape the
@@ -172,4 +189,19 @@ public class AdminController : Controller
             .ToList();
         return View(kpis);
     }
+}
+
+// Phase 20 — data-driven counters for the /Admin dashboard cards.
+public class AdminDashboardCounters
+{
+    public int PillarCount { get; set; }
+    public int ObjectiveCount { get; set; }
+    public int DepartmentCount { get; set; }
+    public int InitiativeCount { get; set; }
+    public int ProjectCount { get; set; }
+    public int StrategicProjectCount { get; set; }
+    public int OperationalProjectCount { get; set; }
+    public int KpiCount { get; set; }
+    public int StrategicKpiCount { get; set; }
+    public int OperationalKpiCount { get; set; }
 }

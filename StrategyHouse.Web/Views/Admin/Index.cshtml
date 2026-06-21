@@ -1,3 +1,4 @@
+@model StrategyHouse.Web.Controllers.AdminDashboardCounters
 @{ ViewData["Title"] = "لوحة الإدارة"; }
 <h1>لوحة الإدارة</h1>
 <p class="muted">استعراض بيانات الاستراتيجية: الركائز، الأهداف، الإدارات، المبادرات، المشاريع، ومؤشرات الأداء.</p>
@@ -5,29 +6,52 @@
 <div class="grid-3">
     <a href="/Admin/Pillars" class="card card--accent">
         <h3>الركائز</h3>
-        <p class="muted">٥ ركائز استراتيجية بميزانياتها وفتراتها.</p>
+        <p class="muted">@Model.PillarCount ركائز استراتيجية بميزانياتها وفتراتها.</p>
     </a>
     <a href="/Admin/Objectives" class="card card--accent">
         <h3>الأهداف</h3>
-        <p class="muted">١٣ هدفاً استراتيجياً مرتبطة بالركائز.</p>
+        <p class="muted">@Model.ObjectiveCount هدفاً استراتيجياً مرتبطة بالركائز.</p>
     </a>
     <a href="/Admin/Departments" class="card card--accent">
         <h3>الإدارات</h3>
-        <p class="muted">١٧ إدارة من المستوى الثاني للهيكل التنظيمي.</p>
+        <p class="muted">@Model.DepartmentCount إدارة من المستوى الثاني للهيكل التنظيمي.</p>
     </a>
     <a href="/Admin/Initiatives" class="card card--accent">
         <h3>المبادرات</h3>
-        <p class="muted">٢٣ مبادرة موزعة على الأهداف.</p>
+        <p class="muted">@Model.InitiativeCount مبادرة موزعة على الأهداف.</p>
     </a>
     <a href="/Admin/Projects" class="card card--accent">
         <h3>المشاريع</h3>
-        <p class="muted">٢٢٠ مشروعاً (١١٠ استراتيجي / ١١٠ تشغيلي).</p>
+        <p class="muted">@Model.ProjectCount مشروعاً (@Model.StrategicProjectCount استراتيجي / @Model.OperationalProjectCount تشغيلي).</p>
     </a>
     <a href="/Admin/Kpis" class="card card--accent">
         <h3>مؤشرات الأداء</h3>
-        <p class="muted">١٣٤ مؤشراً (١٤ استراتيجي / ١٢٠ تشغيلي).</p>
+        <p class="muted">@Model.KpiCount مؤشراً (@Model.StrategicKpiCount استراتيجي / @Model.OperationalKpiCount تشغيلي).</p>
     </a>
 </div>
+
+@if (User.IsInRole("Admin"))
+{
+    <h2 style="margin-top:2rem;">الإدارة المتقدمة</h2>
+    <div class="grid-3">
+        <a href="/Admin/Users" class="card card--accent">
+            <h3>إدارة المستخدمين</h3>
+            <p class="muted">إضافة وتعديل المستخدمين، إعادة تعيين كلمات المرور، وتعطيل الحسابات.</p>
+        </a>
+        <a href="/Admin/JourneyReset" class="card card--accent">
+            <h3>إعادة تشغيل رحلة إدارة</h3>
+            <p class="muted">إعادة ضبط مراحل مختارة لإدارة معيّنة مع تسجيل العملية في سجل التدقيق.</p>
+        </a>
+        <a href="/Admin/TestResults" class="card card--accent">
+            <h3>حذف نتائج الاختبار</h3>
+            <p class="muted">عرض وحذف جلسات مستخدم الاختبار (كاملة أو انتقائية).</p>
+        </a>
+        <a href="/Admin/AuditLog" class="card card--accent">
+            <h3>سجل التدقيق</h3>
+            <p class="muted">سجل كامل بكل العمليات الإدارية الحسّاسة مع إمكانية التصفية والتصدير.</p>
+        </a>
+    </div>
+}
 
 <h2 style="margin-top:2rem;">رحلة الاستراتيجية</h2>
 <div class="grid-3">

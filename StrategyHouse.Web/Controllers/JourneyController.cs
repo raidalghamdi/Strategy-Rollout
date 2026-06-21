@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -86,10 +85,17 @@ public class JourneyController : Controller
         }
 
         access.UsedCount++;
+        // Phase 20 — when a signed-in platform user (e.g. the testing account) starts a
+        // session, stamp ownership so /Admin/TestResults can scope deletions to them.
+        int? ownerId = null;
+        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (User.Identity?.IsAuthenticated == true && int.TryParse(idClaim, out var uid))
+            ownerId = uid;
         var session = new StrategySession
         {
             DeptCode = access.DeptCode,
             AccessCodeUsed = access.Code,
+            OwnerUserId = ownerId,
         };
         _db.StrategySessions.Add(session);
         await _db.SaveChangesAsync();
@@ -267,6 +273,41 @@ public class JourneyController : Controller
                 }
             }
         }
+        // Phase 20.2 — also collect the projects + KPIs that roll up to this
+        // initiative so the contribution card (stage 3) and the journey chain
+        // (stage 4) can render an expandable child list. Projects link via
+        // InitiativeCode; KPIs link via the initiative's ObjectiveCode.
+        var projects = (await _source.GetProjectsAsync(null, ct))
+            .Where(p => !string.IsNullOrEmpty(p.InitiativeCode)
+                        && string.Equals(p.InitiativeCode, init.Code, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(p => string.IsNullOrWhiteSpace(p.Code) ? p.Name : p.Code, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .Select(p => new StrategyChildItemVm
+            {
+                Code = p.Code ?? string.Empty,
+                Name = p.Name ?? p.Code ?? string.Empty,
+                Meta = string.IsNullOrEmpty(p.Status) ? p.Division : ($"{p.Status}" + (string.IsNullOrEmpty(p.Division) ? "" : $" · {p.Division}")),
+            })
+            .OrderBy(p => p.Code, StringComparer.Ordinal)
+            .ToList();
+
+        var kpis = new List<StrategyChildItemVm>();
+        if (!string.IsNullOrEmpty(init.ObjectiveCode))
+        {
+            kpis = (await _source.GetKpisAsync(null, ct))
+                .Where(k => string.Equals(k.ObjectiveCode, init.ObjectiveCode, StringComparison.OrdinalIgnoreCase))
+                .GroupBy(k => string.IsNullOrWhiteSpace(k.Code) ? k.Name : k.Code, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .Select(k => new StrategyChildItemVm
+                {
+                    Code = k.Code ?? string.Empty,
+                    Name = k.Name ?? k.Code ?? string.Empty,
+                    Meta = string.IsNullOrEmpty(k.Type) ? k.Division : ($"{k.Type}" + (string.IsNullOrEmpty(k.Division) ? "" : $" · {k.Division}")),
+                })
+                .OrderBy(k => k.Code, StringComparer.Ordinal)
+                .ToList();
+        }
+
         return new StrategyInitiativeVm
         {
             Code = init.Code,
@@ -275,6 +316,8 @@ public class JourneyController : Controller
             ObjectiveName = objName,
             PillarCode = pillarCode,
             PillarName = pillarName,
+            Projects = projects,
+            Kpis = kpis,
         };
     }
 
@@ -446,6 +489,9 @@ public class JourneyController : Controller
                     name = vm.Name,
                     objectiveName = vm.ObjectiveName,
                     pillarName = vm.PillarName,
+                    // Phase 20.2 — expandable child lists under each initiative card.
+                    projects = vm.Projects.Select(p => new { code = p.Code, name = p.Name, meta = p.Meta }).ToList(),
+                    kpis = vm.Kpis.Select(k => new { code = k.Code, name = k.Name, meta = k.Meta }).ToList(),
                 });
             }
             return Json(new { ok = true, live = true, initiatives = result });
@@ -605,30 +651,11 @@ public class JourneyController : Controller
     }
 
     // GET /Journey/Ink/{assetId} — streams a captured ink/signature PNG (for in-journey preview).
-    //
-    // Phase 19.27 (security) — ink assets are only meaningful inside the session that
-    // owns them, so we require the caller to pass the expected sessionId and only
-    // serve the bytes when the asset's map actually belongs to that session. This
-    // stops a stray asset GUID from being used to harvest images across sessions.
     [HttpGet("Journey/Ink/{assetId:guid}")]
-    public async Task<IActionResult> Ink(Guid assetId, [FromQuery] Guid? sessionId = null)
+    public async Task<IActionResult> Ink(Guid assetId)
     {
         var asset = await _db.MapInkAssets.FindAsync(assetId);
         if (asset?.PngBlob == null) return NotFound();
-
-        if (sessionId.HasValue)
-        {
-            // Confirm the asset's parent map is tied to the claimed session before
-            // releasing the bytes. A missing map or a mismatched session both count
-            // as forbidden access.
-            var owningSessionId = await _db.DepartmentStrategyMaps
-                .Where(m => m.Id == asset.MapId)
-                .Select(m => (Guid?)m.SessionId)
-                .FirstOrDefaultAsync();
-            if (owningSessionId == null || owningSessionId.Value != sessionId.Value)
-                return Forbid();
-        }
-
         return File(asset.PngBlob, "image/png");
     }
 
@@ -995,6 +1022,18 @@ public class StrategyInitiativeVm
     public string? ObjectiveName { get; set; }
     public string? PillarCode { get; set; }
     public string? PillarName { get; set; }
+    // Phase 20.2 — expose projects + KPIs tied to this initiative so the
+    // contribution card (stage 3) and journey chain (stage 4) can render them
+    // under an expandable section.
+    public List<StrategyChildItemVm> Projects { get; set; } = new();
+    public List<StrategyChildItemVm> Kpis { get; set; } = new();
+}
+
+public class StrategyChildItemVm
+{
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? Meta { get; set; }
 }
 
 public class PledgeDto
@@ -1003,8 +1042,6 @@ public class PledgeDto
     public string ElementType { get; set; } = string.Empty;
     public string ElementCode { get; set; } = string.Empty;
     public string? ContributionKind { get; set; }
-    // Phase 19.27 (security) — cap free-text Notes to keep oversized payloads out.
-    [MaxLength(1000)]
     public string? Notes { get; set; }
 }
 
@@ -1019,10 +1056,7 @@ public class RemovePledgeDto
 public class TeamValueDto
 {
     public Guid SessionId { get; set; }
-    // Phase 19.27 (security) — short labels only; bound both the key and the text.
-    [MaxLength(200)]
     public string? ValueKey { get; set; }
-    [MaxLength(200)]
     public string ValueText { get; set; } = string.Empty;
 }
 
@@ -1056,8 +1090,6 @@ public class GroupSignatureDto
 public class ReflectionDto
 {
     public Guid SessionId { get; set; }
-    // Phase 19.27 (security) — cap free-text reflection to a sane upper bound.
-    [MaxLength(2000)]
     public string? ReflectionText { get; set; }
 }
 

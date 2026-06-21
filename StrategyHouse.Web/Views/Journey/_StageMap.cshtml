@@ -15,7 +15,43 @@
     {
         <p class="text-muted">شاهد كيف يتصل دورك — خطوة بخطوة — حتى رؤية الهيئة.</p>
         <div id="journeyChain" class="jchain">
-            <div class="jnode jnode--init" data-step="0"><span class="jlabel">مبادرتك</span><span class="jtext">@sel!.Name</span></div>
+            <div class="jnode jnode--init" data-step="0">
+                <span class="jlabel">مبادرتك</span>
+                <span class="jtext">@sel!.Name</span>
+                @* Phase 20.2 — expandable projects + KPIs tied to this initiative. *@
+                @if ((sel.Projects?.Count ?? 0) > 0 || (sel.Kpis?.Count ?? 0) > 0)
+                {
+                    <details class="jdetails" onclick="event.stopPropagation();">
+                        <summary>عرض المشاريع و KPIs (@(sel.Projects?.Count ?? 0) مشروع · @(sel.Kpis?.Count ?? 0) مؤشّر)</summary>
+                        <div class="jchildren">
+                            @if ((sel.Projects?.Count ?? 0) > 0)
+                            {
+                                <div class="jchild-group">
+                                    <h6>المشاريع</h6>
+                                    <ul>
+                                        @foreach (var p in sel.Projects!)
+                                        {
+                                            <li>@p.Name @(string.IsNullOrEmpty(p.Meta) ? "" : " — ") <span class="jchild-meta">@p.Meta</span></li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                            @if ((sel.Kpis?.Count ?? 0) > 0)
+                            {
+                                <div class="jchild-group">
+                                    <h6>مؤشّرات الأداء</h6>
+                                    <ul>
+                                        @foreach (var k in sel.Kpis!)
+                                        {
+                                            <li>@k.Name @(string.IsNullOrEmpty(k.Meta) ? "" : " — ") <span class="jchild-meta">@k.Meta</span></li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        </div>
+                    </details>
+                }
+            </div>
             <div class="jarrow" data-step="1">↓</div>
             <div class="jnode jnode--obj" data-step="2"><span class="jlabel">الهدف</span><span class="jtext">@(string.IsNullOrEmpty(sel.ObjectiveName) ? "—" : sel.ObjectiveName)</span></div>
             <div class="jarrow" data-step="3">↓</div>
@@ -47,6 +83,53 @@
         opacity: 0; transform: translateY(10px); transition: opacity .6s ease, transform .6s ease;
     }
     #stage-4 .jmsg.is-in { opacity: 1; transform: translateY(0); }
+
+    /* Phase 20.2 — expandable projects + KPIs under the «my initiative» node. */
+    #stage-4 .jdetails {
+        margin-top: 12px;
+        text-align: start;
+        background: rgba(255,255,255,.12);
+        border-radius: 10px;
+        padding: 8px 12px;
+    }
+    #stage-4 .jdetails summary {
+        cursor: pointer;
+        font-size: .85rem;
+        font-weight: 700;
+        color: #fff;
+        list-style: none;
+        outline: none;
+        user-select: none;
+        padding: 4px 0;
+    }
+    #stage-4 .jdetails summary::-webkit-details-marker { display: none; }
+    #stage-4 .jdetails summary::before {
+        content: '◀';
+        display: inline-block;
+        margin-inline-end: 6px;
+        font-size: .7rem;
+        transition: transform .2s;
+    }
+    #stage-4 .jdetails[open] summary::before { transform: rotate(-90deg); }
+    #stage-4 .jchildren { padding: 8px 0 4px; font-size: .82rem; color: #fff; }
+    #stage-4 .jchild-group { margin-bottom: 8px; }
+    #stage-4 .jchild-group:last-child { margin-bottom: 0; }
+    #stage-4 .jchild-group h6 {
+        font-size: .78rem;
+        font-weight: 700;
+        color: rgba(255,255,255,.85);
+        margin: 0 0 4px;
+    }
+    #stage-4 .jchild-group ul { list-style: none; padding: 0; margin: 0; }
+    #stage-4 .jchild-group li {
+        padding: 4px 8px;
+        background: rgba(255,255,255,.18);
+        border-radius: 6px;
+        margin-bottom: 3px;
+        line-height: 1.5;
+        font-weight: 600;
+    }
+    #stage-4 .jchild-meta { color: rgba(255,255,255,.75); font-size: .75rem; font-weight: 400; }
 </style>
 
 <script>

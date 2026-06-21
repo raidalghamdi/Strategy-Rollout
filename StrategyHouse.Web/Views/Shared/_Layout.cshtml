@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="~/css/phase15-responsive.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/phase19_5-responsive.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/dga-theme.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/phase20.css" asp-append-version="true" />
     @await RenderSectionAsync("Styles", required: false)
 </head>
 <body>
@@ -50,9 +51,6 @@
 
                 <div class="group-title">الرحلة الاستراتيجية</div>
                 <a class="@activeIf("Journey")" href="/Journey">الرحلة</a>
-                <a class="@activeIf("AdminInsights")" href="/Admin/Insights">المساهمات</a>
-                <a class="@activeIf("AdminModeration")" href="/Admin/Moderation">الخريطة والاعتماد</a>
-                <a class="@activeIf("AdminWall")" href="/Admin/Wall">جدار المشاركات</a>
 
                 <div class="group-title">الاختبار</div>
                 <a class="@activeIf("AdminQuiz")" href="/Admin/Quiz">إدارة الاختبار</a>
@@ -60,15 +58,22 @@
                 <div class="group-title">الاستبيان</div>
                 <a class="@activeIf("AdminSurveys")" href="/Admin/Surveys">الاستبيان</a>
                 <a class="@activeIf("AdminSurvey")" href="/Admin/Survey/Analytics">تحليلات الاستبيان الرسمي</a>
-                <a href="/Admin/Survey/Categorize">تصنيف إجابات الاستبيان</a>
 
                 <div class="group-title">التقارير</div>
                 <a class="@activeIf("AdminExecutiveReport")" href="/Admin/ExecutiveReport">التقرير التنفيذي</a>
-                <a href="/Admin/Survey/FinalReport">تقرير الاستبيان النهائي</a>
 
                 <div class="group-title">الإعدادات</div>
                 <a class="@activeIf("AdminCodes")" href="/Admin/Codes">رموز الدخول</a>
                 <a class="@activeIf("Admin")" href="/Admin/Content">تحرير النصوص</a>
+
+                @if (User.IsInRole("Admin"))
+                {
+                    <div class="group-title">الإدارة المتقدمة</div>
+                    <a class="@activeIf("AdminUsers")" href="/Admin/Users">إدارة المستخدمين</a>
+                    <a class="@activeIf("AdminJourneyReset")" href="/Admin/JourneyReset">إعادة تشغيل رحلة إدارة</a>
+                    <a class="@activeIf("AdminTestResults")" href="/Admin/TestResults">حذف نتائج الاختبار</a>
+                    <a class="@activeIf("AdminAuditLog")" href="/Admin/AuditLog">سجل التدقيق</a>
+                }
             </nav>
         </aside>
 
@@ -79,13 +84,13 @@
                     <strong style="color:var(--color-gray-800);">@title</strong>
                 </div>
                 <div class="actions">
-                    <div class="user-badge" title="@name">
+                    <a class="user-badge" href="/Account/Profile" title="@name" style="text-decoration:none;color:inherit;">
                         <span class="avatar">@initials(name)</span>
                         <span class="user-meta">
                             <span class="user-name">@name</span>
-                            <span class="user-role">مسؤول</span>
+                            <span class="user-role">الملف الشخصي</span>
                         </span>
-                    </div>
+                    </a>
                     <form method="post" action="/Account/Logout" style="margin:0;">
                         <button class="btn btn-ghost btn-sm" type="submit">خروج</button>
                     </form>

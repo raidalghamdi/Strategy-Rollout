@@ -1,51 +1,66 @@
-@model List<StrategyHouse.Web.Controllers.LiveSessionRow>
+@model StrategyHouse.Web.Controllers.LiveDashboardViewModel
 @{
-    var stageNames = new[] { "", "الصورة", "البيت", "المساهمة", "الخريطة", "الإتمام" };
-    string StageName(int s) => s >= 1 && s < stageNames.Length ? stageNames[s] : "";
+    var stageNames = new[] { "لم تبدأ", "الصورة", "البيت", "المساهمة", "الخريطة", "الإتمام" };
+    string StageName(int s) => s >= 0 && s < stageNames.Length ? stageNames[s] : "";
+    string Color(string key) => key switch { "Completed" => "#5F9600", "InProgress" => "#FAC126", _ => "#9aa6b2" };
+    string Badge(string key) => key switch
+    {
+        "Completed" => "<span class='badge' style='background:#5F9600'>مكتملة</span>",
+        "InProgress" => "<span class='badge' style='background:#FAC126;color:#28334A'>قيد التنفيذ</span>",
+        _ => "<span class='badge' style='background:#9aa6b2'>لم تبدأ</span>"
+    };
+    var k = Model.Kpis;
 }
-@if (!Model.Any())
+<div class="live-kpis" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:0 0 16px;">
+    <div class="card" style="text-align:center;"><div class="muted small">إجمالي الإدارات</div><div style="font-size:1.6rem;font-weight:800;">@k.TotalDepartments</div></div>
+    <div class="card" style="text-align:center;"><div class="muted small">مكتملة</div><div style="font-size:1.6rem;font-weight:800;color:#5F9600;">@k.SessionsCompleted</div></div>
+    <div class="card" style="text-align:center;"><div class="muted small">قيد التنفيذ</div><div style="font-size:1.6rem;font-weight:800;color:#FAC126;">@k.SessionsInProgress</div></div>
+    <div class="card" style="text-align:center;"><div class="muted small">لم تبدأ</div><div style="font-size:1.6rem;font-weight:800;color:#9aa6b2;">@k.NotStarted</div></div>
+    <div class="card" style="text-align:center;"><div class="muted small">نسبة الإنجاز</div><div style="font-size:1.6rem;font-weight:800;">@k.OverallPercent%</div></div>
+</div>
+
+@if (!Model.Groups.Any())
 {
-    <p class="muted">لا توجد جلسات مطابقة.</p>
+    <p class="muted">لا توجد جلسات مطابقة ضمن نطاقك.</p>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-hover align-middle table-responsive-stack" style="background:#fff;">
-            <thead>
-                <tr>
-                    <th>الإدارة</th>
-                    <th>الرمز</th>
-                    <th style="min-width:170px;">المرحلة</th>
-                    <th>الأعضاء</th>
-                    <th>الخريطة</th>
-                    <th>الاختبار</th>
-                    <th>الاستبيان</th>
-                    <th>آخر نشاط</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var r in Model)
-                {
-                    var pct = (int)Math.Round(Math.Clamp(r.CurrentStage, 1, 5) / 5.0 * 100);
-                    <tr style="cursor:pointer;" onclick="location.href='/Admin/SessionDetail/@r.Id'">
-                        <td data-label="الإدارة"><strong>@r.DeptName</strong></td>
-                        <td data-label="الرمز"><span class="muted small">@r.AccessCode</span></td>
-                        <td data-label="المرحلة">
-                            <div class="d-flex align-items-center gap-2">
-                                <div style="flex:1;background:#e7edf5;border-radius:6px;height:10px;overflow:hidden;min-width:80px;">
-                                    <div style="width:@pct%;background:#299ECE;height:100%;"></div>
-                                </div>
-                                <span class="small">@Math.Clamp(r.CurrentStage, 1, 5)/5 — @StageName(Math.Clamp(r.CurrentStage, 1, 5))</span>
-                            </div>
-                        </td>
-                        <td data-label="الأعضاء">@r.Members</td>
-                        <td data-label="الخريطة">@(r.MapSigned ? Html.Raw("<span class='badge bg-success'>معتمدة</span>") : Html.Raw("<span class='badge bg-secondary'>—</span>"))</td>
-                        <td data-label="الاختبار">@r.QuizAttempts</td>
-                        <td data-label="الاستبيان">@r.SurveyResponses</td>
-                        <td data-label="آخر نشاط"><span class="small">@((r.LastActivityAt ?? r.StartedAt).ToLocalTime().ToString("MM-dd HH:mm"))</span></td>
+    foreach (var g in Model.Groups)
+    {
+        <h3 style="margin-top:1.2rem;">@g.Sector <span class="muted small">(@g.Rows.Count)</span></h3>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle table-responsive-stack" style="background:#fff;">
+                <thead>
+                    <tr>
+                        <th>الإدارة</th>
+                        <th>الحالة</th>
+                        <th style="min-width:170px;">المرحلة</th>
+                        <th>الأعضاء</th>
+                        <th>الخريطة</th>
+                        <th>آخر نشاط</th>
                     </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+                </thead>
+                <tbody>
+                    @foreach (var r in g.Rows)
+                    {
+                        <tr style="cursor:pointer;" onclick="location.href='/Admin/SessionDetail/@r.Id'">
+                            <td data-label="الإدارة"><strong>@r.DeptName</strong> <span class="muted small">@r.DeptCode</span></td>
+                            <td data-label="الحالة">@Html.Raw(Badge(r.StatusKey))</td>
+                            <td data-label="المرحلة">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div style="flex:1;background:#e7edf5;border-radius:6px;height:10px;overflow:hidden;min-width:80px;">
+                                        <div style="width:@r.ProgressPercent%;background:@Color(r.StatusKey);height:100%;"></div>
+                                    </div>
+                                    <span class="small">@r.CurrentStage/5 — @StageName(r.CurrentStage)</span>
+                                </div>
+                            </td>
+                            <td data-label="الأعضاء">@r.Members</td>
+                            <td data-label="الخريطة">@(r.MapSigned ? Html.Raw("<span class='badge bg-success'>معتمدة</span>") : Html.Raw("<span class='badge bg-secondary'>—</span>"))</td>
+                            <td data-label="آخر نشاط"><span class="small">@((r.LastActivityAt ?? r.StartedAt).ToLocalTime().ToString("MM-dd HH:mm"))</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 }

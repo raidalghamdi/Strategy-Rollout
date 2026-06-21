@@ -1,0 +1,52 @@
+@model StrategyHouse.Web.Controllers.UserEditModel
+@{ ViewData["Title"] = "مستخدم جديد"; }
+@{
+    var roles = new[] { "Admin", "Facilitator", "Viewer" };
+    var scopes = new (string Key, string Label)[]
+    {
+        ("", "— بدون نطاق —"),
+        ("GLOBAL", "GLOBAL — كل القطاعات"),
+        ("TEST", "TEST — اختبار"),
+        ("SECTOR:CORP_SUPPORT", "قطاع الدعم المؤسسي"),
+        ("SECTOR:ECONOMIC", "قطاع الشؤون الاقتصادية"),
+        ("SECTOR:LEGAL", "قطاع الشؤون القانونية"),
+    };
+}
+<h1>مستخدم جديد</h1>
+<div asp-validation-summary="All" class="text-danger"></div>
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger">@Html.Raw(string.Join("<br>", ViewData.ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)))</div>
+}
+<form method="post" action="/Admin/Users/Create" class="card" style="max-width:560px;">
+    @Html.AntiForgeryToken()
+    <label class="form-label">اسم المستخدم</label>
+    <input name="UserName" class="form-control mb-3" value="@Model.UserName" required />
+
+    <label class="form-label">الاسم بالعربية</label>
+    <input name="FullNameAr" class="form-control mb-3" value="@Model.FullNameAr" />
+
+    <label class="form-label">كلمة المرور</label>
+    <input name="Password" type="password" class="form-control mb-3" required />
+
+    <label class="form-label">الدور</label>
+    <select name="AppRole" class="form-select mb-3">
+        @foreach (var r in roles)
+        {
+            <option value="@r" selected="@(Model.AppRole == r)">@r</option>
+        }
+    </select>
+
+    <label class="form-label">نطاق الرحلة</label>
+    <select name="JourneyScopeKey" class="form-select mb-3">
+        @foreach (var s in scopes)
+        {
+            <option value="@s.Key" selected="@(Model.JourneyScopeKey == s.Key)">@s.Label</option>
+        }
+    </select>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn--primary">حفظ</button>
+        <a href="/Admin/Users" class="btn btn--secondary">إلغاء</a>
+    </div>
+</form>

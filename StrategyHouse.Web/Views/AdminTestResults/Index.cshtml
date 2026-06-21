@@ -1,0 +1,72 @@
+@model StrategyHouse.Web.Controllers.TestResultsViewModel
+@{ ViewData["Title"] = "حذف نتائج الاختبار"; }
+@{
+    var stages = new (int N, string Label)[]
+    {
+        (1, "١ الصورة الكبرى"),
+        (3, "٣ دوري في الاستراتيجية"),
+        (4, "٤ الرحلة نحو الرؤية"),
+        (5, "٥ الإتمام"),
+    };
+}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1 class="mb-0">حذف نتائج الاختبار (@Model.Rows.Count)</h1>
+    @if (Model.Rows.Any())
+    {
+        <form method="post" action="/Admin/TestResults/DeleteAll" onsubmit="return confirm('حذف كل نتائج Testing نهائياً؟');" style="margin:0;">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn--danger">حذف كل نتائج Testing</button>
+        </form>
+    }
+</div>
+<p class="muted">جلسات مملوكة لمستخدم الاختبار (testing). كل عملية حذف تُسجَّل في سجل التدقيق.</p>
+
+@if (TempData["Success"] != null) { <div class="alert alert-success">@TempData["Success"]</div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger">@TempData["Error"]</div> }
+
+@if (!Model.TestingUserExists)
+{
+    <div class="alert alert-warning">لا يوجد مستخدم باسم <code>testing</code>.</div>
+}
+else if (!Model.Rows.Any())
+{
+    <p class="muted">لا توجد نتائج اختبار.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle" style="background:#fff;">
+            <thead>
+                <tr><th>الإدارة</th><th>الحالة</th><th>المرحلة</th><th>البدء</th><th></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr>
+                    <td><strong>@r.DeptName</strong> <span class="muted small">@r.DeptCode</span></td>
+                    <td>@r.Status</td>
+                    <td>@r.CurrentStage/5</td>
+                    <td><span class="small">@r.StartedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span></td>
+                    <td class="text-nowrap">
+                        <form method="post" action="/Admin/TestResults/DeleteFull/@r.Id" style="display:inline;" onsubmit="return confirm('حذف هذه النتيجة كاملةً؟');">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn--danger">حذف كاملة</button>
+                        </form>
+                        <button type="button" class="btn btn-sm btn--secondary" onclick="document.getElementById('sel-@r.Id').style.display='block';">حذف انتقائي</button>
+                        <div id="sel-@r.Id" style="display:none;margin-top:8px;border:1px solid #e7edf5;border-radius:8px;padding:8px;">
+                            <form method="post" action="/Admin/TestResults/DeleteSelective/@r.Id">
+                                @Html.AntiForgeryToken()
+                                @foreach (var s in stages)
+                                {
+                                    <label class="me-2"><input type="checkbox" name="stages" value="@s.N" /> @s.Label</label>
+                                }
+                                <button type="submit" class="btn btn-sm btn--danger mt-2">حذف المختار</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

@@ -1,0 +1,38 @@
+@model StrategyHouse.Web.Controllers.ProfileViewModel
+@{ ViewData["Title"] = "الملف الشخصي"; }
+<h1>الملف الشخصي</h1>
+
+@if (TempData["Success"] != null) { <div class="alert alert-success">@TempData["Success"]</div> }
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger">@Html.Raw(string.Join("<br>", ViewData.ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)))</div>
+}
+
+<div class="card mb-3" style="max-width:560px;">
+    <h3>المعلومات</h3>
+    <dl class="row mb-0">
+        <dt class="col-sm-4 muted">اسم المستخدم</dt><dd class="col-sm-8">@Model.UserName</dd>
+        <dt class="col-sm-4 muted">الدور</dt><dd class="col-sm-8">@Model.AppRole</dd>
+        <dt class="col-sm-4 muted">نطاق الرحلة</dt><dd class="col-sm-8">@(Model.JourneyScopeKey ?? "—")</dd>
+        <dt class="col-sm-4 muted">آخر دخول</dt><dd class="col-sm-8">@(Model.LastLoginAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—")</dd>
+    </dl>
+</div>
+
+<form method="post" action="/Account/Profile" class="card" style="max-width:560px;">
+    @Html.AntiForgeryToken()
+    <h3>تعديل الاسم</h3>
+    <label class="form-label">الاسم بالعربية</label>
+    <input name="FullNameAr" class="form-control mb-3" value="@Model.FullNameAr" />
+
+    <h3 class="mt-3">تغيير كلمة المرور</h3>
+    <label class="form-label">كلمة المرور الحالية</label>
+    <input name="CurrentPassword" type="password" class="form-control mb-3" autocomplete="current-password" />
+
+    <label class="form-label">كلمة المرور الجديدة</label>
+    <input name="NewPassword" type="password" class="form-control mb-3" autocomplete="new-password" />
+
+    <label class="form-label">تأكيد كلمة المرور الجديدة</label>
+    <input name="ConfirmPassword" type="password" class="form-control mb-3" autocomplete="new-password" />
+
+    <button type="submit" class="btn btn--primary">حفظ التغييرات</button>
+</form>

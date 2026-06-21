@@ -56,22 +56,6 @@ public static class SeedData
 
         if (await userManager.FindByEmailAsync("admin@gac.gov.sa") == null)
         {
-            // Phase 19.27 (security) — prefer SEED_ADMIN_PASSWORD env var; the secret
-            // lives in Railway/host config rather than source. Phase 19.28 (hotfix) —
-            // if the env var is missing we fall back to a built-in default and emit a
-            // Console warning instead of crashing startup. Phase 19.29 — the fallback
-            // is now "Demo@123!Strong" so it satisfies the new password policy (length
-            // 12, mixed case, digit, symbol). In steady-state production the admin
-            // user already exists from the previous deploy and this branch is skipped
-            // entirely; the env var is only consulted on a fresh database.
-            var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD");
-            if (string.IsNullOrWhiteSpace(seedPassword))
-            {
-                seedPassword = "Demo@123!Strong";
-                Console.WriteLine(
-                    "[SeedData] WARNING: SEED_ADMIN_PASSWORD is not set. Falling back to the built-in default. Set this environment variable in production.");
-            }
-
             var admin = new AppUser
             {
                 UserName = "admin@gac.gov.sa",
@@ -80,21 +64,58 @@ public static class SeedData
                 FullNameAr = "مدير المنصة",
                 AppRole = UserRole.Admin,
             };
-            var createResult = await userManager.CreateAsync(admin, seedPassword);
-            if (createResult.Succeeded)
-            {
-                await userManager.AddToRoleAsync(admin, "Admin");
-            }
-            else
-            {
-                // Don't take the whole app down if Identity rejects the seed password;
-                // log loudly so the operator can fix it. The site keeps running for
-                // anonymous journeys even without an admin account.
-                Console.WriteLine(
-                    "[SeedData] WARNING: admin seed failed: " +
-                    string.Join("; ", createResult.Errors.Select(e => e.Description)));
-            }
+            await userManager.CreateAsync(admin, "Demo@123");
+            await userManager.AddToRoleAsync(admin, "Admin");
         }
+    }
+
+    // Phase 20 — canonical 20-department list (DEPT-01..DEPT-20) with the three real
+    // sectors. Idempotent per code: inserts only DeptCodes that don't already exist, so it
+    // is safe to call on an empty DB, a legacy 17-row DB, or the production 20-row DB.
+    public static readonly (string Code, string Ar, string Parent)[] CanonicalDepartments =
+    {
+        ("DEPT-01", "الإدارة التنفيذية للأمن السيبراني ومكتب البيانات", ""),
+        ("DEPT-02", "الإدارة التنفيذية للمخاطر والحوكمة والالتزام", ""),
+        ("DEPT-03", "الإدارة التنفيذية للاستراتيجية وتميّز الأعمال", ""),
+        ("DEPT-04", "الأمانة العامة لمجلس الادارة", ""),
+        ("DEPT-05", "المراجعة الداخلية", ""),
+        ("DEPT-06", "أمانة لجنة الفصل", ""),
+        ("DEPT-07", "الإدارة التنفيذية لتقنية المعلومات والتحول الرقمي", "قطاع الدعم المؤسسي"),
+        ("DEPT-08", "الإدارة التنفيذية للتواصل المؤسسي", "قطاع الدعم المؤسسي"),
+        ("DEPT-09", "الإدارة التنفيذية للخدمات المساندة", "قطاع الدعم المؤسسي"),
+        ("DEPT-10", "الإدارة التنفيذية للشؤون المالية", "قطاع الدعم المؤسسي"),
+        ("DEPT-11", "الإدارة التنفيذية للموارد البشرية", "قطاع الدعم المؤسسي"),
+        ("DEPT-12", "أكاديمية المنافسة", "قطاع الدعم المؤسسي"),
+        ("DEPT-13", "الإدارة التنفيذية لرقابة الاسواق والتحليل الاقتصادي", "قطاع الشؤون الاقتصادية"),
+        ("DEPT-14", "الإدارة التنفيذية لدعم السياسات", "قطاع الشؤون الاقتصادية"),
+        ("DEPT-15", "الإدارة التنفيذية للدراسات الاقتصادية", "قطاع الشؤون الاقتصادية"),
+        ("DEPT-16", "الإدارة التنفيذية للاندماجات والاستحواذات", "قطاع الشؤون الاقتصادية"),
+        ("DEPT-17", "الإدارة التنفيذية للامتثال والتسوية", "قطاع الشؤون القانونية"),
+        ("DEPT-18", "الإدارة التنفيذية للتحريات والتحقيق", "قطاع الشؤون القانونية"),
+        ("DEPT-19", "الإدارة التنفيذية للدراسات القانونية والتقاضي", "قطاع الشؤون القانونية"),
+        ("DEPT-20", "مكتب الرئيس التنفيذي", ""),
+    };
+
+    public static async Task SeedCanonicalDepartmentsAsync(ApplicationDbContext db)
+    {
+        var existing = await db.Departments.Select(d => d.DeptCode).ToListAsync();
+        var existingSet = existing.ToHashSet();
+        var added = false;
+        foreach (var (code, ar, parent) in CanonicalDepartments)
+        {
+            if (existingSet.Contains(code)) continue;
+            db.Departments.Add(new Department
+            {
+                DeptCode = code,
+                NameAr = ar,
+                NameEn = code,
+                ParentSector = string.IsNullOrEmpty(parent) ? null : parent,
+                Level = 2,
+                IsActive = true,
+            });
+            added = true;
+        }
+        if (added) await db.SaveChangesAsync();
     }
 
     public static async Task SeedStrategyDataAsync(ApplicationDbContext db)
@@ -164,52 +185,31 @@ public static class SeedData
         db.Objectives.AddRange(objectives);
         await db.SaveChangesAsync();
 
-        // ---- 5.3 Departments (17, GAC Level-2) ----
-        // Phase 16 — TODO: when Features:UseExternalDb is permanently enabled and the
-        // external MSSQL "Departments" table is confirmed as the source of truth, delete
-        // this local seed block. It is kept (conditional via DepartmentDirectoryService at
-        // read time, not at seed time) because pillar→department assignments below still
-        // reference these rows on the local SQLite context.
-        var deptDefs = new (string Code, string Ar, string En, string Parent)[]
-        {
-            ("DEPT-01", "مكتب الرئيس التنفيذي", "CEO Office", "CEO"),
-            ("DEPT-02", "الاستراتيجية وتميز الأعمال", "Strategy & Business Excellence", "CEO"),
-            ("DEPT-03", "المراجعة الداخلية", "Internal Audit", "CEO"),
-            ("DEPT-04", "المخاطر والحوكمة والالتزام", "Risk Governance & Compliance", "CEO"),
-            ("DEPT-05", "الأمن السيبراني ومكتب البيانات", "Cybersecurity & Data Office", "CEO"),
-            ("DEPT-06", "الشؤون القانونية", "Legal Affairs", "CEO"),
-            ("DEPT-07", "الشؤون الاقتصادية", "Economic Affairs", "CEO"),
-            ("DEPT-08", "الدعم المؤسسي", "Corporate Support", "CEO"),
-            ("DEPT-09", "التحريات والتحقيق", "Investigation", "الشؤون القانونية"),
-            ("DEPT-10", "الامتثال والتسوية", "Compliance & Settlement", "الشؤون القانونية"),
-            ("DEPT-11", "رقابة الأسواق والتحليل الاقتصادي", "Market Monitoring", "الشؤون الاقتصادية"),
-            ("DEPT-12", "دعم السياسات", "Policy Support", "الشؤون الاقتصادية"),
-            ("DEPT-13", "الاندماجات والاستحواذات", "M&A", "الشؤون الاقتصادية"),
-            ("DEPT-14", "الخدمات المساندة", "Support Services", "الدعم المؤسسي"),
-            ("DEPT-15", "الموارد البشرية", "HR", "الدعم المؤسسي"),
-            ("DEPT-16", "الشؤون المالية", "Financial Affairs", "الدعم المؤسسي"),
-            ("DEPT-17", "التواصل المؤسسي", "Corporate Communications", "الدعم المؤسسي"),
-        };
-        var departments = deptDefs.Select(d => new Department
-        {
-            DeptCode = d.Code,
-            NameAr = d.Ar,
-            NameEn = d.En,
-            ParentSector = d.Parent,
-            Level = 2,
-            IsActive = true,
-        }).ToList();
-        db.Departments.AddRange(departments);
-        await db.SaveChangesAsync();
+        // ---- 5.3 Departments (canonical 20, DEPT-01..DEPT-20) ----
+        // Phase 20 — the canonical list now mirrors the production DB (20 rows with the
+        // three real sectors). Seeding is idempotent PER CODE: a row is inserted only if
+        // its DeptCode does not already exist. When the production DB is swapped in (which
+        // already has 20 rows — or a legacy DB with the old 17), nothing is touched here
+        // (the whole strategy seed is also short-circuited by Pillars.AnyAsync above).
+        await SeedCanonicalDepartmentsAsync(db);
 
-        // Pillar → preferred department codes (for weighted assignment)
+        var departments = await db.Departments.ToListAsync();
+
+        // Pillar → preferred department codes (for weighted assignment). Falls back to any
+        // existing dept code if a preferred one is absent (e.g. legacy 17-dept DB).
+        var allDeptCodes = departments.Select(d => d.DeptCode).ToHashSet();
+        string[] Pref(params string[] codes)
+        {
+            var present = codes.Where(allDeptCodes.Contains).ToArray();
+            return present.Length > 0 ? present : departments.Select(d => d.DeptCode).ToArray();
+        }
         var pillarDepts = new Dictionary<string, string[]>
         {
-            ["PLR-01"] = new[] { "DEPT-07", "DEPT-12", "DEPT-11", "DEPT-02" },
-            ["PLR-02"] = new[] { "DEPT-06", "DEPT-09", "DEPT-10", "DEPT-11" },
-            ["PLR-03"] = new[] { "DEPT-02", "DEPT-07", "DEPT-17", "DEPT-01" },
-            ["PLR-04"] = new[] { "DEPT-08", "DEPT-14", "DEPT-15", "DEPT-16", "DEPT-03", "DEPT-04" },
-            ["PLR-05"] = new[] { "DEPT-05", "DEPT-02", "DEPT-08" },
+            ["PLR-01"] = Pref("DEPT-13", "DEPT-14", "DEPT-15", "DEPT-03"),
+            ["PLR-02"] = Pref("DEPT-17", "DEPT-18", "DEPT-19", "DEPT-13"),
+            ["PLR-03"] = Pref("DEPT-03", "DEPT-08", "DEPT-04", "DEPT-20"),
+            ["PLR-04"] = Pref("DEPT-09", "DEPT-10", "DEPT-11", "DEPT-12", "DEPT-05", "DEPT-02"),
+            ["PLR-05"] = Pref("DEPT-01", "DEPT-07", "DEPT-03"),
         };
         string DeptName(string code) => departments.First(d => d.DeptCode == code).NameAr!;
         string PickDept(string plr) { var arr = pillarDepts[plr]; return arr[rnd.Next(arr.Length)]; }

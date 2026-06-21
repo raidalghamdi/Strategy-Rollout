@@ -1,22 +1,49 @@
-@model List<StrategyHouse.Web.Controllers.LiveSessionRow>
+@model StrategyHouse.Web.Controllers.LiveDashboardViewModel
 @{
     ViewData["Title"] = "اللوحة الحية";
-    var status = (string)ViewBag.Status;
 }
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
     <h1 class="mb-0">اللوحة الحية</h1>
     <div class="d-flex align-items-center gap-2">
-        <span class="muted small">تتحدّث تلقائياً كل ١٠ ثوانٍ</span>
+        <span class="muted small">آخر تحديث: <span id="liveUpdated">—</span></span>
+        <button type="button" class="btn btn-sm btn--secondary" id="liveRefresh">تحديث الآن</button>
+        <button type="button" class="btn btn-sm btn--secondary" id="liveCsv">تصدير CSV</button>
+        <button type="button" class="btn btn-sm btn--secondary" id="livePdf">طباعة / PDF</button>
         <span id="liveDot" style="width:10px;height:10px;border-radius:50%;background:#5F9600;display:inline-block;"></span>
     </div>
 </div>
-<p class="muted">حالة جلسات الإدارات في الوقت الحالي — المرحلة، النشاط، والمشاركة في الاختبار والاستبيان.</p>
+<p class="muted">جلسات الإدارات ضمن نطاقك، مجمّعة حسب القطاع. تتحدّث تلقائياً كل ٥ دقائق.</p>
 
-<div class="mb-3 d-flex gap-2 flex-wrap">
-    @foreach (var (key, label) in new[] { ("All", "الكل"), ("InProgress", "قيد التنفيذ"), ("Completed", "مكتملة") })
-    {
-        <a class="btn btn-sm @(status == key ? "btn--primary" : "btn--secondary")" href="/Admin/LiveDashboard?status=@key">@label</a>
-    }
+<div class="mb-3 d-flex gap-2 flex-wrap align-items-end">
+    <div>
+        <label class="muted small d-block">الحالة</label>
+        <select id="fStatus" class="form-select form-select-sm">
+            @foreach (var (key, label) in new[] { ("All", "الكل"), ("NotStarted", "لم تبدأ"), ("InProgress", "قيد التنفيذ"), ("Completed", "مكتملة") })
+            {
+                <option value="@key" selected="@(Model.Status == key)">@label</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label class="muted small d-block">القطاع</label>
+        <select id="fSector" class="form-select form-select-sm">
+            <option value="All" selected="@(Model.Sector == "All")">كل القطاعات</option>
+            @foreach (var s in Model.SectorOptions)
+            {
+                <option value="@s" selected="@(Model.Sector == s)">@s</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label class="muted small d-block">الإدارة</label>
+        <select id="fDept" class="form-select form-select-sm">
+            <option value="All" selected="@(Model.Dept == "All")">كل إدارات النطاق</option>
+            @foreach (var (code, nm) in Model.DeptOptions)
+            {
+                <option value="@code" selected="@(Model.Dept == code)">@nm</option>
+            }
+        </select>
+    </div>
 </div>
 
 <div id="liveTable">
@@ -26,18 +53,54 @@
 @section Scripts {
 <script>
 (function () {
-    var status = '@status';
     var host = document.getElementById('liveTable');
     var dot = document.getElementById('liveDot');
+    var updated = document.getElementById('liveUpdated');
+    var fStatus = document.getElementById('fStatus');
+    var fSector = document.getElementById('fSector');
+    var fDept = document.getElementById('fDept');
+
+    function qs() {
+        return 'status=' + encodeURIComponent(fStatus.value) +
+               '&sector=' + encodeURIComponent(fSector.value) +
+               '&dept=' + encodeURIComponent(fDept.value);
+    }
+    function stamp() {
+        var d = new Date();
+        function p(n){ return (n < 10 ? '0' : '') + n; }
+        updated.textContent = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+    }
     async function refresh() {
         try {
             dot.style.background = '#FAC126';
-            var res = await fetch('/Admin/LiveDashboard/Rows?status=' + encodeURIComponent(status), { headers: { 'X-Requested-With': 'fetch' } });
-            if (res.ok) { host.innerHTML = await res.text(); dot.style.background = '#5F9600'; }
+            var res = await fetch('/Admin/LiveDashboard/Rows?' + qs(), { headers: { 'X-Requested-With': 'fetch' } });
+            if (res.ok) { host.innerHTML = await res.text(); dot.style.background = '#5F9600'; stamp(); }
             else { dot.style.background = '#c0392b'; }
         } catch (e) { dot.style.background = '#c0392b'; }
     }
-    setInterval(refresh, 10000);
+    [fStatus, fSector, fDept].forEach(function (el) { el.addEventListener('change', refresh); });
+    document.getElementById('liveRefresh').addEventListener('click', refresh);
+
+    // CSV export of the currently rendered table(s).
+    document.getElementById('liveCsv').addEventListener('click', function () {
+        var rows = [['القطاع', 'الإدارة', 'الحالة', 'المرحلة', 'الأعضاء']];
+        var sec = '';
+        host.querySelectorAll('h3, tbody tr').forEach(function (node) {
+            if (node.tagName === 'H3') { sec = node.textContent.trim(); return; }
+            var c = node.querySelectorAll('td');
+            if (c.length >= 4) rows.push([sec, c[0].innerText.trim(), c[1].innerText.trim(), c[2].innerText.trim(), c[3].innerText.trim()]);
+        });
+        var csv = rows.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
+        var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'live-dashboard.csv';
+        a.click();
+    });
+    document.getElementById('livePdf').addEventListener('click', function () { window.print(); });
+
+    stamp();
+    setInterval(refresh, 300000); // Phase 20 — 5-minute auto-refresh
 })();
 </script>
 }

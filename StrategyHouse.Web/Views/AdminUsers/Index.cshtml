@@ -1,0 +1,47 @@
+@model List<StrategyHouse.Web.Controllers.UserRow>
+@{ ViewData["Title"] = "إدارة المستخدمين"; }
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1 class="mb-0">إدارة المستخدمين (@Model.Count)</h1>
+    <a href="/Admin/Users/Create" class="btn btn--primary">+ مستخدم جديد</a>
+</div>
+<p class="muted">المستخدمون لا يُحذفون نهائياً — التعطيل يحافظ على سجل التدقيق.</p>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle" style="background:#fff;">
+        <thead>
+            <tr>
+                <th>اسم المستخدم</th>
+                <th>الاسم</th>
+                <th>الدور</th>
+                <th>نطاق الرحلة</th>
+                <th>الحالة</th>
+                <th>آخر دخول</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var u in Model)
+        {
+            <tr>
+                <td>@u.UserName</td>
+                <td>@u.FullNameAr</td>
+                <td>@u.AppRole</td>
+                <td><span class="small">@(u.JourneyScopeKey ?? "—")</span></td>
+                <td>@(u.IsActive ? Html.Raw("<span class='badge bg-success'>نشط</span>") : Html.Raw("<span class='badge bg-secondary'>معطّل</span>"))</td>
+                <td><span class="small">@(u.LastLoginAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—")</span></td>
+                <td class="text-nowrap">
+                    <a href="/Admin/Users/Edit/@u.Id" class="btn btn-sm btn--secondary">تعديل</a>
+                    <a href="/Admin/Users/ResetPassword/@u.Id" class="btn btn-sm btn--secondary">كلمة المرور</a>
+                    @if (u.IsActive)
+                    {
+                        <form method="post" action="/Admin/Users/Delete/@u.Id" style="display:inline;" onsubmit="return confirm('تعطيل هذا المستخدم؟');">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn--danger">تعطيل</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>

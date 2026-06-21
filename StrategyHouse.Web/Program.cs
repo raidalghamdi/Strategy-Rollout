@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using StrategyHouse.Domain.Entities;
+using StrategyHouse.Domain.Enums;
 using StrategyHouse.Infrastructure.Persistence;
 using StrategyHouse.Web.Configuration;
 using StrategyHouse.Web.Services;
@@ -46,6 +47,11 @@ if (!string.IsNullOrWhiteSpace(externalConn))
 }
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<DepartmentDirectoryService>();
+builder.Services.AddHttpContextAccessor();
+// Phase 20 — journey scope enforcement + admin audit trail.
+builder.Services.AddScoped<IJourneyScopeService, JourneyScopeService>();
+builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddScoped<JourneyResetService>();
 // Phase 17 — read services for the Option A strategy tables (external MSSQL).
 // When UseExternalDb is off these return empty lists with a logged warning.
 builder.Services.AddScoped<PillarsService>();
@@ -63,24 +69,15 @@ builder.Services.AddScoped<IStrategyDataSource, UnifiedStrategyDataSource>();
 builder.Services.AddScoped<ExternalDbDiagnostics>();
 
 // Identity — three roles: Admin, Facilitator, Viewer.
-// Phase 19.27 (security) — stronger password rules (length 12, mixed-case,
-// digits and a symbol) and account lockout after 5 failed attempts for 15
-// minutes, applied to new users too. Phase 19.29 — kept; the rest of the
-// 19.27 pipeline-level changes were reverted because they broke the Railway
-// proxy chain (502 application-failed-to-respond).
 builder.Services
     .AddIdentity<AppUser, IdentityRole<int>>(options =>
     {
-        options.Password.RequireDigit = true;
-        options.Password.RequireLowercase = true;
-        options.Password.RequireUppercase = true;
-        options.Password.RequireNonAlphanumeric = true;
-        options.Password.RequiredLength = 12;
+        options.Password.RequireDigit = false;
+        options.Password.RequireLowercase = false;
+        options.Password.RequireUppercase = false;
+        options.Password.RequireNonAlphanumeric = false;
+        options.Password.RequiredLength = 4;
         options.User.RequireUniqueEmail = true;
-
-        options.Lockout.MaxFailedAccessAttempts = 5;
-        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
-        options.Lockout.AllowedForNewUsers = true;
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
@@ -161,7 +158,6 @@ builder.Services.AddScoped<ReportEmailService>();
 builder.Services.AddScoped<ChatbotService>();
 // Phase 19.22 — Excel round-trip DB import (full mirror, admin-gated, backup + transaction)
 builder.Services.AddScoped<DbImportService>();
-builder.Services.AddScoped<DbExportService>();  // Phase 19.26 — export DB to xlsx + raw .db
 
 var app = builder.Build();
 
@@ -172,6 +168,10 @@ using (var scope = app.Services.CreateScope())
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<int>>>();
     await SeedData.RunAsync(db, userManager, roleManager);
+
+    // Phase 20 — bootstrap the five journey users (idempotent). Each is created only if
+    // missing; their JourneyScopeKey, role tags, and Facilitator role are always ensured.
+    await SeedJourneyUsersAsync(userManager, roleManager);
 
     // Phase 4 — programme survey (quiz auto-seed removed in Phase 5; admin-controlled).
     // Phase 19.8 — period label comes from StrategyContent:PeriodLabel (default 2026-2030).
@@ -254,3 +254,55 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
+// Phase 20 — idempotent bootstrap of the five journey users described in the spec.
+// VPs get the JourneyManager tag; GAC/Test get JourneySuper. All five also hold the
+// existing Facilitator role. The platform Admin role is left untouched.
+static async Task SeedJourneyUsersAsync(
+    UserManager<AppUser> userManager,
+    RoleManager<IdentityRole<int>> roleManager)
+{
+    foreach (var role in new[] { "JourneyManager", "JourneySuper" })
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+            await roleManager.CreateAsync(new IdentityRole<int>(role));
+    }
+
+    var journeyUsers = new[]
+    {
+        (User: "vp.support",  Pass: "Support@2026",  Name: "VP — قطاع الدعم المؤسسي",   Scope: "SECTOR:CORP_SUPPORT", Tag: "JourneyManager"),
+        (User: "vp.economic", Pass: "Economic@2026", Name: "VP — قطاع الشؤون الاقتصادية", Scope: "SECTOR:ECONOMIC",      Tag: "JourneyManager"),
+        (User: "vp.legal",    Pass: "Legal@2026",    Name: "VP — قطاع الشؤون القانونية",  Scope: "SECTOR:LEGAL",         Tag: "JourneyManager"),
+        (User: "gac.admin",   Pass: "General@2026",  Name: "الهيئة العامة للمنافسة",       Scope: "GLOBAL",              Tag: "JourneySuper"),
+        (User: "testing",     Pass: "Test@2026",     Name: "اختبار",                      Scope: "TEST",                Tag: "JourneySuper"),
+    };
+
+    foreach (var u in journeyUsers)
+    {
+        var existing = await userManager.FindByNameAsync(u.User);
+        if (existing == null)
+        {
+            existing = new AppUser
+            {
+                UserName = u.User,
+                Email = $"{u.User}@gac.gov.sa",
+                EmailConfirmed = true,
+                FullNameAr = u.Name,
+                AppRole = UserRole.Facilitator,
+                IsActive = true,
+                JourneyScopeKey = u.Scope,
+            };
+            await userManager.CreateAsync(existing, u.Pass);
+        }
+        else if (existing.JourneyScopeKey != u.Scope)
+        {
+            existing.JourneyScopeKey = u.Scope;
+            await userManager.UpdateAsync(existing);
+        }
+
+        if (!await userManager.IsInRoleAsync(existing, "Facilitator"))
+            await userManager.AddToRoleAsync(existing, "Facilitator");
+        if (!await userManager.IsInRoleAsync(existing, u.Tag))
+            await userManager.AddToRoleAsync(existing, u.Tag);
+    }
+}

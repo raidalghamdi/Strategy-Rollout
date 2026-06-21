@@ -86,6 +86,55 @@
     #stage-3 .contrib-card input[type=radio] { width: 20px; height: 20px; accent-color: #067647; vertical-align: middle; }
     #stage-3 .contrib-card .ci-name { font-weight: 700; color: #28334A; margin-inline-start: 8px; }
     #stage-3 .contrib-card .ci-meta { display: block; margin-top: 8px; font-size: .82rem; color: #5a6b80; }
+
+    /* Phase 20.2 — expandable projects + KPIs section inside each initiative card. */
+    #stage-3 .ci-details {
+        margin-top: 10px;
+        border-top: 1px dashed #d5dbe4;
+        padding-top: 8px;
+    }
+    #stage-3 .ci-details summary {
+        cursor: pointer;
+        font-size: .85rem;
+        font-weight: 700;
+        color: #067647;
+        list-style: none;
+        padding: 4px 0;
+        outline: none;
+        user-select: none;
+    }
+    #stage-3 .ci-details summary::-webkit-details-marker { display: none; }
+    #stage-3 .ci-details summary::before {
+        content: '◀';
+        display: inline-block;
+        margin-inline-end: 6px;
+        font-size: .7rem;
+        transition: transform .2s;
+    }
+    #stage-3 .ci-details[open] summary::before { transform: rotate(-90deg); }
+    #stage-3 .ci-children { padding: 8px 0 4px; font-size: .82rem; color: #28334A; }
+    #stage-3 .ci-child-group { margin-bottom: 8px; }
+    #stage-3 .ci-child-group:last-child { margin-bottom: 0; }
+    #stage-3 .ci-child-group h6 {
+        font-size: .78rem;
+        font-weight: 700;
+        color: #5a6b80;
+        margin: 0 0 4px;
+        text-transform: none;
+    }
+    #stage-3 .ci-child-group ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    #stage-3 .ci-child-group li {
+        padding: 4px 8px;
+        background: #f6f8fb;
+        border-radius: 6px;
+        margin-bottom: 3px;
+        line-height: 1.5;
+    }
+    #stage-3 .ci-child-meta { color: #7a8699; font-size: .75rem; }
     #stage-3 .link-chain { margin-top: 18px; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
     #stage-3 .link-node {
         border-radius: 12px; padding: 14px 16px; color: #fff; text-align: center;
@@ -142,9 +191,50 @@
                 var meta = '';
                 if (it.objectiveName) meta += 'الهدف: ' + it.objectiveName;
                 if (it.pillarName) meta += (meta ? ' · ' : '') + 'الركيزة: ' + it.pillarName;
+
+                // Phase 20.2 — expandable details with projects + KPIs tied to
+                // this initiative. The <details> element is iOS Safari-safe and
+                // needs no extra JS. Empty lists fall back to a friendly note.
+                var projects = it.projects || [];
+                var kpis = it.kpis || [];
+                var detailsHtml = '';
+                if (projects.length > 0 || kpis.length > 0) {
+                    var projLis = '';
+                    for (var pi = 0; pi < projects.length; pi++) {
+                        var pr = projects[pi];
+                        var pmeta = pr.meta ? ' <span class="ci-child-meta">— ' + pr.meta + '</span>' : '';
+                        projLis += '<li>' + (pr.name || pr.code) + pmeta + '</li>';
+                    }
+                    var kpiLis = '';
+                    for (var ki = 0; ki < kpis.length; ki++) {
+                        var kp = kpis[ki];
+                        var kmeta = kp.meta ? ' <span class="ci-child-meta">— ' + kp.meta + '</span>' : '';
+                        kpiLis += '<li>' + (kp.name || kp.code) + kmeta + '</li>';
+                    }
+                    detailsHtml = '<details class="ci-details" onclick="event.stopPropagation();">'
+                        + '<summary>عرض المشاريع و KPIs ('
+                        + projects.length + ' مشروع · ' + kpis.length + ' مؤشّر)</summary>'
+                        + '<div class="ci-children">'
+                        +   (projects.length
+                              ? '<div class="ci-child-group"><h6>المشاريع</h6><ul>' + projLis + '</ul></div>'
+                              : '')
+                        +   (kpis.length
+                              ? '<div class="ci-child-group"><h6>مؤشّرات الأداء</h6><ul>' + kpiLis + '</ul></div>'
+                              : '')
+                        + '</div>'
+                        + '</details>';
+                }
+
                 label.innerHTML = '<input type="radio" name="initiative" value="' + it.code + '" />'
                     + '<span class="ci-name">' + (it.name || it.code) + '</span>'
-                    + (meta ? '<span class="ci-meta">' + meta + '</span>' : '');
+                    + (meta ? '<span class="ci-meta">' + meta + '</span>' : '')
+                    + detailsHtml;
+                // Phase 20.2 — clicking inside <details> (the summary or list)
+                // must NOT bubble up to the label and toggle the radio.
+                var detailsEl = label.querySelector('details');
+                if (detailsEl) {
+                    detailsEl.addEventListener('click', function (ev) { ev.stopPropagation(); });
+                }
                 var radio = label.querySelector('input');
                 radio.addEventListener('change', function () {
                     var cards = grid.querySelectorAll('.contrib-card');

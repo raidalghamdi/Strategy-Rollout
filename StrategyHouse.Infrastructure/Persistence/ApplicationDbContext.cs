@@ -49,6 +49,10 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
     public DbSet<OpeningReflection> OpeningReflections => Set<OpeningReflection>();
     public DbSet<RoleContribution> RoleContributions => Set<RoleContribution>();
 
+    // Phase 20 — journey administration audit trail + selective stage-reset log
+    public DbSet<JourneyAuditLog> JourneyAuditLogs => Set<JourneyAuditLog>();
+    public DbSet<JourneyStageReset> JourneyStageResets => Set<JourneyStageReset>();
+
     // Phase 19.5 — local SQLite mirror of the external MSSQL strategy warehouse,
     // populated by the admin push action and read as a fallback when MSSQL is down.
     public DbSet<MirrorPillar> MirrorPillars => Set<MirrorPillar>();
@@ -191,6 +195,20 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
         // Phase 18 — index the redesigned-journey capture tables by session for fast reads.
         b.Entity<OpeningReflection>().HasIndex(r => r.SessionId);
         b.Entity<RoleContribution>().HasIndex(r => r.SessionId);
+
+        // Phase 20 — StrategySession owner FK (test-data scoping). No cascade: deleting a
+        // user must never delete journey history. Optional; legacy rows have null owner.
+        b.Entity<StrategySession>()
+            .HasOne<AppUser>()
+            .WithMany()
+            .HasForeignKey(s => s.OwnerUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        // Phase 20 — audit + reset logs, indexed for the admin filters.
+        b.Entity<JourneyAuditLog>().HasIndex(a => a.CreatedAt);
+        b.Entity<JourneyAuditLog>().HasIndex(a => a.ActionType);
+        b.Entity<JourneyStageReset>().HasIndex(r => r.DeptCode);
 
         // Phase 19.5 — index mirror tables by their warehouse codes for chain lookups.
         b.Entity<MirrorPillar>().HasIndex(p => p.PlrCode);

@@ -1,4 +1,4 @@
-// Phase 19 — interactive strategy flow (Sankey) for stage 2 "تدفق تفاعلي" tab.
+// Phase 20.1 — interactive strategy flow (Sankey) for stage 2 "تدفق تفاعلي" tab.
 // Uses ECharts (loaded lazily from CDN). iOS Safari-safe: ES5 only, IIFE, string
 // concat, for-loops, no template literals, no block scope, try/catch + fallback.
 // Public API: window.StrategySankey.render(containerEl).
@@ -29,8 +29,6 @@
 
     function colorFor(category) {
         switch (category) {
-            // Phase 19.13 — Vision is now the left-most root node in the flow.
-            // Use the navy brand color so it visually anchors the chart.
             case 'vision': return '#00192B';
             case 'pillar': return '#067647';
             case 'objective': return '#299ECE';
@@ -40,36 +38,128 @@
         }
     }
 
+    // Phase 20.1 — wrap long Arabic labels onto up to N lines so dense columns
+    // (objectives/initiatives/projects) stay readable instead of clipping.
+    function wrapN(name, maxCharsPerLine, maxLines) {
+        var s = String(name || '').replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+        if (!s) return '';
+        var lines = [];
+        var remaining = s;
+        while (remaining.length > maxCharsPerLine && lines.length < maxLines - 1) {
+            var cut = remaining.lastIndexOf(' ', maxCharsPerLine);
+            if (cut <= 0) cut = maxCharsPerLine;
+            lines.push(remaining.substring(0, cut));
+            remaining = remaining.substring(cut).replace(/^\s+/, '');
+        }
+        if (remaining.length > maxCharsPerLine) {
+            remaining = remaining.substring(0, maxCharsPerLine - 1) + '…';
+        }
+        lines.push(remaining);
+        return lines.join('\n');
+    }
+
+    // Phase 20.1 — count nodes per column (layer) by walking the links graph.
+    // The tallest column governs the required canvas height; using nodes.length
+    // alone over-estimates short columns and under-estimates the busy ones.
+    function tallestColumn(data) {
+        var depth = {};
+        var hasIncoming = {};
+        for (var j = 0; j < data.links.length; j++) {
+            hasIncoming[data.links[j].target] = true;
+        }
+        var bfs = [];
+        for (var k = 0; k < data.nodes.length; k++) {
+            var nm = data.nodes[k].name;
+            if (!hasIncoming[nm]) { depth[nm] = 0; bfs.push(nm); }
+        }
+        var head = 0;
+        while (head < bfs.length) {
+            var cur = bfs[head++];
+            var d = depth[cur];
+            for (var l = 0; l < data.links.length; l++) {
+                if (data.links[l].source === cur) {
+                    var tgt = data.links[l].target;
+                    var nd = d + 1;
+                    if (depth[tgt] === undefined || depth[tgt] < nd) {
+                        depth[tgt] = nd;
+                        bfs.push(tgt);
+                    }
+                }
+            }
+        }
+        var counts = {};
+        var maxCount = 0;
+        for (var name in depth) {
+            if (!depth.hasOwnProperty(name)) continue;
+            var dv = depth[name];
+            counts[dv] = (counts[dv] || 0) + 1;
+            if (counts[dv] > maxCount) maxCount = counts[dv];
+        }
+        return Math.max(maxCount, 1);
+    }
+
     function draw(el, data) {
+        // Phase 20.1 — height driven by the tallest column, not total node count.
+        // Each label needs ~3 lines × ~22px line-height ≈ 66px + gap.
+        var tallest = tallestColumn(data);
+        var perNode = 72;
+        var height = Math.max(1400, tallest * perNode + 120);
+        el.style.height = height + 'px';
+        el.style.minWidth = '900px';
+
         var chart = window.echarts.init(el, null, { renderer: 'canvas' });
         var nodes = [];
         for (var i = 0; i < data.nodes.length; i++) {
             var n = data.nodes[i];
             nodes.push({
                 name: n.name,
-                itemStyle: { color: colorFor(n.category) }
+                itemStyle: { color: colorFor(n.category), borderWidth: 0 }
             });
         }
         var option = {
-            tooltip: { trigger: 'item', triggerOn: 'mousemove' },
+            tooltip: {
+                trigger: 'item',
+                triggerOn: 'mousemove',
+                textStyle: { fontFamily: 'Cairo, sans-serif', fontSize: 13 },
+                extraCssText: 'max-width:320px; white-space:normal; line-height:1.5;',
+                formatter: function (p) {
+                    if (p.dataType === 'node') {
+                        return '<b style="font-family:Cairo;">' + p.name + '</b>';
+                    }
+                    if (p.dataType === 'edge' && p.data) {
+                        return '<div style="font-family:Cairo;">' +
+                               '<b>' + (p.data.source || '') + '</b>' +
+                               ' ← ' +
+                               '<b>' + (p.data.target || '') + '</b>' +
+                               '</div>';
+                    }
+                    return p.name || '';
+                }
+            },
             series: [{
                 type: 'sankey',
-                left: 8, right: 8, top: 12, bottom: 12,
+                left: 12, right: 12, top: 28, bottom: 28,
                 data: nodes,
                 links: data.links,
-                emphasis: { focus: 'adjacency' },
-                lineStyle: { color: 'gradient', curveness: 0.5, opacity: 0.45 },
+                emphasis: { focus: 'adjacency', lineStyle: { opacity: 0.7 } },
+                lineStyle: { color: 'gradient', curveness: 0.5, opacity: 0.4 },
                 label: {
                     fontFamily: 'Cairo, sans-serif',
-                    fontSize: 12,
-                    color: '#28334A'
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: '#1a2638',
+                    formatter: function (p) { return wrapN(p.name, 24, 3); },
+                    overflow: 'break',
+                    width: 170,
+                    lineHeight: 18
                 },
-                nodeWidth: 16,
-                nodeGap: 10
+                nodeWidth: 14,
+                nodeGap: 16,
+                nodeAlign: 'justify',
+                draggable: false
             }]
         };
         chart.setOption(option);
-        // Keep the chart responsive to container/orientation changes.
         if (!el.__resizeBound) {
             el.__resizeBound = true;
             window.addEventListener('resize', function () { try { chart.resize(); } catch (e) {} });
@@ -85,9 +175,6 @@
             fetch('/api/strategy/sankey', { headers: { 'Accept': 'application/json' } })
                 .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
                 .then(function (data) {
-                    // Phase 19.20 (Fix 3) — a successful response with an empty graph means
-                    // "no data yet", not a load error. Show a gentle empty-state message and
-                    // reserve the red error message for genuine network/HTTP failures (catch).
                     if (!data || !data.nodes || !data.nodes.length) { empty(el); return; }
                     loadEcharts(function (err) {
                         if (err || !window.echarts) { fail(el); return; }
@@ -116,7 +203,6 @@
         el.innerHTML = '<div class="alert alert-warning">تعذّر تحميل مخطط التدفق. حاول مرة أخرى لاحقاً.</div>';
     }
 
-    // Phase 19.20 (Fix 3) — empty-state (valid response, no nodes). Not an error.
     function empty(el) {
         el.__sankeyRendered = false;
         el.innerHTML = '<div class="text-muted" style="padding:18px;text-align:center;">لا توجد بيانات لعرضها حالياً.</div>';

@@ -1,0 +1,39 @@
+/* Phase 20.1 — strategy-house pillar grid, sankey sizing, profile/admin tweaks. */
+
+/* Pillars: five fixed columns on desktop, single column on small screens. */
+#stage-2 .house-pillars.pillars-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+}
+@media (max-width: 992px) {
+    #stage-2 .house-pillars.pillars-grid { grid-template-columns: 1fr; }
+}
+
+/* Sankey: grows vertically (height set inline by strategy-sankey.js).
+   The container scrolls horizontally on narrow screens so labels never
+   compress into each other. */
+#stage-2 .sankey-chart {
+    min-height: 1400px;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 8px;
+}
+#stage-2 .sankey-chart > div {
+    min-width: 900px;
+}
+@media (max-width: 768px) {
+    #stage-2 .sankey-chart > div { min-width: 760px; }
+}
+
+/* Profile page card spacing. */
+.profile-card dt { font-weight: 600; }
+
+/* Live dashboard KPI strip — stack on narrow screens. */
+@media (max-width: 768px) {
+    .live-kpis { grid-template-columns: repeat(2, 1fr) !important; }
+}

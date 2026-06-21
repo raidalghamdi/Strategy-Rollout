@@ -1,0 +1,76 @@
+@model StrategyHouse.Web.Controllers.JourneyResetViewModel
+@{ ViewData["Title"] = "إعادة تشغيل رحلة إدارة"; }
+@{
+    var stages = new (int N, string Label)[]
+    {
+        (1, "١ — الصورة الكبرى"),
+        (2, "٢ — البيت الاستراتيجي"),
+        (3, "٣ — دوري في الاستراتيجية"),
+        (4, "٤ — الرحلة نحو الرؤية"),
+        (5, "٥ — الإتمام والتوقيع"),
+    };
+}
+<h1>إعادة تشغيل رحلة إدارة</h1>
+<p class="muted">يحذف بيانات المراحل المختارة لجميع جلسات الإدارة. عملية لا يمكن التراجع عنها وتُسجَّل في سجل التدقيق.</p>
+
+@if (TempData["Success"] != null) { <div class="alert alert-success">@TempData["Success"]</div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger">@TempData["Error"]</div> }
+
+<form method="post" action="/Admin/JourneyReset/Execute" id="resetForm" class="card" style="max-width:620px;">
+    @Html.AntiForgeryToken()
+    <label class="form-label">الإدارة</label>
+    <select name="deptCode" class="form-select mb-3" required>
+        <option value="">— اختر إدارة —</option>
+        @foreach (var d in Model.Departments)
+        {
+            <option value="@d.Code">@d.Name (@d.Code)</option>
+        }
+    </select>
+
+    <label class="form-label">المراحل المراد إعادة ضبطها</label>
+    <div class="mb-3">
+        @foreach (var s in stages)
+        {
+            <div class="form-check">
+                <input class="form-check-input stage-cb" type="checkbox" name="stages" value="@s.N" id="st@(s.N)" />
+                <label class="form-check-label" for="st@(s.N)">@s.Label</label>
+            </div>
+        }
+        <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" name="allStages" value="true" id="allStages" />
+            <label class="form-check-label fw-bold" for="allStages">كل المراحل (يحذف الجلسات نفسها أيضاً)</label>
+        </div>
+    </div>
+
+    <button type="button" class="btn btn--danger" id="confirmBtn">تنفيذ إعادة الضبط</button>
+</form>
+
+<div class="modal" tabindex="-1" id="confirmModal" style="display:none;background:rgba(0,0,0,.5);position:fixed;inset:0;z-index:1050;align-items:center;justify-content:center;">
+    <div class="card" style="max-width:420px;margin:auto;">
+        <h3>تأكيد العملية</h3>
+        <p>سيتم حذف بيانات المراحل المختارة نهائياً. هل أنت متأكد؟</p>
+        <div class="d-flex gap-2">
+            <button type="submit" form="resetForm" class="btn btn--danger">نعم، نفّذ</button>
+            <button type="button" class="btn btn--secondary" id="cancelBtn">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    var modal = document.getElementById('confirmModal');
+    var all = document.getElementById('allStages');
+    var cbs = document.querySelectorAll('.stage-cb');
+    all.addEventListener('change', function () {
+        cbs.forEach(function (c) { c.disabled = all.checked; });
+    });
+    document.getElementById('confirmBtn').addEventListener('click', function () {
+        var any = all.checked || Array.prototype.some.call(cbs, function (c) { return c.checked; });
+        if (!any) { alert('يجب اختيار مرحلة واحدة على الأقل.'); return; }
+        modal.style.display = 'flex';
+    });
+    document.getElementById('cancelBtn').addEventListener('click', function () { modal.style.display = 'none'; });
+})();
+</script>
+}

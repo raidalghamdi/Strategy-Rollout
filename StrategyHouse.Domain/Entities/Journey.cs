@@ -39,6 +39,7 @@ public class StrategySession
     public int CurrentStage { get; set; } = 1; // Phase 9 — furthest journey stage reached (1..5 since Phase 13), for anti-skip + live dashboard
     public DateTime? LastActivityAt { get; set; } // Phase 9 — bumped on each stage advance, for the live dashboard
     public int? AttendeeCount { get; set; } // Phase 13 — number of department employees present, entered by the team on the Map stage
+    public int? OwnerUserId { get; set; } // Phase 20 — AppUser who created this session (used to scope/delete test data); no cascade
     public ICollection<SessionMember> Members { get; set; } = new List<SessionMember>();
 }
 

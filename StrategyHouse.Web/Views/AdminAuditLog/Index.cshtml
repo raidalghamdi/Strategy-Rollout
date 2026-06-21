@@ -1,0 +1,83 @@
+@model StrategyHouse.Web.Controllers.AuditLogViewModel
+@{ ViewData["Title"] = "سجل التدقيق"; }
+@{
+    string Q(int page) =>
+        $"?actor={Uri.EscapeDataString(Model.Actor ?? "")}&actionType={Uri.EscapeDataString(Model.ActionType ?? "")}" +
+        $"&targetType={Uri.EscapeDataString(Model.TargetType ?? "")}" +
+        $"&from={Model.From?.ToString("yyyy-MM-dd")}&to={Model.To?.ToString("yyyy-MM-dd")}&page={page}";
+}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1 class="mb-0">سجل التدقيق</h1>
+    <a href="/Admin/AuditLog/Csv@(Q(1))" class="btn btn--secondary">تصدير CSV</a>
+</div>
+
+<form method="get" action="/Admin/AuditLog" class="d-flex gap-2 flex-wrap align-items-end mb-3">
+    <div>
+        <label class="muted small d-block">المنفّذ</label>
+        <input name="actor" class="form-control form-control-sm" value="@Model.Actor" />
+    </div>
+    <div>
+        <label class="muted small d-block">نوع العملية</label>
+        <select name="actionType" class="form-select form-select-sm">
+            <option value="">الكل</option>
+            @foreach (var a in Model.ActionTypeOptions)
+            {
+                <option value="@a" selected="@(Model.ActionType == a)">@a</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label class="muted small d-block">نوع الهدف</label>
+        <input name="targetType" class="form-control form-control-sm" value="@Model.TargetType" />
+    </div>
+    <div>
+        <label class="muted small d-block">من</label>
+        <input name="from" type="date" class="form-control form-control-sm" value="@Model.From?.ToString("yyyy-MM-dd")" />
+    </div>
+    <div>
+        <label class="muted small d-block">إلى</label>
+        <input name="to" type="date" class="form-control form-control-sm" value="@Model.To?.ToString("yyyy-MM-dd")" />
+    </div>
+    <button type="submit" class="btn btn-sm btn--primary">تصفية</button>
+    <a href="/Admin/AuditLog" class="btn btn-sm btn--secondary">مسح</a>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle" style="background:#fff;">
+        <thead>
+            <tr><th>التاريخ</th><th>المنفّذ</th><th>العملية</th><th>الهدف</th><th>المعرّف</th><th>التفاصيل</th></tr>
+        </thead>
+        <tbody>
+        @if (!Model.Items.Any())
+        {
+            <tr><td colspan="6" class="muted text-center">لا توجد سجلات.</td></tr>
+        }
+        @foreach (var l in Model.Items)
+        {
+            <tr>
+                <td class="text-nowrap"><span class="small">@l.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</span></td>
+                <td>@l.Actor</td>
+                <td>@l.ActionType</td>
+                <td>@l.TargetType</td>
+                <td>@l.TargetId</td>
+                <td><code class="small" style="word-break:break-all;">@l.DetailsJson</code></td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+@if (Model.TotalPages > 1)
+{
+    <nav class="d-flex gap-2 align-items-center">
+        @if (Model.Page > 1)
+        {
+            <a class="btn btn-sm btn--secondary" href="/Admin/AuditLog@(Q(Model.Page - 1))">السابق</a>
+        }
+        <span class="muted small">صفحة @Model.Page من @Model.TotalPages</span>
+        @if (Model.Page < Model.TotalPages)
+        {
+            <a class="btn btn-sm btn--secondary" href="/Admin/AuditLog@(Q(Model.Page + 1))">التالي</a>
+        }
+    </nav>
+}

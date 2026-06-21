@@ -21,13 +21,14 @@
             <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
             <div class="form-row">
                 <label for="email">البريد الإلكتروني</label>
-                <input id="email" name="email" type="email" class="input" required autocomplete="username" />
+                <input id="email" name="email" type="email" class="input" required value="admin@gac.gov.sa" />
             </div>
             <div class="form-row">
                 <label for="password">كلمة المرور</label>
-                <input id="password" name="password" type="password" class="input" required autocomplete="current-password" />
+                <input id="password" name="password" type="password" class="input" required value="Demo@123" />
             </div>
             <button type="submit" class="btn btn--primary btn--block">دخول</button>
+            <p class="muted mt-2">حساب تجريبي: <code>admin@gac.gov.sa</code> / <code>Demo@123</code></p>
         </form>
     </div>
 </div>
