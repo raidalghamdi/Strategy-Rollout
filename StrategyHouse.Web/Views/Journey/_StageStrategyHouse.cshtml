@@ -145,8 +145,21 @@
                     if (view === 'flow') {
                         if (treeView) treeView.setAttribute('hidden', 'hidden');
                         if (flowView) flowView.removeAttribute('hidden');
+                        // Phase 20.8.5 — wait for the browser to lay out the now-visible
+                        // panel before rendering, otherwise ECharts measures the host
+                        // element as 0 × 0 and produces a single tall green bar.
                         var chart = document.getElementById('sankey-chart');
-                        if (chart && window.StrategySankey) window.StrategySankey.render(chart);
+                        if (chart && window.StrategySankey) {
+                            if (window.requestAnimationFrame) {
+                                requestAnimationFrame(function () {
+                                    requestAnimationFrame(function () {
+                                        window.StrategySankey.render(chart);
+                                    });
+                                });
+                            } else {
+                                setTimeout(function () { window.StrategySankey.render(chart); }, 50);
+                            }
+                        }
                     } else {
                         if (flowView) flowView.setAttribute('hidden', 'hidden');
                         if (treeView) treeView.removeAttribute('hidden');

@@ -163,13 +163,36 @@
             }]
         };
         chart.setOption(option);
-        // Phase 20.8.3 — ECharts measures the container at init(); if the tab was
-        // hidden a moment ago the canvas can come out 0 × 0. Force a resize once the
-        // browser has actually laid the element out so the diagram fills the panel.
-        try { setTimeout(function () { try { chart.resize(); } catch (e2) {} }, 60); } catch (e1) {}
+        // Phase 20.8.5 — robust resize: ECharts measures the container at init();
+        // if the tab/section was hidden the canvas can come out 0 × 0 and produce
+        // a thin vertical bar. We retry multiple times AND use ResizeObserver so
+        // the chart always fills the visible width once layout settles.
+        function safeResize() { try { chart.resize(); } catch (e) {} }
+        try { setTimeout(safeResize, 60); } catch (e1) {}
+        try { setTimeout(safeResize, 250); } catch (e2) {}
+        try { setTimeout(safeResize, 800); } catch (e3) {}
         if (!el.__resizeBound) {
             el.__resizeBound = true;
-            window.addEventListener('resize', function () { try { chart.resize(); } catch (e) {} });
+            window.addEventListener('resize', safeResize);
+            if (window.ResizeObserver) {
+                try {
+                    var ro = new ResizeObserver(function () { safeResize(); });
+                    ro.observe(el);
+                    if (el.parentElement) ro.observe(el.parentElement);
+                } catch (e4) {}
+            }
+            // Re-measure when the parent tab becomes visible (Bootstrap tabs).
+            try {
+                var tabPane = el.closest && el.closest('.tab-pane');
+                if (tabPane) {
+                    var observer = new MutationObserver(function () {
+                        if (tabPane.classList.contains('active') || tabPane.classList.contains('show')) {
+                            safeResize();
+                        }
+                    });
+                    observer.observe(tabPane, { attributes: true, attributeFilter: ['class'] });
+                }
+            } catch (e5) {}
         }
         return chart;
     }
@@ -196,9 +219,13 @@
                                 || 'لا توجد بيانات استراتيجية. يرجى مزامنة MSSQL أو التواصل مع المسؤول.';
                             el.appendChild(warn);
                         }
+                        // Phase 20.8.5 — draw directly into the host element instead of a
+                        // 100%-height child. Nested 100% heights collapsed to ~0px when the
+                        // parent had no fixed height yet, so ECharts produced a single tall
+                        // green bar instead of the full Sankey diagram.
                         var chartHost = document.createElement('div');
                         chartHost.style.width = '100%';
-                        chartHost.style.height = '100%';
+                        chartHost.style.minHeight = '600px';
                         el.appendChild(chartHost);
                         try { draw(chartHost, data); el.__sankeyRendered = true; }
                         catch (e) { fail(el); }
