@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -656,12 +657,15 @@ public class JourneyController : Controller
         return Json(new { ok = true, assetId = asset.Id });
     }
 
-    // GET /Journey/Ink/{assetId} — streams a captured ink/signature PNG (for in-journey preview).
+    // GET /Journey/Ink/{assetId}?sessionId=... — streams a captured ink/signature PNG (for in-journey preview).
+    // Phase 20.8 — the asset's parent map must belong to the supplied session, otherwise we 403.
     [HttpGet("Journey/Ink/{assetId:guid}")]
-    public async Task<IActionResult> Ink(Guid assetId)
+    public async Task<IActionResult> Ink(Guid assetId, [FromQuery] Guid sessionId)
     {
         var asset = await _db.MapInkAssets.FindAsync(assetId);
         if (asset?.PngBlob == null) return NotFound();
+        var map = await _db.DepartmentStrategyMaps.FirstOrDefaultAsync(m => m.Id == asset.MapId);
+        if (map == null || map.SessionId != sessionId) return Forbid();
         return File(asset.PngBlob, "image/png");
     }
 
@@ -1048,6 +1052,7 @@ public class PledgeDto
     public string ElementType { get; set; } = string.Empty;
     public string ElementCode { get; set; } = string.Empty;
     public string? ContributionKind { get; set; }
+    [MaxLength(1000)]
     public string? Notes { get; set; }
 }
 
@@ -1062,7 +1067,9 @@ public class RemovePledgeDto
 public class TeamValueDto
 {
     public Guid SessionId { get; set; }
+    [MaxLength(200)]
     public string? ValueKey { get; set; }
+    [MaxLength(200)]
     public string ValueText { get; set; } = string.Empty;
 }
 
@@ -1096,6 +1103,7 @@ public class GroupSignatureDto
 public class ReflectionDto
 {
     public Guid SessionId { get; set; }
+    [MaxLength(2000)]
     public string? ReflectionText { get; set; }
 }
 

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using StrategyHouse.Domain.Entities;
 using StrategyHouse.Infrastructure.Persistence;
@@ -31,6 +32,7 @@ public class AccountController : Controller
     // username. If it matches an active DepartmentAccessCode, route into the journey;
     // otherwise fall back to username + password sign-in.
     [HttpPost, ValidateAntiForgeryToken]
+    [EnableRateLimiting("login")]
     public async Task<IActionResult> Login(string email, string password, string? returnUrl = null)
     {
         var input = (email ?? "").Trim();
@@ -44,7 +46,7 @@ public class AccountController : Controller
                 return RedirectToAction("Index", "Journey", new { code = code.Code });
         }
 
-        var result = await _signInManager.PasswordSignInAsync(input, password, true, false);
+        var result = await _signInManager.PasswordSignInAsync(input, password, true, true);
         if (result.Succeeded)
         {
             var user = await _userManager.FindByNameAsync(input);
@@ -61,7 +63,7 @@ public class AccountController : Controller
             {
                 return Redirect("/Admin/LiveDashboard");
             }
-            return Redirect(returnUrl ?? "/");
+            return LocalRedirect(Url.IsLocalUrl(returnUrl) ? returnUrl : "/");
         }
         ModelState.AddModelError("", "اسم المستخدم أو كلمة المرور غير صحيحة");
         return View();

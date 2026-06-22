@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using StrategyHouse.Domain.Entities;
 using StrategyHouse.Domain.Enums;
 using StrategyHouse.Infrastructure.Persistence;
 using StrategyHouse.Web.Configuration;
 using StrategyHouse.Web.Services;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,6 +48,21 @@ if (!string.IsNullOrWhiteSpace(externalConn))
     builder.Services.AddDbContext<ExternalDbContext>(options => options.UseSqlServer(externalConn));
 }
 builder.Services.AddMemoryCache();
+
+// Phase 20.8 — fixed-window rate limit on the login POST. 5 requests / minute / partition,
+// no queueing (excess returns 429). Wired into POST /Account/Login via [EnableRateLimiting].
+builder.Services.AddRateLimiter(o =>
+{
+    o.AddFixedWindowLimiter("login", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder =
+            System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+    });
+});
+
 builder.Services.AddScoped<DepartmentDirectoryService>();
 builder.Services.AddHttpContextAccessor();
 // Phase 20 — journey scope enforcement + admin audit trail.
@@ -69,15 +86,21 @@ builder.Services.AddScoped<IStrategyDataSource, UnifiedStrategyDataSource>();
 builder.Services.AddScoped<ExternalDbDiagnostics>();
 
 // Identity — three roles: Admin, Facilitator, Viewer.
+// Phase 20.8 — production password policy + 5-strikes / 15-minute lockout (enforced via
+// AccountController which now passes lockoutOnFailure=true to PasswordSignInAsync).
 builder.Services
     .AddIdentity<AppUser, IdentityRole<int>>(options =>
     {
-        options.Password.RequireDigit = false;
-        options.Password.RequireLowercase = false;
-        options.Password.RequireUppercase = false;
-        options.Password.RequireNonAlphanumeric = false;
-        options.Password.RequiredLength = 4;
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = true;
+        options.Password.RequiredLength = 12;
         options.User.RequireUniqueEmail = true;
+
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+        options.Lockout.AllowedForNewUsers = true;
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
@@ -244,8 +267,24 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// Phase 20.8 — baseline security headers on every response.
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.Headers["X-Frame-Options"] = "DENY";
+    ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    ctx.Response.Headers["Permissions-Policy"] = "geolocation=(), microphone=()";
+    ctx.Response.Headers["Content-Security-Policy"] =
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; " +
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data:;";
+    await next();
+});
+
+app.UseHttpsRedirection();
+
 app.UseStaticFiles();
 app.UseRouting();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

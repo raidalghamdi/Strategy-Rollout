@@ -64,7 +64,9 @@ public static class SeedData
                 FullNameAr = "مدير المنصة",
                 AppRole = UserRole.Admin,
             };
-            await userManager.CreateAsync(admin, "Demo@123");
+            var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD")
+                ?? throw new InvalidOperationException("SEED_ADMIN_PASSWORD environment variable is required.");
+            await userManager.CreateAsync(admin, seedPassword);
             await userManager.AddToRoleAsync(admin, "Admin");
         }
     }
