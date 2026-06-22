@@ -3,7 +3,8 @@
 // concat, for-loops, no template literals, no block scope, try/catch + fallback.
 // Public API: window.StrategySankey.render(containerEl).
 (function () {
-    var ECHARTS_SRC = 'https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js';
+    // Phase 20.8.4 — self-hosted ECharts because CSP blocks CDN scripts.
+    var ECHARTS_SRC = '/lib/echarts/echarts.min.js';
     var loading = false;
     var queue = [];
 
