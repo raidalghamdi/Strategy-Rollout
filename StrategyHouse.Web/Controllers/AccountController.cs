@@ -76,6 +76,16 @@ public class AccountController : Controller
         return RedirectToAction("Login", "Account");
     }
 
+    // Phase 20.9 — also sign out on GET so legacy <a href="/Account/Logout"> links
+    // and accidental GETs (e.g. when AntiForgery is missing) don't 404 / look like a
+    // file download to the browser.
+    [HttpGet]
+    public async Task<IActionResult> Logout(bool _ = false)
+    {
+        await _signInManager.SignOutAsync();
+        return RedirectToAction("Login", "Account");
+    }
+
     public IActionResult AccessDenied() => View();
 
     // Phase 20 — self-service profile: view identity fields, edit display name, change password.

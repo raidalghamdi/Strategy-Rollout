@@ -17,6 +17,9 @@ public class StrategyNode
     public string Code { get; set; } = "";
     public string Name { get; set; } = "";
     public string? ParentCode { get; set; }
+    // Phase 20.9 — carry project type ("Strategic" / "Operational" / other) so the
+    // Sankey + step views can filter projects without a second DB round-trip.
+    public string? Kind { get; set; }
 }
 
 public class StrategyDataSet
@@ -62,7 +65,7 @@ public class StrategyDataProvider : IStrategyDataProvider
             Pillars = pillars.Select(p => new StrategyNode { Code = p.Code, Name = p.Name }).ToList(),
             Objectives = objectives.Select(o => new StrategyNode { Code = o.Code, Name = o.Name, ParentCode = o.PillarCode }).ToList(),
             Initiatives = initiatives.Select(i => new StrategyNode { Code = i.Code, Name = i.Name, ParentCode = i.ObjectiveCode }).ToList(),
-            Projects = projects.Select(p => new StrategyNode { Code = p.Code, Name = p.Name, ParentCode = p.InitiativeCode }).ToList(),
+            Projects = projects.Select(p => new StrategyNode { Code = p.Code, Name = p.Name, ParentCode = p.InitiativeCode, Kind = p.Type }).ToList(),
         };
     }
 
@@ -117,11 +120,32 @@ public class StrategyDataProvider : IStrategyDataProvider
             AddNode(i.Name, "initiative");
             if (i.ParentCode != null && objByCode.TryGetValue(i.ParentCode, out var o)) AddLink(o.Name, i.Name);
         }
+        // Phase 20.9 — emit project type alongside each project node so the client can
+        // filter Strategic vs Operational without re-querying. We keep AddNode
+        // single-shot per name and attach kind metadata via a parallel dictionary.
+        var projectKinds = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var pr in data.Projects)
         {
             AddNode(pr.Name, "project");
+            if (!string.IsNullOrWhiteSpace(pr.Name) && !projectKinds.ContainsKey(pr.Name))
+            {
+                projectKinds[pr.Name] = NormalizeKind(pr.Kind);
+            }
             if (pr.ParentCode != null && initByCode.TryGetValue(pr.ParentCode, out var i)) AddLink(i.Name, pr.Name);
         }
+
+        // Re-emit nodes with `kind` field for projects (echarts ignores unknown keys).
+        var enrichedNodes = nodes.Select(n =>
+        {
+            dynamic d = n;
+            string name = d.name;
+            string category = d.category;
+            if (category == "project" && projectKinds.TryGetValue(name, out var k))
+            {
+                return (object)new { name, category, kind = k };
+            }
+            return n;
+        }).ToList();
 
         return new
         {
@@ -130,8 +154,20 @@ public class StrategyDataProvider : IStrategyDataProvider
             source = data.Source.ToString().ToLowerInvariant(),
             empty = data.IsEmpty,
             warning = data.IsEmpty ? EmptyWarning : null,
-            nodes,
+            nodes = enrichedNodes,
             links,
         };
+    }
+
+    // Phase 20.9 — normalise project type strings into canonical "strategic" /
+    // "operational" / "other" so the client filter works regardless of MSSQL casing
+    // or Arabic labels.
+    private static string NormalizeKind(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "other";
+        var v = raw.Trim().ToLowerInvariant();
+        if (v.Contains("strateg") || v.Contains("استراتيج")) return "strategic";
+        if (v.Contains("oper") || v.Contains("تشغيل")) return "operational";
+        return "other";
     }
 }

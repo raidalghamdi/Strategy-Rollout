@@ -99,6 +99,41 @@
         return Math.max(maxCount, 1);
     }
 
+    // Phase 20.9 — filter the dataset to only "strategic" or "operational" projects.
+    // The chain Vision → Pillar → Objective → Initiative is preserved; only project
+    // nodes (and links targeting them) are pruned.
+    function filterData(data, kind) {
+        if (!kind || kind === 'all') return data;
+        var keepProject = {};
+        for (var i = 0; i < data.nodes.length; i++) {
+            var n = data.nodes[i];
+            if (n.category !== 'project') continue;
+            var k = (n.kind || 'other');
+            // Unknown ("other") projects default to Strategic so we never blank the
+            // chart when MSSQL hasn't classified rows yet.
+            if (k === kind || (kind === 'strategic' && k === 'other')) {
+                keepProject[n.name] = true;
+            }
+        }
+        var filteredProjectNames = {};
+        var nodes = [];
+        for (var j = 0; j < data.nodes.length; j++) {
+            var nn = data.nodes[j];
+            if (nn.category === 'project' && !keepProject[nn.name]) {
+                filteredProjectNames[nn.name] = true;
+                continue;
+            }
+            nodes.push(nn);
+        }
+        var links = [];
+        for (var l = 0; l < data.links.length; l++) {
+            var lk = data.links[l];
+            if (filteredProjectNames[lk.target]) continue;
+            links.push(lk);
+        }
+        return { nodes: nodes, links: links, empty: data.empty, warning: data.warning };
+    }
+
     function draw(el, data) {
         // Phase 20.8.6 — the previous formula (tallest × 72px) produced a ~6000px
         // canvas for a dense column of ~80 projects, which pushed all real nodes
@@ -112,9 +147,14 @@
         var maxHeight = 2400;
         var height = Math.min(maxHeight, Math.max(minHeight, tallest * perNode + 120));
         el.style.height = height + 'px';
-        // Phase 20.8.3 — do not force a min-width that breaks responsive layouts; let
-        // ECharts stretch to the container width and rely on overflow-x on the parent.
-        el.style.width = '100%';
+        // Phase 20.9 — give the canvas a minimum width so dense graphs become
+        // horizontally scrollable inside the parent .sankey-scroller wrapper
+        // instead of squeezing labels off-screen.
+        var minCanvasWidth = 1100;
+        if (tallest > 30) minCanvasWidth = 1500;
+        if (tallest > 60) minCanvasWidth = 1900;
+        var parentW = (el.parentElement && el.parentElement.clientWidth) || 0;
+        el.style.width = (parentW > minCanvasWidth ? '100%' : (minCanvasWidth + 'px'));
 
         var chart = window.echarts.init(el, null, { renderer: 'canvas' });
         var nodes = [];
@@ -147,21 +187,25 @@
             },
             series: [{
                 type: 'sankey',
-                left: 12, right: 12, top: 28, bottom: 28,
+                // Phase 20.9 — give the rightmost column extra room so project names
+                // render in full instead of being clipped by the canvas edge.
+                left: 12, right: 200, top: 28, bottom: 28,
                 data: nodes,
                 links: data.links,
                 emphasis: { focus: 'adjacency', lineStyle: { opacity: 0.7 } },
                 lineStyle: { color: 'gradient', curveness: 0.5, opacity: 0.4 },
                 label: {
+                    show: true,
                     fontFamily: 'Cairo, sans-serif',
                     fontSize: 13,
                     fontWeight: 600,
                     color: '#1a2638',
-                    formatter: function (p) { return wrapN(p.name, 24, 3); },
+                    formatter: function (p) { return wrapN(p.name, 28, 4); },
                     overflow: 'break',
-                    width: 170,
+                    width: 210,
                     lineHeight: 18
                 },
+                labelLayout: { hideOverlap: false },
                 nodeWidth: 14,
                 nodeGap: 16,
                 nodeAlign: 'justify',
@@ -225,20 +269,88 @@
                                 || 'لا توجد بيانات استراتيجية. يرجى مزامنة MSSQL أو التواصل مع المسؤول.';
                             el.appendChild(warn);
                         }
-                        // Phase 20.8.5 — draw directly into the host element instead of a
-                        // 100%-height child. Nested 100% heights collapsed to ~0px when the
-                        // parent had no fixed height yet, so ECharts produced a single tall
-                        // green bar instead of the full Sankey diagram.
+                        // Phase 20.9 — Strategic is the default per spec.
+                        var currentKind = 'strategic';
+                        var toolbar = buildToolbar(currentKind);
+                        el.appendChild(toolbar);
+
+                        // Horizontal-scroll wrapper so dense graphs don't break the
+                        // page layout on phones/tablets.
+                        var scroller = document.createElement('div');
+                        scroller.className = 'sankey-scroller';
+                        scroller.style.cssText = 'width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;border:1px solid #e5e9f2;border-radius:8px;background:#fff;';
+                        el.appendChild(scroller);
+
                         var chartHost = document.createElement('div');
-                        chartHost.style.width = '100%';
                         chartHost.style.minHeight = '600px';
-                        el.appendChild(chartHost);
-                        try { draw(chartHost, data); el.__sankeyRendered = true; }
-                        catch (e) { fail(el); }
+                        scroller.appendChild(chartHost);
+
+                        var currentChart = null;
+                        function repaint() {
+                            try { if (currentChart) currentChart.dispose(); } catch (eDispose) {}
+                            chartHost.innerHTML = '';
+                            chartHost.removeAttribute('_echarts_instance_');
+                            var filtered = filterData(data, currentKind);
+                            if (!filtered.nodes.length) {
+                                chartHost.innerHTML = '<div class="text-muted" style="padding:24px;text-align:center;">لا توجد مشاريع ضمن هذا التصنيف.</div>';
+                                return;
+                            }
+                            try { currentChart = draw(chartHost, filtered); }
+                            catch (eDraw) { fail(el); }
+                        }
+
+                        toolbar.addEventListener('click', function (ev) {
+                            var b = ev.target;
+                            while (b && b !== toolbar && !(b.getAttribute && b.getAttribute('data-kind'))) b = b.parentNode;
+                            if (!b || b === toolbar) return;
+                            var kind = b.getAttribute('data-kind');
+                            if (!kind) return;
+                            currentKind = kind;
+                            var btns = toolbar.querySelectorAll('.sankey-filter-btn');
+                            for (var i = 0; i < btns.length; i++) {
+                                var on = btns[i].getAttribute('data-kind') === currentKind;
+                                btns[i].classList.toggle('active', on);
+                                btns[i].style.background = on ? '#067647' : '#fff';
+                                btns[i].style.color = on ? '#fff' : '#067647';
+                            }
+                            repaint();
+                        });
+
+                        repaint();
+                        el.__sankeyRendered = true;
                     });
                 })
                 .catch(function () { fail(el); });
         } catch (e) { fail(el); }
+    }
+
+    // Phase 20.9 — Strategic / Operational / All toggle bar.
+    function buildToolbar(currentKind) {
+        var bar = document.createElement('div');
+        bar.className = 'sankey-toolbar';
+        bar.setAttribute('role', 'toolbar');
+        bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-bottom:10px;';
+
+        var label = document.createElement('span');
+        label.style.cssText = 'flex:1 1 auto;align-self:center;font-family:Cairo,sans-serif;font-weight:700;color:#28334A;';
+        label.textContent = 'عرض المشاريع:';
+        bar.appendChild(label);
+
+        function btn(kind, text) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'btn btn-sm sankey-filter-btn' + (kind === currentKind ? ' active' : '');
+            b.setAttribute('data-kind', kind);
+            b.textContent = text;
+            var on = kind === currentKind;
+            b.style.cssText = 'font-family:Cairo,sans-serif;font-weight:600;padding:6px 14px;border-radius:8px;border:1px solid #067647;' +
+                (on ? 'background:#067647;color:#fff;' : 'background:#fff;color:#067647;');
+            return b;
+        }
+        bar.appendChild(btn('strategic', 'استراتيجية'));
+        bar.appendChild(btn('operational', 'تشغيلية'));
+        bar.appendChild(btn('all', 'الكل'));
+        return bar;
     }
 
     function fail(el) {

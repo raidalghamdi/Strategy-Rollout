@@ -192,35 +192,22 @@
                 if (it.objectiveName) meta += 'الهدف: ' + it.objectiveName;
                 if (it.pillarName) meta += (meta ? ' · ' : '') + 'الركيزة: ' + it.pillarName;
 
-                // Phase 20.2 — expandable details with projects + KPIs tied to
-                // this initiative. The <details> element is iOS Safari-safe and
-                // needs no extra JS. Empty lists fall back to a friendly note.
+                // Phase 20.9 — step "دوري في الاستراتيجية" (was 3, now 4) now shows projects
+                // only. KPI linkage moved to the next stage (الرحلة نحو الرؤية)
+                // where users toggle between Initiatives and KPIs.
                 var projects = it.projects || [];
-                var kpis = it.kpis || [];
                 var detailsHtml = '';
-                if (projects.length > 0 || kpis.length > 0) {
+                if (projects.length > 0) {
                     var projLis = '';
                     for (var pi = 0; pi < projects.length; pi++) {
                         var pr = projects[pi];
                         var pmeta = pr.meta ? ' <span class="ci-child-meta">— ' + pr.meta + '</span>' : '';
                         projLis += '<li>' + (pr.name || pr.code) + pmeta + '</li>';
                     }
-                    var kpiLis = '';
-                    for (var ki = 0; ki < kpis.length; ki++) {
-                        var kp = kpis[ki];
-                        var kmeta = kp.meta ? ' <span class="ci-child-meta">— ' + kp.meta + '</span>' : '';
-                        kpiLis += '<li>' + (kp.name || kp.code) + kmeta + '</li>';
-                    }
                     detailsHtml = '<details class="ci-details" onclick="event.stopPropagation();">'
-                        + '<summary>عرض المشاريع و KPIs ('
-                        + projects.length + ' مشروع · ' + kpis.length + ' مؤشّر)</summary>'
+                        + '<summary>عرض المشاريع (' + projects.length + ' مشروع)</summary>'
                         + '<div class="ci-children">'
-                        +   (projects.length
-                              ? '<div class="ci-child-group"><h6>المشاريع</h6><ul>' + projLis + '</ul></div>'
-                              : '')
-                        +   (kpis.length
-                              ? '<div class="ci-child-group"><h6>مؤشّرات الأداء</h6><ul>' + kpiLis + '</ul></div>'
-                              : '')
+                        +   '<div class="ci-child-group"><h6>المشاريع</h6><ul>' + projLis + '</ul></div>'
                         + '</div>'
                         + '</details>';
                 }

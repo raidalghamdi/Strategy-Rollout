@@ -222,7 +222,8 @@ html, body { max-width: 100%; overflow-x: hidden; }
 img, svg, video { max-width: 100%; height: auto; }
 
 /* Card grids reflow comfortably across the full breakpoint range. */
-.stats, .kpi-grid, .cx-stat-strip {
+/* Phase 20.9: .stats always stays a single row of 5 — handled in site.css */
+.kpi-grid, .cx-stat-strip {
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 .cx-feature-grid, .commitments, .wall {

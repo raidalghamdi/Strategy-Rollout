@@ -13,9 +13,11 @@ namespace StrategyHouse.Web.Controllers;
 [AllowAnonymous]
 public class JourneyController : Controller
 {
-    // Phase 13 — the Members stage was removed; the journey is now 5 stages:
-    // 1 BigPicture · 2 StrategyHouse · 3 Contribute · 4 Map (group signature + attendee count) · 5 Complete.
-    private const int MaxStage = 5;
+    // Phase 20.9 — inserted a read-only GAC Goals stage at position 3 (الأهداف
+    // الاستراتيجية للهيئة) and shifted the others. The journey is now 6 stages:
+    // 1 BigPicture · 2 StrategyHouse · 3 GacGoals (NEW, read-only) · 4 Contribute
+    // · 5 Map (vision journey) · 6 Complete.
+    private const int MaxStage = 6;
 
     private readonly ApplicationDbContext _db;
     private readonly StrategyContentService _content;
@@ -109,6 +111,71 @@ public class JourneyController : Controller
         return RedirectToAction(nameof(Run), new { sessionId = session.Id });
     }
 
+    // GET /Journey/Sector — Phase 20.9 sector-wide journey launcher for VP accounts.
+    // Resolves the signed-in VP's JourneyScopeKey (e.g. SECTOR:CORP_SUPPORT) and
+    // either resumes the latest sector session (if one is in progress) or creates
+    // a new one anchored on a synthetic SectorDeptCode so the existing journey
+    // flow can render it without a real Department row.
+    [HttpGet("Journey/Sector")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    public async Task<IActionResult> Sector(
+        [FromServices] Microsoft.AspNetCore.Identity.UserManager<StrategyHouse.Domain.Entities.AppUser> users)
+    {
+        var appUser = await users.GetUserAsync(User);
+        if (appUser == null) return Challenge();
+        var scopeKey = appUser.JourneyScopeKey;
+        if (string.IsNullOrEmpty(scopeKey) || !scopeKey.StartsWith("SECTOR:", StringComparison.Ordinal))
+        {
+            TempData["Error"] = "حسابك غير مرتبط بقطاع. تواصل مع المسؤول.";
+            return Redirect("/Admin/LiveDashboard");
+        }
+
+        // Synthetic dept code so the existing session-keyed pipeline works without
+        // creating real Department rows. The code fits the MaxLength(15) on
+        // StrategySession.DeptCode (e.g. "SEC_CORP_SUPP").
+        var sectorCode = SyntheticSectorCode(scopeKey);
+
+        // Resume the latest in-progress sector session for this VP if any.
+        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        int? ownerId = int.TryParse(idClaim, out var uid) ? uid : (int?)null;
+        var existing = await _db.StrategySessions
+            .Where(s => s.DeptCode == sectorCode && s.Status == "InProgress")
+            .OrderByDescending(s => s.StartedAt)
+            .FirstOrDefaultAsync();
+        if (existing != null)
+            return RedirectToAction(nameof(Run), new { sessionId = existing.Id });
+
+        var session = new StrategySession
+        {
+            DeptCode = sectorCode,
+            AccessCodeUsed = scopeKey,
+            OwnerUserId = ownerId,
+        };
+        _db.StrategySessions.Add(session);
+        await _db.SaveChangesAsync();
+        return RedirectToAction(nameof(Run), new { sessionId = session.Id });
+    }
+
+    // Phase 20.9 — maps a SECTOR:* JourneyScopeKey to a stable, 15-char synthetic
+    // DeptCode that the StrategySession.DeptCode column can hold.
+    private static string SyntheticSectorCode(string scopeKey) => scopeKey switch
+    {
+        "SECTOR:CORP_SUPPORT" => "SEC_CORP_SUPP",
+        "SECTOR:ECONOMIC" => "SEC_ECONOMIC",
+        "SECTOR:LEGAL" => "SEC_LEGAL",
+        _ => "SEC_UNKNOWN",
+    };
+
+    // Phase 20.9 — reverse map: synthetic sector dept code → Arabic display name.
+    // Used by BuildRunViewModelAsync so the journey header shows "رحلة قطاع ...".
+    private static string? SectorDisplayName(string deptCode) => deptCode switch
+    {
+        "SEC_CORP_SUPP" => "قطاع الدعم المؤسسي",
+        "SEC_ECONOMIC" => "قطاع الشؤون الاقتصادية",
+        "SEC_LEGAL" => "قطاع الشؤون القانونية",
+        _ => null,
+    };
+
     // GET /Journey/Run/{sessionId} — entry point. Redirects to the multi-page stage flow
     // at the furthest stage the team has reached.
     [HttpGet("Journey/Run/{sessionId:guid}")]
@@ -159,6 +226,24 @@ public class JourneyController : Controller
         if (session == null) return null;
 
         var dept = await _db.Departments.FindAsync(session.DeptCode);
+        // Phase 20.9 — if this is a synthetic sector session (no matching
+        // Departments row) build an in-memory pseudo-Department so the rest of
+        // the journey UI can render "رحلة قطاع ..." without errors.
+        if (dept == null)
+        {
+            var sectorName = SectorDisplayName(session.DeptCode);
+            if (sectorName != null)
+            {
+                dept = new Department
+                {
+                    DeptCode = session.DeptCode,
+                    NameAr = sectorName,
+                    NameEn = sectorName,
+                    ParentSector = sectorName,
+                    IsActive = true,
+                };
+            }
+        }
         var map = await _db.DepartmentStrategyMaps.FirstOrDefaultAsync(m => m.SessionId == sessionId);
 
         var housePillars = await BuildHousePillarsAsync();
@@ -355,9 +440,15 @@ public class JourneyController : Controller
     [HttpGet("Journey/StrategyHouse/{sessionId:guid}")]
     public IActionResult StrategyHouse(Guid sessionId) => RedirectToRun(sessionId, 2);
 
-    // GET /Journey/Contribute/{sessionId} — deep-link alias → Stage 3.
+    // GET /Journey/Contribute/{sessionId} — Phase 20.9 deep-link alias → Stage 4
+    // (Contribute shifted from 3 to 4 when the new GAC Goals stage was inserted).
     [HttpGet("Journey/Contribute/{sessionId:guid}")]
-    public IActionResult Contribute(Guid sessionId) => RedirectToRun(sessionId, 3);
+    public IActionResult Contribute(Guid sessionId) => RedirectToRun(sessionId, 4);
+
+    // GET /Journey/GacGoals/{sessionId} — Phase 20.9 deep-link alias for the new
+    // read-only Stage 3 (الأهداف الاستراتيجية للهيئة).
+    [HttpGet("Journey/GacGoals/{sessionId:guid}")]
+    public IActionResult GacGoals(Guid sessionId) => RedirectToRun(sessionId, 3);
 
     // POST /Journey/SavePledge — JSON endpoint.
     [HttpPost("Journey/SavePledge")]
@@ -567,9 +658,10 @@ public class JourneyController : Controller
         }
     }
 
-    // GET /Journey/Map/{sessionId} — deep-link alias → Stage 4.
+    // GET /Journey/Map/{sessionId} — Phase 20.9 deep-link alias → Stage 5
+    // (Map shifted from 4 to 5 when the new GAC Goals stage was inserted).
     [HttpGet("Journey/Map/{sessionId:guid}")]
-    public IActionResult Map(Guid sessionId) => RedirectToRun(sessionId, 4);
+    public IActionResult Map(Guid sessionId) => RedirectToRun(sessionId, 5);
 
     // POST /Journey/SaveAttendeeCount — Phase 18: the optional attendee count moved to
     // stage 5 (الأثر). One value per session. Redirects back to stage 5.

@@ -4,10 +4,30 @@
     var code = ViewBag.Code as string;
 }
 
-<div class="row justify-content-center">
-    <div class="col-lg-7">
+<style>
+    /* Phase 20.9 — fully center the kiosk login box on every viewport. */
+    .kiosk-stage {
+        min-height: calc(100vh - 220px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 12px;
+    }
+    .kiosk-stage .kiosk-shell {
+        width: 100%;
+        max-width: 560px;
+        margin: 0 auto;
+    }
+    .kiosk-stage .kiosk-shell .text-center { text-align: center; }
+    .kiosk-stage .gac-card { text-align: right; }
+    @@media (max-height: 640px) {
+        .kiosk-stage { min-height: auto; padding: 18px 12px; }
+    }
+</style>
+<div class="kiosk-stage">
+    <div class="kiosk-shell">
         <div class="text-center mb-4">
-            <div style="font-size:3rem;font-weight:900;color:var(--gac-primary);">GAC</div>
+            <div style="font-weight:800;color:var(--gac-primary);font-size:clamp(1.1rem, 3vw, 1.6rem);text-align:center;">الهيئة العامة للمنافسة</div>
             <h1 class="mt-2">رحلة استراتيجية الهيئة</h1>
             <p class="text-muted">اكتشف كيف يرتبط عمل إدارتك برؤية الهيئة العامة للمنافسة</p>
         </div>

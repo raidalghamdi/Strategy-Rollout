@@ -1,53 +1,58 @@
+@* Phase 20.9 — stage 5 (الرحلة نحو الرؤية) now sits at position 5 (was 4
+   before the new GAC Goals stage was inserted). Adds a Initiatives/KPIs
+   toggle so users can flip between the initiative-linkage chain and the
+   KPI-linkage chain that fall under their scope. The closing line «أنت أقرب
+   للرؤية مما تتصور» is centred via a dedicated flex wrapper. *@
 @model StrategyHouse.Web.Controllers.JourneyRunViewModel
 @{
     var sel = Model.SelectedInitiative;
     var visionText = Model.Content?.Vision.Ar;
     var hasSelection = sel != null && !string.IsNullOrEmpty(sel.Code);
+
+    // Phase 20.9 — KPIs scoped to the visitor's authority. The journey runs
+    // per department code, so we surface every KPI the controller already
+    // resolved for that scope and let the user pick one when the KPI toggle
+    // is active. The first KPI is shown by default if no selection exists.
+    var scopedKpis = Model.Kpis ?? new List<StrategyHouse.Domain.Entities.Kpi>();
 }
-<div class="gac-card text-center" id="journey-card">
-    <h2 class="h4 h-md-2">الرحلة نحو الرؤية</h2>
+<div class="gac-card" id="journey-card">
+    <h2 class="h4 h-md-2 text-center">الرحلة نحو الرؤية</h2>
 
     @if (!hasSelection)
     {
-        <div class="alert alert-info mt-2">اختر مبادرتك في مرحلة «دوري في الاستراتيجية» لعرض ارتباط دورك بالرؤية.</div>
+        <div class="alert alert-info mt-2 text-center">
+            اختر مبادرتك في مرحلة «دوري في الاستراتيجية» لعرض ارتباط دورك بالرؤية.
+        </div>
     }
     else
     {
-        <p class="text-muted">شاهد كيف يتصل دورك — خطوة بخطوة — حتى رؤية الهيئة.</p>
-        <div id="journeyChain" class="jchain">
+        <p class="text-muted text-center">شاهد كيف يتصل دورك — خطوة بخطوة — حتى رؤية الهيئة.</p>
+
+        @* Phase 20.9 — Initiatives / KPIs toggle. Initiatives is the default
+           (matches the previous behaviour). *@
+        <div class="journey-toggle" role="tablist" aria-label="نوع الربط">
+            <button type="button" class="jtoggle is-active" data-mode="initiatives" role="tab" aria-selected="true">المبادرات</button>
+            <button type="button" class="jtoggle" data-mode="kpis" role="tab" aria-selected="false">مؤشّرات الأداء</button>
+        </div>
+
+        <div id="journeyChain" class="jchain jchain--initiatives">
             <div class="jnode jnode--init" data-step="0">
                 <span class="jlabel">مبادرتك</span>
                 <span class="jtext">@sel!.Name</span>
-                @* Phase 20.2 — expandable projects + KPIs tied to this initiative. *@
-                @if ((sel.Projects?.Count ?? 0) > 0 || (sel.Kpis?.Count ?? 0) > 0)
+                @if ((sel.Projects?.Count ?? 0) > 0)
                 {
                     <details class="jdetails" onclick="event.stopPropagation();">
-                        <summary>عرض المشاريع و KPIs (@(sel.Projects?.Count ?? 0) مشروع · @(sel.Kpis?.Count ?? 0) مؤشّر)</summary>
+                        <summary>عرض المشاريع (@(sel.Projects?.Count ?? 0) مشروع)</summary>
                         <div class="jchildren">
-                            @if ((sel.Projects?.Count ?? 0) > 0)
-                            {
-                                <div class="jchild-group">
-                                    <h6>المشاريع</h6>
-                                    <ul>
-                                        @foreach (var p in sel.Projects!)
-                                        {
-                                            <li>@p.Name @(string.IsNullOrEmpty(p.Meta) ? "" : " — ") <span class="jchild-meta">@p.Meta</span></li>
-                                        }
-                                    </ul>
-                                </div>
-                            }
-                            @if ((sel.Kpis?.Count ?? 0) > 0)
-                            {
-                                <div class="jchild-group">
-                                    <h6>مؤشّرات الأداء</h6>
-                                    <ul>
-                                        @foreach (var k in sel.Kpis!)
-                                        {
-                                            <li>@k.Name @(string.IsNullOrEmpty(k.Meta) ? "" : " — ") <span class="jchild-meta">@k.Meta</span></li>
-                                        }
-                                    </ul>
-                                </div>
-                            }
+                            <div class="jchild-group">
+                                <h6>المشاريع</h6>
+                                <ul>
+                                    @foreach (var p in sel.Projects!)
+                                    {
+                                        <li>@p.Name @(string.IsNullOrEmpty(p.Meta) ? "" : " — ") <span class="jchild-meta">@p.Meta</span></li>
+                                    }
+                                </ul>
+                            </div>
                         </div>
                     </details>
                 }
@@ -59,101 +64,248 @@
             <div class="jarrow" data-step="5">↓</div>
             <div class="jnode jnode--vision" data-step="6"><span class="jlabel">الرؤية</span><span class="jtext">@visionText</span></div>
         </div>
-        <div id="journeyMsg" class="jmsg">أنت أقرب للرؤية مما تتصور</div>
+
+        @* Phase 20.9 — KPI chain (initially hidden). When the user clicks
+           "مؤشّرات الأداء" the JS swaps which chain is visible. The KPI chain
+           reuses the same step semantics so the reveal animation works. *@
+        <div id="journeyChainKpis" class="jchain jchain--kpis" hidden>
+            @if (scopedKpis.Count == 0)
+            {
+                <div class="alert alert-info text-center">
+                    لا توجد مؤشّرات أداء ضمن صلاحيتك حالياً.
+                </div>
+            }
+            else
+            {
+                <div class="jkpi-picker">
+                    <label for="jkpiPicker">اختر مؤشّراً:</label>
+                    <select id="jkpiPicker">
+                        @foreach (var k in scopedKpis)
+                        {
+                            var oName = Model.Objectives.FirstOrDefault(o => o.ObjectiveCode == k.ObjectiveCode)?.ObjectiveName ?? "";
+                            var pCode = Model.Objectives.FirstOrDefault(o => o.ObjectiveCode == k.ObjectiveCode)?.PlrCode;
+                            var pName = Model.Pillars.FirstOrDefault(pi => pi.PlrCode == pCode)?.PillarName ?? "";
+                            <option value="@k.KpiCode"
+                                    data-name="@k.KpiName"
+                                    data-objective="@oName"
+                                    data-pillar="@pName">@k.KpiName</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="jnode jnode--init" data-step="0">
+                    <span class="jlabel">مؤشّرك</span>
+                    <span class="jtext" id="jkpiName">@scopedKpis[0].KpiName</span>
+                </div>
+                <div class="jarrow" data-step="1">↓</div>
+                <div class="jnode jnode--obj" data-step="2">
+                    <span class="jlabel">الهدف</span>
+                    <span class="jtext" id="jkpiObjective">
+                        @{
+                            var firstObj = Model.Objectives.FirstOrDefault(o => o.ObjectiveCode == scopedKpis[0].ObjectiveCode);
+                        }
+                        @(firstObj?.ObjectiveName ?? "—")
+                    </span>
+                </div>
+                <div class="jarrow" data-step="3">↓</div>
+                <div class="jnode jnode--pillar" data-step="4">
+                    <span class="jlabel">الركيزة</span>
+                    <span class="jtext" id="jkpiPillar">
+                        @{
+                            var firstPillar = firstObj == null ? null : Model.Pillars.FirstOrDefault(pi => pi.PlrCode == firstObj.PlrCode);
+                        }
+                        @(firstPillar?.PillarName ?? "—")
+                    </span>
+                </div>
+                <div class="jarrow" data-step="5">↓</div>
+                <div class="jnode jnode--vision" data-step="6">
+                    <span class="jlabel">الرؤية</span>
+                    <span class="jtext">@visionText</span>
+                </div>
+            }
+        </div>
+
+        @* Phase 20.9 — explicitly centred closing line. *@
+        <div class="jmsg-wrap">
+            <div id="journeyMsg" class="jmsg">أنت أقرب للرؤية مما تتصور</div>
+        </div>
     }
 </div>
 
 <style>
-    #stage-4 .jchain { display: flex; flex-direction: column; align-items: stretch; gap: 8px; max-width: 640px; margin: 18px auto 0; }
-    #stage-4 .jnode {
+    /* Phase 20.9 — selector targets stage-5 wrapper (Map was stage 4, now 5). */
+    #stage-5 .jchain { display: flex; flex-direction: column; align-items: stretch; gap: 8px; max-width: 640px; margin: 18px auto 0; }
+    #stage-5 .jnode {
         border-radius: 14px; padding: 16px 18px; color: #fff; text-align: center;
         opacity: 0; transform: translateY(14px) scale(.98); transition: opacity .5s ease, transform .5s ease;
     }
-    #stage-4 .jnode.is-in { opacity: 1; transform: translateY(0) scale(1); }
-    #stage-4 .jnode--init { background: #5F9600; }
-    #stage-4 .jnode--obj { background: #299ECE; }
-    #stage-4 .jnode--pillar { background: #0f8f5b; }
-    #stage-4 .jnode--vision { background: #067647; }
-    #stage-4 .jlabel { display: block; font-size: .82rem; opacity: .9; }
-    #stage-4 .jtext { display: block; font-weight: 800; line-height: 1.7; margin-top: 4px; }
-    #stage-4 .jarrow { text-align: center; color: #067647; font-size: 1.5rem; line-height: 1; opacity: 0; transition: opacity .5s ease; }
-    #stage-4 .jarrow.is-in { opacity: 1; }
-    #stage-4 .jmsg {
-        margin-top: 22px; color: #067647; font-size: 1.6rem; font-weight: 900; line-height: 1.6;
+    #stage-5 .jnode.is-in { opacity: 1; transform: translateY(0) scale(1); }
+    #stage-5 .jnode--init { background: #5F9600; }
+    #stage-5 .jnode--obj { background: #299ECE; }
+    #stage-5 .jnode--pillar { background: #0f8f5b; }
+    #stage-5 .jnode--vision { background: #067647; }
+    #stage-5 .jlabel { display: block; font-size: .82rem; opacity: .9; }
+    #stage-5 .jtext { display: block; font-weight: 800; line-height: 1.7; margin-top: 4px; }
+    #stage-5 .jarrow { text-align: center; color: #067647; font-size: 1.5rem; line-height: 1; opacity: 0; transition: opacity .5s ease; }
+    #stage-5 .jarrow.is-in { opacity: 1; }
+
+    /* Phase 20.9 — closing line forced into a centred flex row regardless of
+       its parent's text-align. */
+    #stage-5 .jmsg-wrap { display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 22px; }
+    #stage-5 .jmsg {
+        color: #067647; font-size: 1.6rem; font-weight: 900; line-height: 1.6;
+        text-align: center;
         opacity: 0; transform: translateY(10px); transition: opacity .6s ease, transform .6s ease;
     }
-    #stage-4 .jmsg.is-in { opacity: 1; transform: translateY(0); }
+    #stage-5 .jmsg.is-in { opacity: 1; transform: translateY(0); }
 
-    /* Phase 20.2 — expandable projects + KPIs under the «my initiative» node. */
-    #stage-4 .jdetails {
-        margin-top: 12px;
-        text-align: start;
-        background: rgba(255,255,255,.12);
-        border-radius: 10px;
-        padding: 8px 12px;
+    /* Phase 20.9 — Initiatives / KPIs toggle. */
+    #stage-5 .journey-toggle {
+        display: flex; justify-content: center; gap: 8px;
+        margin: 14px 0 6px;
     }
-    #stage-4 .jdetails summary {
-        cursor: pointer;
-        font-size: .85rem;
-        font-weight: 700;
-        color: #fff;
-        list-style: none;
-        outline: none;
-        user-select: none;
+    #stage-5 .jtoggle {
+        font-family: "Cairo", sans-serif; font-weight: 700;
+        padding: 8px 18px; border-radius: 999px;
+        border: 1.5px solid #067647; background: #fff; color: #067647;
+        cursor: pointer; transition: background .15s, color .15s;
+    }
+    #stage-5 .jtoggle.is-active { background: #067647; color: #fff; }
+    #stage-5 .jtoggle:hover { background: #ECF6F0; }
+    #stage-5 .jtoggle.is-active:hover { background: #05623A; }
+
+    #stage-5 .jkpi-picker {
+        max-width: 640px; margin: 0 auto 14px;
+        display: flex; gap: 10px; align-items: center; justify-content: center;
+        flex-wrap: wrap;
+    }
+    #stage-5 .jkpi-picker label { font-weight: 700; color: #28334A; }
+    #stage-5 .jkpi-picker select {
+        flex: 1 1 280px; min-width: 0;
+        padding: 8px 12px; border-radius: 8px;
+        border: 1px solid #c9d1de; background: #fff;
+        font-family: "Cairo", sans-serif; font-size: .95rem;
+    }
+
+    /* Phase 20.2/20.9 — expandable projects under «my initiative». */
+    #stage-5 .jdetails {
+        margin-top: 12px; text-align: start;
+        background: rgba(255,255,255,.12);
+        border-radius: 10px; padding: 8px 12px;
+    }
+    #stage-5 .jdetails summary {
+        cursor: pointer; font-size: .85rem; font-weight: 700;
+        color: #fff; list-style: none; outline: none; user-select: none;
         padding: 4px 0;
     }
-    #stage-4 .jdetails summary::-webkit-details-marker { display: none; }
-    #stage-4 .jdetails summary::before {
-        content: '◀';
-        display: inline-block;
-        margin-inline-end: 6px;
-        font-size: .7rem;
-        transition: transform .2s;
+    #stage-5 .jdetails summary::-webkit-details-marker { display: none; }
+    #stage-5 .jdetails summary::before {
+        content: '◀'; display: inline-block; margin-inline-end: 6px;
+        font-size: .7rem; transition: transform .2s;
     }
-    #stage-4 .jdetails[open] summary::before { transform: rotate(-90deg); }
-    #stage-4 .jchildren { padding: 8px 0 4px; font-size: .82rem; color: #fff; }
-    #stage-4 .jchild-group { margin-bottom: 8px; }
-    #stage-4 .jchild-group:last-child { margin-bottom: 0; }
-    #stage-4 .jchild-group h6 {
-        font-size: .78rem;
-        font-weight: 700;
-        color: rgba(255,255,255,.85);
-        margin: 0 0 4px;
+    #stage-5 .jdetails[open] summary::before { transform: rotate(-90deg); }
+    #stage-5 .jchildren { padding: 8px 0 4px; font-size: .82rem; color: #fff; }
+    #stage-5 .jchild-group { margin-bottom: 8px; }
+    #stage-5 .jchild-group:last-child { margin-bottom: 0; }
+    #stage-5 .jchild-group h6 {
+        font-size: .78rem; font-weight: 700;
+        color: rgba(255,255,255,.85); margin: 0 0 4px;
     }
-    #stage-4 .jchild-group ul { list-style: none; padding: 0; margin: 0; }
-    #stage-4 .jchild-group li {
-        padding: 4px 8px;
-        background: rgba(255,255,255,.18);
-        border-radius: 6px;
-        margin-bottom: 3px;
-        line-height: 1.5;
-        font-weight: 600;
+    #stage-5 .jchild-group ul { list-style: none; padding: 0; margin: 0; }
+    #stage-5 .jchild-group li {
+        padding: 4px 8px; background: rgba(255,255,255,.18);
+        border-radius: 6px; margin-bottom: 3px;
+        line-height: 1.5; font-weight: 600;
     }
-    #stage-4 .jchild-meta { color: rgba(255,255,255,.75); font-size: .75rem; font-weight: 400; }
+    #stage-5 .jchild-meta { color: rgba(255,255,255,.75); font-size: .75rem; font-weight: 400; }
 </style>
 
 <script>
-// Phase 18 — Stage 4 (الرحلة نحو الرؤية). Animated reveal of the linkage chain.
-// iOS Safari-safe ES5: IIFE, for-loops, setTimeout stagger, no template literals,
-// no block scope, try/catch with fallback (reveal everything at once).
+// Phase 20.9 — Stage 5 (الرحلة نحو الرؤية). Animated reveal + Initiatives/KPIs
+// toggle. iOS Safari-safe ES5: IIFE, for-loops, setTimeout stagger, no
+// template literals, no block scope, try/catch with fallback (reveal at once).
 window.__stageMapInit = (function () {
     var done = false;
+    function revealChain(scope) {
+        var steps = scope.querySelectorAll('[data-step]');
+        if (!steps || steps.length === 0) return;
+        for (var i = 0; i < steps.length; i++) {
+            (function (node, idx) {
+                setTimeout(function () {
+                    node.className = node.className + ' is-in';
+                }, 280 * idx);
+            })(steps[i], i);
+        }
+    }
+    function showMsgOnce() {
+        var msg = document.getElementById('journeyMsg');
+        if (msg && msg.className.indexOf('is-in') === -1) {
+            setTimeout(function () { msg.className = 'jmsg is-in'; }, 1400);
+        }
+    }
+    function resetReveal(scope) {
+        var steps = scope.querySelectorAll('[data-step]');
+        for (var i = 0; i < steps.length; i++) {
+            steps[i].className = steps[i].className.replace(/\s*is-in/g, '');
+        }
+    }
+    function bindToggle() {
+        var btns = document.querySelectorAll('#stage-5 .jtoggle');
+        if (!btns || btns.length === 0) return;
+        var chainInit = document.getElementById('journeyChain');
+        var chainKpi = document.getElementById('journeyChainKpis');
+        for (var i = 0; i < btns.length; i++) {
+            btns[i].addEventListener('click', function () {
+                var mode = this.getAttribute('data-mode');
+                for (var j = 0; j < btns.length; j++) {
+                    var on = btns[j].getAttribute('data-mode') === mode;
+                    btns[j].classList.toggle('is-active', on);
+                    btns[j].setAttribute('aria-selected', on ? 'true' : 'false');
+                }
+                if (mode === 'kpis') {
+                    if (chainInit) chainInit.hidden = true;
+                    if (chainKpi) {
+                        chainKpi.hidden = false;
+                        resetReveal(chainKpi);
+                        revealChain(chainKpi);
+                    }
+                } else {
+                    if (chainKpi) chainKpi.hidden = true;
+                    if (chainInit) {
+                        chainInit.hidden = false;
+                        resetReveal(chainInit);
+                        revealChain(chainInit);
+                    }
+                }
+            });
+        }
+        // KPI dropdown — repopulate the KPI chain when the user picks a new
+        // indicator. Reads data-* attributes set server-side from the user's
+        // scoped KPI list.
+        var picker = document.getElementById('jkpiPicker');
+        if (picker) {
+            picker.addEventListener('change', function () {
+                var opt = picker.options[picker.selectedIndex];
+                if (!opt) return;
+                var n = document.getElementById('jkpiName');
+                var o = document.getElementById('jkpiObjective');
+                var p = document.getElementById('jkpiPillar');
+                if (n) n.textContent = opt.getAttribute('data-name') || opt.text;
+                if (o) o.textContent = opt.getAttribute('data-objective') || '—';
+                if (p) p.textContent = opt.getAttribute('data-pillar') || '—';
+            });
+        }
+    }
     return function () {
         if (done) return; done = true;
         try {
-            var steps = document.querySelectorAll('#stage-4 [data-step]');
-            if (!steps || steps.length === 0) return;
-            for (var i = 0; i < steps.length; i++) {
-                (function (node, idx) {
-                    setTimeout(function () {
-                        node.className = node.className + ' is-in';
-                    }, 350 * idx);
-                })(steps[i], i);
-            }
-            var msg = document.getElementById('journeyMsg');
-            if (msg) setTimeout(function () { msg.className = 'jmsg is-in'; }, 350 * steps.length + 200);
+            var chainInit = document.getElementById('journeyChain');
+            if (chainInit) revealChain(chainInit);
+            showMsgOnce();
+            bindToggle();
         } catch (err) {
-            var nodes = document.querySelectorAll('#stage-4 [data-step]');
+            // Fallback: reveal everything immediately so the user still sees content.
+            var nodes = document.querySelectorAll('#stage-5 [data-step]');
             for (var k = 0; k < nodes.length; k++) nodes[k].className = nodes[k].className + ' is-in';
             var m = document.getElementById('journeyMsg');
             if (m) m.className = 'jmsg is-in';

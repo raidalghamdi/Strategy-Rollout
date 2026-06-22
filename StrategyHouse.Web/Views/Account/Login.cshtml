@@ -1,7 +1,25 @@
 @{
     ViewData["Title"] = "تسجيل الدخول";
 }
-<div class="container--narrow">
+<style>
+    /* Phase 20.9 — fully center the login card on every viewport. */
+    .login-stage {
+        min-height: calc(100vh - 220px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 12px;
+    }
+    .login-stage > .card {
+        width: 100%;
+        max-width: 480px;
+        margin: 0 auto;
+    }
+    @@media (max-height: 640px) {
+        .login-stage { min-height: auto; padding: 18px 12px; }
+    }
+</style>
+<div class="login-stage">
     <div class="card">
         <h2>تسجيل الدخول</h2>
         <p class="muted">للحضور: لا حاجة لتسجيل الدخول، استخدم رمز الجلسة من المُيسّر.</p>

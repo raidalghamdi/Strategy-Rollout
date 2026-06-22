@@ -231,29 +231,39 @@ p { margin: 0 0 12px 0; color: var(--text-soft); }
 .table tr:last-child td { border-bottom: none; }
 .table tr:hover td { background: var(--surface-alt); }
 
-/* ---- Stat grid ---- */
+/* ---- Stat grid (Phase 20.9 — always-single-row, fully responsive) ---- */
 .stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 16px;
+    /* Always 5 columns side-by-side regardless of viewport width. */
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: clamp(6px, 1.2vw, 16px);
     margin-bottom: 24px;
+    width: 100%;
 }
 .stat {
     background: #fff;
-    padding: 18px;
+    padding: clamp(8px, 1.6vw, 18px);
     border-radius: var(--radius-md);
     border: 1px solid var(--border);
-    text-align: right;
+    text-align: center;
+    min-width: 0; /* allow children to shrink inside grid tracks */
 }
 .stat__num {
-    font-size: 28px;
+    font-size: clamp(16px, 3vw, 28px);
     font-weight: 800;
     color: var(--primary);
     font-family: "Cairo", sans-serif;
     font-style: normal !important;
     line-height: 1.1;
 }
-.stat__label { font-size: 13px; color: var(--text-soft); margin-top: 4px; }
+.stat__label {
+    font-size: clamp(10px, 1.4vw, 13px);
+    color: var(--text-soft);
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 /* ---- Hero ---- */
 .hero {

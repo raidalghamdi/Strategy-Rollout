@@ -1,0 +1,109 @@
+@* Phase 20.9 — NEW read-only stage 3 (الأهداف الاستراتيجية للهيئة).
+   Shows every strategic objective of the authority, grouped by its parent
+   pillar. Each objective can be expanded to reveal the initiatives and KPIs
+   that fall under it — filtered to whatever scope the current visitor has
+   (department/sector). Linkage cards are intentionally NOT shown here; they
+   moved to stage 5 (الرحلة نحو الرؤية) per the Phase 20.9 spec. *@
+@model StrategyHouse.Web.Controllers.JourneyRunViewModel
+@{
+    var pillars = Model.HousePillars;
+    var objectives = Model.Objectives;
+    var initiatives = Model.Initiatives;
+    var kpis = Model.Kpis;
+    var live = Model.StrategyDataLive;
+}
+<div class="gac-card" id="gac-goals-card">
+    <h2 class="h4 h-md-2">الأهداف الاستراتيجية للهيئة العامة للمنافسة</h2>
+    <p class="text-muted">
+        تعرض هذه المرحلة جميع الأهداف الاستراتيجية للهيئة. اضغط أي هدف لمعرفة
+        المبادرات ومؤشرات الأداء المرتبطة به ضمن صلاحيتك.
+    </p>
+
+    @if (!live)
+    {
+        <div class="alert alert-info" role="note">
+            البيانات الاستراتيجية ستتوفر عند الربط — تُعرض الآن بيانات توضيحية.
+        </div>
+    }
+
+    <style>
+        .gac-goal-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 16px; }
+        @@media (min-width: 720px) { .gac-goal-grid { grid-template-columns: 1fr 1fr; } }
+        @@media (min-width: 1100px) { .gac-goal-grid { grid-template-columns: 1fr 1fr 1fr; } }
+
+        .gac-goal { background: #fff; border: 1px solid #e5e9f2; border-radius: 12px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(40,51,74,.05); }
+        .gac-goal__pillar { font-size: .78rem; color: #5a6b80; margin-bottom: 4px; font-weight: 600; }
+        .gac-goal__name { font-weight: 800; color: #00192B; font-family: "Cairo", sans-serif; line-height: 1.4; margin-bottom: 8px; }
+        .gac-goal__counts { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+        .gac-goal__count { background: #f0f4f9; border-radius: 999px; padding: 3px 10px; font-size: .78rem; color: #28334A; font-weight: 600; }
+        .gac-goal__count i { font-style: normal; color: #067647; font-weight: 800; margin-inline-end: 4px; }
+
+        .gac-goal details { margin-top: 8px; }
+        .gac-goal details > summary { cursor: pointer; padding: 6px 0; color: #067647; font-weight: 600; user-select: none; }
+        .gac-goal details > summary::marker { color: #FAC126; }
+        .gac-goal details ul { margin: 6px 0 0; padding-inline-start: 18px; }
+        .gac-goal details ul li { padding: 3px 0; color: #28334A; font-size: .88rem; line-height: 1.5; }
+        .gac-goal__empty { color: #8a96a8; font-size: .85rem; font-style: italic; }
+    </style>
+
+    <div class="gac-goal-grid">
+        @if (!objectives.Any())
+        {
+            <div class="gac-goal__empty">لا توجد أهداف لعرضها حالياً.</div>
+        }
+        else
+        {
+            @foreach (var o in objectives.OrderBy(x => x.ObjectiveCode, StringComparer.Ordinal))
+            {
+                var pillarName = pillars.FirstOrDefault(p => p.Code == o.PlrCode)?.Name ?? "—";
+                var objInitiatives = initiatives
+                    .Where(i => i.ObjectiveCode == o.ObjectiveCode)
+                    .OrderBy(i => i.InitiativeCode, StringComparer.Ordinal)
+                    .ToList();
+                var objKpis = kpis
+                    .Where(k => k.ObjectiveCode == o.ObjectiveCode)
+                    .OrderBy(k => k.KpiCode, StringComparer.Ordinal)
+                    .ToList();
+                <div class="gac-goal">
+                    <div class="gac-goal__pillar">الركيزة: @pillarName</div>
+                    <div class="gac-goal__name">@o.ObjectiveName</div>
+                    <div class="gac-goal__counts">
+                        <span class="gac-goal__count"><i>@objInitiatives.Count</i> مبادرة</span>
+                        <span class="gac-goal__count"><i>@objKpis.Count</i> مؤشّر أداء</span>
+                    </div>
+
+                    @if (objInitiatives.Any())
+                    {
+                        <details>
+                            <summary>عرض المبادرات (@objInitiatives.Count)</summary>
+                            <ul>
+                                @foreach (var i in objInitiatives)
+                                {
+                                    <li>@i.InitiativeName</li>
+                                }
+                            </ul>
+                        </details>
+                    }
+
+                    @if (objKpis.Any())
+                    {
+                        <details>
+                            <summary>عرض مؤشّرات الأداء (@objKpis.Count)</summary>
+                            <ul>
+                                @foreach (var k in objKpis)
+                                {
+                                    <li>@k.KpiName</li>
+                                }
+                            </ul>
+                        </details>
+                    }
+
+                    @if (!objInitiatives.Any() && !objKpis.Any())
+                    {
+                        <div class="gac-goal__empty">لا توجد مبادرات أو مؤشرات مرتبطة بهذا الهدف.</div>
+                    }
+                </div>
+            }
+        }
+    </div>
+</div>

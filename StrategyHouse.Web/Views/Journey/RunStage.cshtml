@@ -4,13 +4,16 @@
     var stage = (int)ViewBag.Stage;
     var sessionId = Model.Session.Id;
     var dept = Model.Dept;
+    // Phase 20.9 — inserted a read-only GAC Goals stage at position 3. The journey
+    // is now 6 stages; Contribute/Map/Complete shifted down by one position.
     var stages = new[]
     {
         (1, "الصورة الكبرى"),
         (2, "البيت الاستراتيجي"),
-        (3, "دوري في الاستراتيجية"),
-        (4, "الرحلة نحو الرؤية"),
-        (5, "الأثر"),
+        (3, "الأهداف الاستراتيجية للهيئة"),
+        (4, "دوري في الاستراتيجية"),
+        (5, "الرحلة نحو الرؤية"),
+        (6, "الأثر"),
     };
     var current = stages.First(s => s.Item1 == stage);
     var introKey = $"journey.stage{stage}.intro";
@@ -18,8 +21,9 @@
     {
         1 => "_StageBigPicture",
         2 => "_StageStrategyHouse",
-        3 => "_StageContribute",
-        4 => "_StageMap",
+        3 => "_StageGacGoals",
+        4 => "_StageContribute",
+        5 => "_StageMap",
         _ => "_StageComplete",
     };
     ViewData["Title"] = $"المرحلة {stage} — {current.Item2}";
@@ -111,7 +115,7 @@
     @foreach (var (n, label) in stages)
     {
         var cls = n == stage ? "active" : (n < stage ? "done" : "locked");
-        var reachable = n <= Math.Min(Model.Session.CurrentStage, 5);
+        var reachable = n <= Math.Min(Model.Session.CurrentStage, 6);
         if (reachable && n != stage)
         {
             <a class="pip @cls" href="/Journey/Run/@sessionId/@n">@n. @label</a>
@@ -125,7 +129,7 @@
 
 <div class="container-fluid px-0 px-md-2 mt-2">
     <h1 class="h4 text-center my-2">رحلة @dept?.NameAr</h1>
-    <div class="journey-progress">المرحلة @stage من 5 — @current.Item2</div>
+    <div class="journey-progress">المرحلة @stage من 6 — @current.Item2</div>
 
     <section id="stage-@stage" class="journey-section is-active" data-stage="@stage">
         <h2 class="section-title h5">@stage — @current.Item2</h2>
@@ -145,11 +149,11 @@
             }
         </div>
         <div class="nav-side nav-next">
-            @if (stage == 4)
+            @if (stage == 5)
             {
-                <a class="btn gac-btn-primary text-white" href="/Journey/Run/@sessionId/5">المتابعة إلى مرحلة الأثر ⟵</a>
+                <a class="btn gac-btn-primary text-white" href="/Journey/Run/@sessionId/6">المتابعة إلى مرحلة الأثر ⟵</a>
             }
-            else if (stage < 5)
+            else if (stage < 6)
             {
                 <a class="btn gac-btn-primary text-white" href="/Journey/Run/@sessionId/@(stage + 1)">التالي ⟵</a>
             }
@@ -165,7 +169,9 @@
     // page we fire it once for the rendered stage.
     var stage = @stage;
     function fireReady() {
-        if (stage === 4 && window.__stageMapInit) window.__stageMapInit();
+        // Phase 20.9 — Map shifted from stage 4 to stage 5 when the GAC Goals
+        // stage was inserted at position 3.
+        if (stage === 5 && window.__stageMapInit) window.__stageMapInit();
         // Phase 19 — stage 5 confetti now fires only after the inline quiz completes
         // (the thank-you block is revealed then), so it is no longer fired on load.
         document.dispatchEvent(new CustomEvent('stageReady', { detail: { stage: stage } }));
