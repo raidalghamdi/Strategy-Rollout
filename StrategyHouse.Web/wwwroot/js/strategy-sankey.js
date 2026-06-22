@@ -100,11 +100,17 @@
     }
 
     function draw(el, data) {
-        // Phase 20.1 — height driven by the tallest column, not total node count.
-        // Each label needs ~3 lines × ~22px line-height ≈ 66px + gap.
+        // Phase 20.8.6 — the previous formula (tallest × 72px) produced a ~6000px
+        // canvas for a dense column of ~80 projects, which pushed all real nodes
+        // far below the visible viewport: the user saw a tall white canvas and
+        // could only reveal a tooltip near the bottom by accident. Cap height to
+        // a realistic value that fits an iPad/desktop viewport while still giving
+        // each node enough vertical room.
         var tallest = tallestColumn(data);
-        var perNode = 72;
-        var height = Math.max(1400, tallest * perNode + 120);
+        var perNode = 36;
+        var minHeight = 800;
+        var maxHeight = 2400;
+        var height = Math.min(maxHeight, Math.max(minHeight, tallest * perNode + 120));
         el.style.height = height + 'px';
         // Phase 20.8.3 — do not force a min-width that breaks responsive layouts; let
         // ECharts stretch to the container width and rely on overflow-x on the parent.
