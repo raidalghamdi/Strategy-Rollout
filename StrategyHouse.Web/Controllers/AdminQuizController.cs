@@ -13,16 +13,27 @@ namespace StrategyHouse.Web.Controllers;
 public class AdminQuizController : Controller
 {
     private readonly ApplicationDbContext _db;
+    private readonly PageContentService _pageContent;
+    private readonly QuizTemplateService _templates;
 
-    public AdminQuizController(ApplicationDbContext db)
+    public AdminQuizController(
+        ApplicationDbContext db,
+        PageContentService pageContent,
+        QuizTemplateService templates)
     {
         _db = db;
+        _pageContent = pageContent;
+        _templates = templates;
     }
 
     // GET /Admin/Quiz?tab=Pending|Approved|Rejected
     [HttpGet("")]
     public async Task<IActionResult> Index(string tab = "Pending")
     {
+        // Phase 20.11 — expose the expanded-bank toggle value to the view.
+        ViewBag.ExpandedBankEnabled = string.Equals(
+            _pageContent.Get("quiz.bank.useExpanded", "false"),
+            "true", StringComparison.OrdinalIgnoreCase);
         IQueryable<Domain.Entities.QuizQuestion> q = _db.QuizQuestions;
         q = tab switch
         {
@@ -261,6 +272,33 @@ public class AdminQuizController : Controller
         }
         var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
         return File(bytes, "text/csv", "quiz-analytics.csv");
+    }
+
+    // Phase 20.11 — toggle the expanded (200-template) quiz bank on/off.
+    // When OFF (default) the standalone quiz shows the 5 curated questions
+    // from QuizQuestionsProvider. When ON the QuizController generates 5
+    // random questions from live DB data (filtered to the user's department
+    // for domains 4 & 5).
+    [HttpPost("ToggleBank")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleBank(bool enabled, string tab = "Pending")
+    {
+        await _pageContent.SaveAsync(_db, "quiz.bank.useExpanded", enabled ? "true" : "false");
+        TempData["Saved"] = enabled
+            ? "تم تفعيل بنك الأسئلة الموسّع (200 سؤال ديناميكي من قاعدة البيانات)."
+            : "تم إيقاف بنك الأسئلة الموسّع (العودة لــ 5 أسئلة التجريبية).";
+        return RedirectToAction(nameof(Index), new { tab });
+    }
+
+    // GET /Admin/Quiz/PreviewBank — inspect a freshly generated bank sample
+    // (for admins to verify templates render correctly against current DB).
+    [HttpGet("PreviewBank")]
+    public async Task<IActionResult> PreviewBank(string? deptCode = null)
+    {
+        var bank = await _templates.GenerateForUserAsync(deptCode);
+        ViewBag.DeptCode = deptCode;
+        ViewBag.Total = bank.Count;
+        return View(bank.Take(40).ToList());
     }
 
     // POST /Admin/Quiz/Delete/{id} — soft delete to preserve attempt history.

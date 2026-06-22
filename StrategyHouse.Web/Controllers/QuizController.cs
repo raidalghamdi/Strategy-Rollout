@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using StrategyHouse.Domain.Entities;
 using StrategyHouse.Infrastructure.Persistence;
 using StrategyHouse.Web.Services;
@@ -17,13 +18,34 @@ public class QuizController : Controller
     private readonly ApplicationDbContext _db;
     private readonly PageContentService _pageContent;
     private readonly QrService _qr;
+    private readonly QuizTemplateService _templates;
+    private readonly IMemoryCache _cache;
 
-    public QuizController(ApplicationDbContext db, PageContentService pageContent, QrService qr)
+    public QuizController(
+        ApplicationDbContext db,
+        PageContentService pageContent,
+        QrService qr,
+        QuizTemplateService templates,
+        IMemoryCache cache)
     {
         _db = db;
         _pageContent = pageContent;
         _qr = qr;
+        _templates = templates;
+        _cache = cache;
     }
+
+    // Phase 20.11 — when the expanded bank is on, we cache the generated
+    // question (incl. correct index + explanation) by its Guid so /Submit
+    // can grade it without trusting the client. 2-hour sliding window is
+    // generous enough for slow respondents and is automatically refreshed
+    // every time the same Id is read.
+    private static readonly TimeSpan QuizCacheTtl = TimeSpan.FromHours(2);
+
+    private bool ExpandedBankEnabled()
+        => string.Equals(_pageContent.Get("quiz.bank.useExpanded", "false"), "true", StringComparison.OrdinalIgnoreCase);
+
+    private static string QuizCacheKey(Guid qid) => $"quiz.dyn.{qid}";
 
     // GET /Quiz — landing alias so the bare /Quiz URL never 404s. Sends visitors
     // into the standalone quiz; admins manage the bank at /Admin/Quiz.
@@ -51,7 +73,25 @@ public class QuizController : Controller
             if (session != null) deptCode = session.DeptCode;
         }
 
-        var picked = QuizQuestionsProvider.GetRandom(10);
+        List<QuizQuestion> picked;
+        if (ExpandedBankEnabled())
+        {
+            // Phase 20.11 — pick 5 random from the live 200-template bank.
+            // Domains 4 & 5 are auto-filtered to the user's department; if no
+            // deptCode is available (anonymous quiz), they're skipped.
+            var bank = await _templates.GenerateForUserAsync(deptCode);
+            picked = bank.OrderBy(_ => Guid.NewGuid()).Take(5).ToList();
+            // Cache each picked question (full record incl. CorrectIndex/explanation)
+            // so /Quiz/Submit can grade against server-side truth.
+            foreach (var q in picked)
+            {
+                _cache.Set(QuizCacheKey(q.Id), q, QuizCacheTtl);
+            }
+        }
+        else
+        {
+            picked = QuizQuestionsProvider.GetRandom(10);
+        }
 
         ViewBag.SessionId = sessionGuid;
         ViewBag.Scope = "General";
@@ -104,11 +144,27 @@ public class QuizController : Controller
     // can be embedded inline (e.g. stage 5 of the journey) without a full page render.
     // Returns the same shape the standalone view serialises ({ id, text, options }).
     [HttpGet("Quiz/Questions")]
-    public IActionResult Questions(int count = 5)
+    public async Task<IActionResult> Questions(int count = 5, string? deptCode = null)
     {
         if (count < 1) count = 1;
         if (count > 50) count = 50;
-        var picked = QuizQuestionsProvider.GetRandom(count).Select(q => new
+
+        List<QuizQuestion> source;
+        if (ExpandedBankEnabled())
+        {
+            var bank = await _templates.GenerateForUserAsync(deptCode);
+            source = bank.OrderBy(_ => Guid.NewGuid()).Take(count).ToList();
+            foreach (var q in source)
+            {
+                _cache.Set(QuizCacheKey(q.Id), q, QuizCacheTtl);
+            }
+        }
+        else
+        {
+            source = QuizQuestionsProvider.GetRandom(count).ToList();
+        }
+
+        var picked = source.Select(q => new
         {
             id = q.Id,
             text = q.QuestionAr,
@@ -123,7 +179,20 @@ public class QuizController : Controller
     {
         if (dto.Answers == null || dto.Answers.Count == 0) return BadRequest();
         var ids = dto.Answers.Select(a => a.Qid).ToHashSet();
+        // Phase 20.11 — accept both static-bank and expanded-bank questions.
+        // Static bank is matched by Id from QuizQuestionsProvider.All; expanded
+        // bank questions live in IMemoryCache from when /Start or /Questions
+        // generated them. Both lookups are server-side, so the client can
+        // never inject a fabricated CorrectIndex.
         var questions = QuizQuestionsProvider.All.Where(q => ids.Contains(q.Id)).ToList();
+        foreach (var id in ids)
+        {
+            if (questions.Any(q => q.Id == id)) continue;
+            if (_cache.TryGetValue<QuizQuestion>(QuizCacheKey(id), out var dyn) && dyn != null)
+            {
+                questions.Add(dyn);
+            }
+        }
 
         int score = 0;
         var detail = new List<object>();

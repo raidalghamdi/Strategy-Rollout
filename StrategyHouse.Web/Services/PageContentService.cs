@@ -76,6 +76,12 @@ public class PageContentService
         // generated QR without losing the uploaded image (kept for fast re-enable).
         ("quiz.survey.qr.useCustom", "false"),
         ("quiz.survey.qr.custom", ""),
+        // Phase 20.11 — expanded quiz question bank toggle. When "false" (default),
+        // the public quiz uses the 5 static curated questions from QuizQuestionsProvider.
+        // When "true", the quiz picks 5 random questions from the 200-template dynamic
+        // bank generated from live DB data (Pillars/Objectives/Initiatives/Projects/KPIs
+        // /Departments). Templates 4 & 5 are filtered by the user's DeptCode.
+        ("quiz.bank.useExpanded", "false"),
         ("survey.thank_you", "شكراً لمشاركتك! تم استلام إجابتك بنجاح."),
         ("footer.copyright", "الهيئة العامة للمنافسة · منصة إطلاق استراتيجية الهيئة"),
 

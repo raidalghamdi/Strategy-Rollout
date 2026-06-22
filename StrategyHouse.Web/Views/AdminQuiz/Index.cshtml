@@ -34,6 +34,36 @@
     @if (TempData["Saved"] != null) { <div class="alert alert-success mt-2">@TempData["Saved"]</div> }
     @if (TempData["Error"] != null) { <div class="alert alert-danger mt-2">@TempData["Error"]</div> }
 
+    @{
+        var expandedOn = (bool)(ViewBag.ExpandedBankEnabled ?? false);
+    }
+    <div class="card mt-3" style="border-color:#28334A;">
+        <div class="card-body">
+            <div class="d-flex flex-wrap align-items-center gap-3 justify-content-between">
+                <div>
+                    <h6 class="mb-1" style="color:#28334A;">بنك الأسئلة الموسّع (200 سؤال ديناميكي)</h6>
+                    <small class="text-muted">
+                        عند التفعيل يتم اختيار 5 أسئلة عشوائيًا من بنك مبني على بيانات قاعدة البيانات الحيّة
+                        (الرؤية – الأهداف – المبادرات – المشاريع حسب الإدارة – المؤشرات حسب الإدارة – القطاعات).
+                        عند الإيقاف تعود إلى الـ 5 أسئلة التجريبية الجاهزة.
+                    </small>
+                </div>
+                <form method="post" asp-action="ToggleBank" class="d-flex align-items-center gap-2">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="tab" value="@tab" />
+                    <input type="hidden" name="enabled" value="@(expandedOn ? "false" : "true")" />
+                    <span class="badge @(expandedOn ? "bg-success" : "bg-secondary")">
+                        @(expandedOn ? "مفعّل" : "غير مفعّل (افتراضي)")
+                    </span>
+                    <button class="btn btn-sm @(expandedOn ? "btn-outline-danger" : "btn-success")">
+                        @(expandedOn ? "إيقاف البنك الموسّع" : "تفعيل البنك الموسّع")
+                    </button>
+                    <a class="btn btn-sm btn-outline-secondary" href="/Admin/Quiz/PreviewBank">معاينة</a>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <ul class="nav nav-pills my-3 flex-wrap">
         @foreach (var (key, label) in tabs)
         {

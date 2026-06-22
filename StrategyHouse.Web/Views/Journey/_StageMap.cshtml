@@ -9,9 +9,11 @@
 
     var scopedKpis = Model.Kpis ?? new List<StrategyHouse.Domain.Entities.Kpi>();
 
-    // Phase 20.10 — build initiative→projects map for the two-dropdown picker.
-    var allProjects = Model.Projects ?? new List<StrategyHouse.Domain.Entities.Project>();
-    var pickerInits = (Model.Initiatives ?? new List<StrategyHouse.Domain.Entities.Initiative>())
+    // Phase 20.11 — build initiative→projects map for the two-dropdown picker.
+    // Use FULL project + initiative lists (all departments) so each initiative can
+    // show every linked project regardless of the current user's department.
+    var allProjects = Model.AllProjects ?? new List<StrategyHouse.Domain.Entities.Project>();
+    var pickerInits = (Model.AllInitiatives ?? new List<StrategyHouse.Domain.Entities.Initiative>())
         .Select(i =>
         {
             var obj = Model.Objectives.FirstOrDefault(o => o.ObjectiveCode == i.ObjectiveCode);
@@ -208,20 +210,28 @@
     #stage-5 .jtoggle:hover { background: #ECF6F0; }
     #stage-5 .jtoggle.is-active:hover { background: #05623A; }
 
+    /* Phase 20.11 — compact dropdown picker (was oversized on mobile). */
     #stage-5 .jkpi-picker {
-        max-width: 640px; margin: 0 auto 14px;
-        display: flex; gap: 10px; align-items: center; justify-content: center;
-        flex-wrap: wrap;
+        max-width: 520px; margin: 0 auto 14px;
+        display: flex; flex-wrap: wrap; gap: 6px 12px;
+        align-items: center; justify-content: center;
     }
-    #stage-5 .jkpi-picker label { font-weight: 700; color: #28334A; }
+    #stage-5 .jkpi-picker label {
+        font-weight: 700; color: #28334A; font-size: .9rem;
+        flex: 0 0 auto;
+    }
     #stage-5 .jkpi-picker select {
-        flex: 1 1 280px; min-width: 0;
-        padding: 8px 12px; border-radius: 8px;
-        border: 1px solid #c9d1de; background: #fff;
-        font-family: "Cairo", sans-serif; font-size: .95rem;
+        flex: 1 1 200px; min-width: 0; max-width: 100%;
+        height: 38px; padding: 6px 10px; box-sizing: border-box;
+        border-radius: 8px; border: 1px solid #c9d1de; background: #fff;
+        font-family: "Cairo", sans-serif; font-size: .9rem; line-height: 1.4;
+        appearance: auto; -webkit-appearance: menulist;
     }
-    #stage-5 .jkpi-picker--init { flex-direction: column; align-items: stretch; }
-    #stage-5 .jkpi-picker--init label { text-align: start; }
+    #stage-5 .jkpi-picker--init {
+        flex-direction: column; align-items: stretch; gap: 10px;
+        max-width: 520px;
+    }
+    #stage-5 .jkpi-picker--init label { text-align: start; margin-bottom: -4px; }
 
     #stage-5 .jdetails {
         margin-top: 12px; text-align: start;
@@ -283,6 +293,13 @@ window.__stageMapInit = (function () {
             steps[i].className = steps[i].className.replace(/\s*is-in/g, '');
         }
     }
+    // Phase 20.11 — force-hide helper so leftover inline/CSS state can't leak
+    // between the Initiatives mode and the KPIs mode.
+    function setShown(el, shown) {
+        if (!el) return;
+        if (shown) { el.removeAttribute('hidden'); el.style.display = ''; }
+        else { el.setAttribute('hidden', 'hidden'); el.style.display = 'none'; }
+    }
     function bindToggle() {
         var btns = document.querySelectorAll('#stage-5 .jtoggle');
         if (!btns || btns.length === 0) return;
@@ -297,22 +314,17 @@ window.__stageMapInit = (function () {
                     btns[j].classList.toggle('is-active', on);
                     btns[j].setAttribute('aria-selected', on ? 'true' : 'false');
                 }
+                // Phase 20.11 — exclusive: either Initiatives details OR KPIs details.
                 if (mode === 'kpis') {
-                    if (chainInit) chainInit.hidden = true;
-                    if (pickerInitWrap) pickerInitWrap.hidden = true;
-                    if (chainKpi) {
-                        chainKpi.hidden = false;
-                        resetReveal(chainKpi);
-                        revealChain(chainKpi);
-                    }
+                    setShown(chainInit, false);
+                    setShown(pickerInitWrap, false);
+                    setShown(chainKpi, true);
+                    if (chainKpi) { resetReveal(chainKpi); revealChain(chainKpi); }
                 } else {
-                    if (chainKpi) chainKpi.hidden = true;
-                    if (pickerInitWrap) pickerInitWrap.hidden = false;
-                    if (chainInit) {
-                        chainInit.hidden = false;
-                        resetReveal(chainInit);
-                        revealChain(chainInit);
-                    }
+                    setShown(chainKpi, false);
+                    setShown(pickerInitWrap, true);
+                    setShown(chainInit, true);
+                    if (chainInit) { resetReveal(chainInit); revealChain(chainInit); }
                 }
             });
         }

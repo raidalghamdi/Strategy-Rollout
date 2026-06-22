@@ -321,6 +321,12 @@ public class JourneyController : Controller
             Pledges = await _db.ContributionPledges.Where(p => p.SessionId == sessionId).ToListAsync(),
             Kpis = deptKpis,
             Projects = deptProjects,
+            // Phase 20.11 — full lists (all departments) for the stage-5 initiative picker.
+            AllProjects = ToProjectEntities(await _source.GetProjectsAsync(null, ct))
+                .GroupBy(p => string.IsNullOrWhiteSpace(p.ProjectCode) ? p.ProjectName : p.ProjectCode, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList(),
+            AllInitiatives = StrategyDedup.ByInitiativeCode(ToInitiativeEntities(await _source.GetInitiativesAsync(null, ct))).ToList(),
             Map = map,
             InkAssets = map == null
                 ? new List<MapInkAsset>()
@@ -351,6 +357,7 @@ public class JourneyController : Controller
     // Phase 18/19.23 — vision → pillars → objectives for the strategy-house stage.
     // Sourced through the unified data source (MSSQL mirror → SQLite → empty); never
     // hardcoded. When empty, the view shows the "no strategy data" notice.
+    // Phase 20.11 — Tree displays Pillar → Objective only (no initiatives/projects).
     private async Task<List<StrategyPillarVm>> BuildHousePillarsAsync()
     {
         var ct = HttpContext.RequestAborted;
@@ -363,16 +370,6 @@ public class JourneyController : Controller
             .OrderBy(o => o.ObjectiveCode, StringComparer.Ordinal)
             .ToList();
 
-        // Phase 20.10 — also load initiatives + projects so the Strategic Map tree
-        // can render an expandable Pillar → Objective → Initiative → Project hierarchy.
-        var allInitiatives = StrategyDedup.ByInitiativeCode(ToInitiativeEntities(await _source.GetInitiativesAsync(null, ct)))
-            .OrderBy(i => i.InitiativeCode, StringComparer.Ordinal)
-            .ToList();
-        var allProjects = ToProjectEntities(await _source.GetProjectsAsync(null, ct))
-            .GroupBy(p => string.IsNullOrWhiteSpace(p.ProjectCode) ? p.ProjectName : p.ProjectCode, StringComparer.OrdinalIgnoreCase)
-            .Select(g => g.First())
-            .ToList();
-
         return pillars.Select(p => new StrategyPillarVm
         {
             Code = p.PlrCode,
@@ -383,24 +380,6 @@ public class JourneyController : Controller
                 {
                     Code = o.ObjectiveCode,
                     Name = o.ObjectiveName ?? o.ObjectiveCode,
-                    Initiatives = allInitiatives
-                        .Where(i => string.Equals(i.ObjectiveCode, o.ObjectiveCode, StringComparison.OrdinalIgnoreCase))
-                        .Select(i => new StrategyObjectiveInitiativeVm
-                        {
-                            Code = i.InitiativeCode,
-                            Name = i.InitiativeName ?? i.InitiativeCode,
-                            Projects = allProjects
-                                .Where(pr => !string.IsNullOrEmpty(pr.InitiativeCode)
-                                             && string.Equals(pr.InitiativeCode, i.InitiativeCode, StringComparison.OrdinalIgnoreCase))
-                                .Select(pr => new StrategyChildItemVm
-                                {
-                                    Code = pr.ProjectCode ?? string.Empty,
-                                    Name = pr.ProjectName ?? pr.ProjectCode ?? string.Empty,
-                                    Meta = string.IsNullOrEmpty(pr.ProjectType) ? pr.Division : ($"{pr.ProjectType}" + (string.IsNullOrEmpty(pr.Division) ? "" : $" · {pr.Division}")),
-                                })
-                                .ToList(),
-                        })
-                        .ToList(),
                 })
                 .ToList(),
         }).ToList();
@@ -447,7 +426,8 @@ public class JourneyController : Controller
             {
                 Code = p.Code ?? string.Empty,
                 Name = p.Name ?? p.Code ?? string.Empty,
-                Meta = string.IsNullOrEmpty(p.Status) ? p.Division : ($"{p.Status}" + (string.IsNullOrEmpty(p.Division) ? "" : $" · {p.Division}")),
+                // Phase 20.11 — hide project status; show only the executing division/department.
+                Meta = p.Division,
             })
             .OrderBy(p => p.Code, StringComparer.Ordinal)
             .ToList();
@@ -1182,6 +1162,11 @@ public class JourneyRunViewModel
     public List<ContributionPledge> Pledges { get; set; } = new();
     public List<Kpi> Kpis { get; set; } = new();
     public List<Project> Projects { get; set; } = new();
+    // Phase 20.11 — stage 5 picker needs the full project + initiative lists
+    // (across all departments) so a chosen initiative can show every linked
+    // project regardless of the current user's department.
+    public List<Project> AllProjects { get; set; } = new();
+    public List<Initiative> AllInitiatives { get; set; } = new();
     public DepartmentStrategyMap? Map { get; set; }
     public List<MapInkAsset> InkAssets { get; set; } = new();
     public string? SelectedTeamValue { get; set; } // Phase 16 — the team's chosen Big Picture value (Ar text)
