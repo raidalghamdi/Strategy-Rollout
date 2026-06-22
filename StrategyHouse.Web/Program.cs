@@ -249,6 +249,10 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Phase 20.6 — keep journey-only accounts (those with AppUser.JourneyScopeKey set)
+// out of every platform page; they may only visit /Journey/* and sign out.
+app.UseMiddleware<StrategyHouse.Web.Services.JourneyOnlyGuardMiddleware>();
+
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");

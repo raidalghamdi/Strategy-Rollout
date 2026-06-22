@@ -26,7 +26,13 @@ public class AdminUsersController : Controller
     [HttpGet("")]
     public async Task<IActionResult> Index()
     {
-        var users = await _users.Users.OrderBy(u => u.UserName).ToListAsync();
+        // Phase 20.6 — journey-only accounts (JourneyScopeKey set) are not platform
+        // users; hide them from the admin user list entirely. They’re managed via the
+        // seeded Journey accounts list, not as people who belong on the platform.
+        var users = await _users.Users
+            .Where(u => u.JourneyScopeKey == null)
+            .OrderBy(u => u.UserName)
+            .ToListAsync();
         return View(users.Select(u => new UserRow
         {
             Id = u.Id,

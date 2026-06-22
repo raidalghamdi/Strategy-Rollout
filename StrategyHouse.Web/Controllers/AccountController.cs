@@ -53,6 +53,14 @@ public class AccountController : Controller
                 user.LastLoginAt = DateTime.UtcNow;
                 await _userManager.UpdateAsync(user);
             }
+            // Phase 20.6 — journey-only accounts (any user with JourneyScopeKey set, e.g.
+            // gac.admin, vp.support, vp.economic, vp.legal, testing) never see the platform
+            // UI. Send them straight to the department picker. Real platform admins keep
+            // their existing returnUrl / root behavior.
+            if (user != null && !string.IsNullOrEmpty(user.JourneyScopeKey))
+            {
+                return RedirectToAction("Pick", "Journey");
+            }
             return Redirect(returnUrl ?? "/");
         }
         ModelState.AddModelError("", "اسم المستخدم أو كلمة المرور غير صحيحة");
