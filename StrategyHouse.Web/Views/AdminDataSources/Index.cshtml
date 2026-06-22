@@ -25,7 +25,6 @@
         .sec-title { color:#00192B;font-weight:800;border-inline-start:5px solid #FAC126;padding-inline-start:12px;margin-bottom:14px; }
         .ds-table th { color:#00192B; }
         .ds-badge { display:inline-block;padding:2px 10px;border-radius:999px;color:#fff;font-weight:700;font-size:.8rem; }
-        .ds-json { background:#f5f7fa;border:1px solid #e3e8ef;border-radius:10px;padding:12px;font-family:monospace;font-size:.8rem;direction:ltr;text-align:left;white-space:pre-wrap;word-break:break-all; }
     </style>
 }
 
@@ -78,60 +77,5 @@
             </table>
         </div>
     </div>
-
-    <div class="ds-card">
-        <h4 class="sec-title">ربط الإدارات بأقسام MSSQL (Division)</h4>
-        <p class="text-muted" style="font-size:.9rem;">
-            عند القراءة من نسخة MSSQL، تُرشَّح المشاريع والمؤشرات حسب حقل «Division». اربط رمز الإدارة
-            بأسماء الأقسام (Division) المقابلة في MSSQL. افصل بين الأسماء بسطر جديد أو فاصلة.
-        </p>
-        <form method="post" action="/Admin/DataSources/SaveMap" class="row g-2 align-items-end">
-            @Html.AntiForgeryToken()
-            <div class="col-12 col-md-4">
-                <label class="form-label">الإدارة</label>
-                <select name="deptCode" id="ds-dept" class="form-select" required>
-                    <option value="">— اختر الإدارة —</option>
-                    @foreach (var d in Model.Departments)
-                    {
-                        <option value="@d.DeptCode">@d.NameAr (@d.DeptCode)</option>
-                    }
-                </select>
-            </div>
-            <div class="col-12 col-md-6">
-                <label class="form-label">أسماء الأقسام (Division)</label>
-                <textarea name="divisions" id="ds-divisions" class="form-control" rows="3" placeholder="قسم 1&#10;قسم 2"></textarea>
-            </div>
-            <div class="col-12 col-md-2">
-                <button type="submit" class="btn w-100 text-white" style="background:#00192B;">حفظ الربط</button>
-            </div>
-        </form>
-    </div>
-
-    <div class="ds-card">
-        <h4 class="sec-title">الربط الحالي (JSON)</h4>
-        <div class="ds-json" id="ds-map-json">@Model.DivisionMapJson</div>
-    </div>
 </div>
 
-@section Scripts {
-    <script>
-        // ES5 only (iOS Safari): no template literals, no arrow functions, no block scope.
-        (function () {
-            var raw = document.getElementById('ds-map-json');
-            var sel = document.getElementById('ds-dept');
-            var area = document.getElementById('ds-divisions');
-            if (!raw || !sel || !area) return;
-
-            var map = {};
-            try { map = JSON.parse(raw.textContent || '{}'); } catch (e) { map = {}; }
-
-            // Pre-fill the textarea when an already-mapped department is selected.
-            sel.addEventListener('change', function () {
-                var code = sel.value;
-                var list = map[code];
-                if (list && list.join) { area.value = list.join('\n'); }
-                else { area.value = ''; }
-            });
-        })();
-    </script>
-}
