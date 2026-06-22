@@ -1,0 +1,124 @@
+/* Phase 20.8.3 — global responsive hardening pass.
+   Goal: keep every page usable from 360px phones up to 2560px desktops without
+   horizontal scrolling, clipped buttons, or broken multi-column grids. This file
+   loads last so it overrides any earlier breakpoint that was tuned for a single
+   form factor. */
+
+/* ---------- Document-level safety net ---------- */
+html, body { overflow-x: hidden; }
+*, *::before, *::after { box-sizing: border-box; }
+img, svg, video, canvas { max-width: 100%; height: auto; }
+table { max-width: 100%; }
+
+/* Wrap long Arabic text everywhere instead of overflowing. */
+.gac-card, .gac-card *, .card, .card * {
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+
+/* ---------- Generic containers ---------- */
+.container, .container-fluid { padding-inline: 12px; }
+@media (max-width: 575px) {
+    .container, .container-fluid { padding-inline: 10px; }
+    h1 { font-size: 1.6rem; }
+    h2 { font-size: 1.35rem; }
+    h3 { font-size: 1.15rem; }
+    .h4, h4  { font-size: 1.05rem; }
+    .btn { font-size: .9rem; padding: 8px 12px; }
+    .gac-card { padding: 14px !important; border-radius: 12px; }
+}
+
+/* ---------- Strategy House pillars (Phase 20 fix) ---------- */
+/* The five pillars must sit on one row on desktop. We re-assert here in a global
+   sheet so any page rendering the same grid (Stage 2, /StrategyHouse, exports
+   preview) honours the layout — not only the inline style inside the partial. */
+.house-pillars,
+.pillars-grid,
+#stage-2 .house-pillars {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+}
+@media (max-width: 1199px) {
+    .house-pillars, .pillars-grid, #stage-2 .house-pillars {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+@media (max-width: 767px) {
+    .house-pillars, .pillars-grid, #stage-2 .house-pillars {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 479px) {
+    .house-pillars, .pillars-grid, #stage-2 .house-pillars {
+        grid-template-columns: 1fr;
+    }
+}
+/* Pillar cells must not overflow their grid track — long names should wrap. */
+.house-pillar, #stage-2 .house-pillar { min-width: 0; }
+.house-pillar__name { overflow-wrap: anywhere; word-break: break-word; }
+
+/* ---------- Sankey chart safety ---------- */
+.sankey-chart { width: 100%; }
+@media (max-width: 991px) {
+    /* On narrow viewports the Sankey needs horizontal scrolling rather than
+       being clipped to 0×0. */
+    #house-view-flow { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .sankey-chart { min-width: 700px; }
+}
+
+/* ---------- Admin sidebar + content layout ---------- */
+@media (max-width: 991px) {
+    .admin-shell, .gac-shell, .layout-shell {
+        grid-template-columns: 1fr !important;
+        display: block !important;
+    }
+    .admin-sidebar, .gac-sidebar { width: 100% !important; position: static !important; }
+    .admin-content, .gac-content { padding: 12px !important; }
+}
+
+/* ---------- Tables ---------- */
+.table-responsive { -webkit-overflow-scrolling: touch; }
+@media (max-width: 575px) {
+    table th, table td { padding: .45rem .5rem; font-size: .85rem; }
+}
+
+/* ---------- Dashboards / KPI cards ---------- */
+.kpi-grid, .stats-grid, .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+@media (max-width: 575px) {
+    .kpi-grid, .stats-grid, .metric-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+}
+@media (max-width: 359px) {
+    .kpi-grid, .stats-grid, .metric-grid { grid-template-columns: 1fr; }
+}
+
+/* ---------- Forms ---------- */
+@media (max-width: 575px) {
+    .form-control, .form-select { font-size: 16px; } /* prevents iOS zoom on focus */
+    .row > [class*="col-"] { margin-bottom: 12px; }
+}
+
+/* ---------- Buttons groups (download/export bars) ---------- */
+.d-flex.flex-wrap.gap-2 .btn,
+.btn-toolbar .btn {
+    min-height: 38px;
+}
+@media (max-width: 575px) {
+    .d-flex.flex-wrap.gap-2 .btn { flex: 1 1 calc(50% - 8px); text-align: center; }
+}
+
+/* ---------- Navigation & header ---------- */
+@media (max-width: 575px) {
+    .navbar-brand img, .gac-logo img { max-height: 36px; }
+    .gac-header { padding: 8px 12px; }
+}
+
+/* ---------- Modals ---------- */
+@media (max-width: 575px) {
+    .modal-dialog { margin: 8px; }
+    .modal-body { padding: 12px; }
+}

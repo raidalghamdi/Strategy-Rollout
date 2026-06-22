@@ -105,7 +105,9 @@
         var perNode = 72;
         var height = Math.max(1400, tallest * perNode + 120);
         el.style.height = height + 'px';
-        el.style.minWidth = '900px';
+        // Phase 20.8.3 — do not force a min-width that breaks responsive layouts; let
+        // ECharts stretch to the container width and rely on overflow-x on the parent.
+        el.style.width = '100%';
 
         var chart = window.echarts.init(el, null, { renderer: 'canvas' });
         var nodes = [];
@@ -160,6 +162,10 @@
             }]
         };
         chart.setOption(option);
+        // Phase 20.8.3 — ECharts measures the container at init(); if the tab was
+        // hidden a moment ago the canvas can come out 0 × 0. Force a resize once the
+        // browser has actually laid the element out so the diagram fills the panel.
+        try { setTimeout(function () { try { chart.resize(); } catch (e2) {} }, 60); } catch (e1) {}
         if (!el.__resizeBound) {
             el.__resizeBound = true;
             window.addEventListener('resize', function () { try { chart.resize(); } catch (e) {} });
@@ -169,7 +175,10 @@
 
     function render(el) {
         if (!el || el.__sankeyRendered) return;
-        el.__sankeyRendered = true;
+        // Phase 20.8.3 — only flip the rendered flag after the draw succeeds. Marking
+        // it true up-front meant that a transient fetch / ECharts CDN failure would
+        // permanently block any subsequent render attempt (so the preview stayed
+        // blank even after the network recovered).
         el.innerHTML = '<div class="text-muted small" style="padding:18px;text-align:center;">جارٍ تحميل المخطط…</div>';
         try {
             fetch('/api/strategy/sankey', { headers: { 'Accept': 'application/json' } })
@@ -190,7 +199,7 @@
                         chartHost.style.width = '100%';
                         chartHost.style.height = '100%';
                         el.appendChild(chartHost);
-                        try { draw(chartHost, data); }
+                        try { draw(chartHost, data); el.__sankeyRendered = true; }
                         catch (e) { fail(el); }
                     });
                 })
