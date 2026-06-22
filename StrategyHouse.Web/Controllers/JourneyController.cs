@@ -52,6 +52,10 @@ public class JourneyController : Controller
     [HttpGet("Journey/Pick")]
     public async Task<IActionResult> Pick()
     {
+        if (User?.Identity?.IsAuthenticated != true)
+        {
+            return Redirect("/Account/Login");
+        }
         var visible = await _scope.GetVisibleDeptCodesAsync(User);
         var depts = await _db.Departments
             .Where(d => visible.Contains(d.DeptCode))
@@ -69,6 +73,10 @@ public class JourneyController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> PickStart(string deptCode)
     {
+        if (User?.Identity?.IsAuthenticated != true)
+        {
+            return Redirect("/Account/Login");
+        }
         var visible = await _scope.GetVisibleDeptCodesAsync(User);
         if (string.IsNullOrWhiteSpace(deptCode) || !visible.Contains(deptCode))
         {
