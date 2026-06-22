@@ -14,7 +14,6 @@
 @{
     var sel = Model.SelectedInitiative;
     var visionText = Model.Content?.Vision.Ar;
-    var hasSelection = sel != null && !string.IsNullOrEmpty(sel.Code);
 
     var scopedKpis = Model.Kpis ?? new List<StrategyHouse.Domain.Entities.Kpi>();
 
@@ -52,18 +51,42 @@
             Projects = projs2,
         });
     }
+
+    // Phase 20.13 — Stage 5 must render independently of any choice made in
+    // Stage 4. If no initiative was pre-selected, fall back to the first one
+    // in the picker so the chain has real data; if there are no initiatives at
+    // all, synthesise a placeholder so the page never crashes on sel.Name.
+    if (sel == null || string.IsNullOrEmpty(sel.Code))
+    {
+        if (pickerInits.Count > 0)
+        {
+            var first = pickerInits[0];
+            sel = new StrategyHouse.Web.Controllers.StrategyInitiativeVm
+            {
+                Code = first.Code,
+                Name = first.Name,
+                ObjectiveName = first.ObjectiveName,
+                PillarName = first.PillarName,
+            };
+        }
+        else
+        {
+            sel = new StrategyHouse.Web.Controllers.StrategyInitiativeVm
+            {
+                Code = "",
+                Name = "—",
+                ObjectiveName = "—",
+                PillarName = "—",
+            };
+        }
+    }
 }
 <div class="gac-card" id="journey-card">
     <h2 class="h4 h-md-2 text-center">الرحلة نحو الرؤية</h2>
 
-    @if (!hasSelection)
-    {
-        <div class="alert alert-info mt-2 text-center">
-            اختر مبادرتك في مرحلة «دوري في الاستراتيجية» لعرض ارتباط دورك بالرؤية.
-        </div>
+    @{
+        // Phase 20.13 — content always renders, even without a Stage 4 selection.
     }
-    else
-    {
         <p class="text-muted text-center">شاهد كيف يتصل دورك — خطوة بخطوة — حتى رؤية الهيئة.</p>
 
         <div class="journey-toggle" role="tablist" aria-label="نوع الربط">
@@ -176,7 +199,6 @@
         <div class="jmsg-wrap">
             <div id="journeyMsg" class="jmsg">أنت أقرب للرؤية مما تتصور</div>
         </div>
-    }
 </div>
 
 <style>

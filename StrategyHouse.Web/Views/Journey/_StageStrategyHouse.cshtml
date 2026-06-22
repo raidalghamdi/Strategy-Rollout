@@ -89,9 +89,13 @@
     /* Phase 20.12 — the .house-objs class sets display:flex which beats the
        native [hidden] attribute (HTML attr is overridden by any class
        setting display). Add explicit [hidden]{display:none !important} so
-       collapse really hides the objectives panel on every pillar. */
-    #stage-2 .house-objs { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
-    #stage-2 .house-objs[hidden] { display: none !important; }
+       collapse really hides the objectives panel on every pillar.
+       Phase 20.13 — widen the selector to apply on ANY journey type (VP,
+       department, general). Previously the rule was scoped to #stage-2 which
+       depends on the journey wrapper id; some department-journey wrappers
+       render under a different id, so the collapse rule never fired there. */
+    #stage-2 .house-objs, .house-objs { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+    #stage-2 .house-objs[hidden], .house-objs[hidden] { display: none !important; }
     #stage-2 .house-obj {
         background: #eef6f1; color: #1d4d39; border-radius: 10px; padding: 12px 14px;
         font-weight: 600; font-size: .92rem; line-height: 1.6; border-right: 4px solid #067647;

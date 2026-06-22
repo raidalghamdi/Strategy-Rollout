@@ -15,6 +15,11 @@
     <link rel="stylesheet" href="~/css/phase15-responsive.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/phase19_5-responsive.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/dga-theme.css" asp-append-version="true" />
+    @* Phase 20.13 — self-host Tom Select on journey pages too so searchable
+       dropdowns (data-pplx-search="1") work on every journey type, not only
+       on platform pages that use _Layout. *@
+    <link rel="stylesheet" href="~/lib/tomselect/tom-select.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/phase20_12-pplx-select.css" asp-append-version="true" />
     <style>
         /* Journey palette mapped to GAC brand tokens (Phase 7) */
         :root {
@@ -66,6 +71,10 @@
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/konva@9.3.6/konva.min.js"></script>
+    @* Phase 20.13 — wire Tom Select into journey layout as well, so dropdowns
+       on stages 4/5 become searchable for every journey type. *@
+    <script src="~/lib/tomselect/tom-select.complete.min.js" asp-append-version="true"></script>
+    <script src="~/js/pplx-select.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

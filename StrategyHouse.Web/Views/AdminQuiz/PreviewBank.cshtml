@@ -3,10 +3,16 @@
     ViewData["Title"] = "معاينة بنك الأسئلة الموسّع";
     var total = (int)(ViewBag.Total ?? 0);
     var deptCode = ViewBag.DeptCode as string;
+    var matchedDeptName = ViewBag.MatchedDeptName as string;
+    var deptQ = (int)(ViewBag.DeptQuestionCount ?? 0);
+    var generalQ = (int)(ViewBag.GeneralQuestionCount ?? 0);
+    var depts = ViewBag.Departments as List<StrategyHouse.Web.Controllers.DeptOption> ?? new();
 }
 
 @section Styles {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
+    @* Phase 20.13 — Tom Select theme + script are already wired into _Layout.cshtml,
+       so no extra includes are needed here for the searchable dept dropdown. *@
 }
 
 <div class="container py-3" dir="rtl">
@@ -18,14 +24,46 @@
         <a class="btn btn-outline-secondary btn-sm" href="/Admin/Quiz">رجوع لإدارة البنك</a>
     </div>
 
-    <form method="get" class="my-3 d-flex gap-2 flex-wrap">
-        <input class="form-control form-control-sm" style="max-width:240px;" name="deptCode" value="@deptCode" placeholder="رمز الإدارة (اختياري لاختبار النطاق 4 و 5)" />
+    @* Phase 20.13 — replaced the bare text input with a searchable dropdown so
+       admins can pick an existing department by name. Previously a free-text
+       code that didn't match any department silently reused the same general
+       bank, giving the impression «أضفت الرمز ولم يحصل شيء». *@
+    <form method="get" class="my-3 d-flex gap-2 flex-wrap align-items-end">
+        <div style="min-width: 320px;">
+            <label class="form-label small text-muted mb-1">الإدارة (لتوليد النطاق 4 و 5)</label>
+            <select class="form-select form-select-sm" name="deptCode" data-pplx-search="1" data-placeholder="ابحث عن إدارة…">
+                <option value="">— جميع الإدارات (عام فقط) —</option>
+                @foreach (var d in depts)
+                {
+                    <option value="@d.Code" selected="@(d.Code == deptCode ? "selected" : null)">@d.Name (@d.Code)</option>
+                }
+            </select>
+        </div>
         <button class="btn btn-sm btn-primary">إعادة التوليد</button>
+        @if (!string.IsNullOrEmpty(deptCode))
+        {
+            <a class="btn btn-sm btn-outline-secondary" href="/Admin/Quiz/PreviewBank">إلغاء الفلترة</a>
+        }
     </form>
+
+    @if (!string.IsNullOrEmpty(deptCode) && string.IsNullOrEmpty(matchedDeptName))
+    {
+        <div class="alert alert-warning">
+            الرمز <code>@deptCode</code> لم يتطابق مع أي إدارة فعلية، لذلك لم تُولَّد
+            أسئلة النطاق 4 و 5. اختر إدارة من القائمة أعلاه.
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(matchedDeptName))
+    {
+        <div class="alert alert-success py-2">
+            تمّ التوليد للإدارة: <strong>@matchedDeptName</strong> (<code>@deptCode</code>)
+            — أسئلة خاصة بالإدارة: <strong>@deptQ</strong>، أسئلة عامة: <strong>@generalQ</strong>.
+        </div>
+    }
 
     <div class="alert alert-info">
         البنك يُولَّد ديناميكيًا من قاعدة البيانات الحيّة. إذا تغيّرت البيانات تتغيّر الأسئلة معها.
-        النطاقات 4 و 5 (المشاريع والمؤشرات) تظهر فقط عند تمرير رمز إدارة.
+        النطاقات 4 و 5 (المشاريع والمؤشرات) تظهر فقط عند اختيار إدارة موجودة في قائمة الإدارات.
     </div>
 
     @if (!Model.Any())

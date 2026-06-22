@@ -292,11 +292,29 @@ public class AdminQuizController : Controller
 
     // GET /Admin/Quiz/PreviewBank — inspect a freshly generated bank sample
     // (for admins to verify templates render correctly against current DB).
+    // Phase 20.13 — expose the dept list to the view so the admin can pick a
+    // department instead of typing a code (free-text input «دون تغذية راجعة»
+    // gave the impression nothing happened when the code didn’t match), and
+    // surface whether the entered code resolved to an actual department.
     [HttpGet("PreviewBank")]
     public async Task<IActionResult> PreviewBank(string? deptCode = null)
     {
         var bank = await _templates.GenerateForUserAsync(deptCode);
+        var depts = await _db.Departments
+            .Where(d => d.IsActive)
+            .OrderBy(d => d.DeptCode)
+            .Select(d => new DeptOption { Code = d.DeptCode, Name = d.NameAr ?? d.DeptCode })
+            .ToListAsync();
+        var matched = !string.IsNullOrEmpty(deptCode)
+            ? depts.FirstOrDefault(d => d.Code == deptCode)
+            : null;
+        var deptCount = bank.Count(q => q.Scope == "Department");
+        var generalCount = bank.Count - deptCount;
         ViewBag.DeptCode = deptCode;
+        ViewBag.Departments = depts;
+        ViewBag.MatchedDeptName = matched?.Name;
+        ViewBag.DeptQuestionCount = deptCount;
+        ViewBag.GeneralQuestionCount = generalCount;
         ViewBag.Total = bank.Count;
         return View(bank.Take(40).ToList());
     }

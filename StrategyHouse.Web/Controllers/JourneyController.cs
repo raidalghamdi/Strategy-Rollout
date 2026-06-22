@@ -216,6 +216,13 @@ public class JourneyController : Controller
         var vm = await BuildRunViewModelAsync(sessionId);
         if (vm == null) return NotFound();
         ViewBag.Stage = stage;
+        // Phase 20.13 — iOS Safari was treating URLs ending in a bare digit
+        // (e.g. /Journey/Run/{guid}/4) as downloadable files and showing
+        // "Do you want to download '4'" when the user tapped «التالي». Force an
+        // explicit HTML content type + inline disposition so the browser
+        // always renders the page instead of offering a download.
+        Response.ContentType = "text/html; charset=utf-8";
+        Response.Headers["Content-Disposition"] = "inline";
         return View("RunStage", vm);
     }
 
