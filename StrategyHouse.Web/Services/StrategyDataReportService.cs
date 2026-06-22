@@ -95,6 +95,7 @@ public class StrategyDataReportService
             var skipped = 0;
 
             using var wb = new XLWorkbook();
+            wb.Style.Font.FontName = "Cairo"; // Phase 20.10 — unify exports on website font
 
             var wsP = wb.Worksheets.Add("المرتكزات");
             WriteHeader(wsP, "الرمز", "الاسم", "الميزانية", "السيولة");
@@ -171,6 +172,7 @@ public class StrategyDataReportService
         {
             _log.LogError(ex, "Strategy report Excel build failed; returning notice workbook.");
             using var wb = new XLWorkbook();
+            wb.Style.Font.FontName = "Cairo"; // Phase 20.10 — unify exports on website font
             var ws = wb.Worksheets.Add("تنبيه");
             ws.Cell(1, 1).Value = "تعذّر إنشاء التقرير حالياً. حاول مرة أخرى لاحقاً.";
             using var ms = new MemoryStream();

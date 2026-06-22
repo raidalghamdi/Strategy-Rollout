@@ -8,7 +8,8 @@ namespace StrategyHouse.Web.Services;
 // Generates the print-ready department strategy map PDF (A3 landscape, Arabic RTL).
 public class StrategyMapPdfService
 {
-    private const string Font = "Noto Naskh Arabic";
+    // Phase 20.10 — unify exports on the website font (Cairo) for consistency.
+    private const string Font = "Cairo";
 
     // GAC brand palette (Phase 7) — navy title bar + gold accents.
     private const string NavyDark = "#00192B";

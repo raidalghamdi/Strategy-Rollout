@@ -9,7 +9,8 @@ namespace StrategyHouse.Web.Services;
 // MCQ distributions, per-department breakdown, and a sample of verbatim text.
 public class SurveyReportPdfService
 {
-    private const string Font = "Noto Naskh Arabic";
+    // Phase 20.10 — unify exports on the website font (Cairo) for consistency.
+    private const string Font = "Cairo";
     private const string Primary = "#194F90";
     private const string Cyan = "#46BCCD";
     private const string Green = "#009845";

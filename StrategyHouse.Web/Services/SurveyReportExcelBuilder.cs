@@ -13,6 +13,7 @@ public class SurveyReportExcelBuilder
     public byte[] Build(FinalReportViewModel m)
     {
         using var wb = new XLWorkbook();
+        wb.Style.Font.FontName = "Cairo"; // Phase 20.10 — unify exports on website font
         BuildSummary(wb, m);
         BuildLikert(wb, m);
         BuildChoice(wb, m);

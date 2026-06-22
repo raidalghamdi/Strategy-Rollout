@@ -5,7 +5,6 @@
     var savedImpact = role?.PerceivedImpact;
     var savedDept = role?.DepartmentCode;
     var savedInit = role?.SelectedInitiativeCode;
-    var visionText = Model.Content?.Vision.Ar;
 
     // Phase 19.13 — the journey already knows the department from the journey
     // code (GAC202 / GAC206 / GAC208), so re-asking on stage 3 is redundant.
@@ -65,95 +64,88 @@
         </div>
     </div>
 
-    <div id="linkChain" class="link-chain" hidden>
-        <div class="link-node link-node--init"><span class="link-label">مبادرتك</span><span class="link-text" id="lcInit"></span></div>
-        <div class="link-arrow">↓</div>
-        <div class="link-node link-node--obj"><span class="link-label">الهدف</span><span class="link-text" id="lcObj"></span></div>
-        <div class="link-arrow">↓</div>
-        <div class="link-node link-node--pillar"><span class="link-label">الركيزة</span><span class="link-text" id="lcPillar"></span></div>
-        <div class="link-arrow">↓</div>
-        <div class="link-node link-node--vision"><span class="link-label">الرؤية</span><span class="link-text">@visionText</span></div>
-    </div>
+    @* Phase 20.10 — the linkage chain that used to live here (مبادرة → هدف → ركيزة → رؤية)
+       was removed; the same chain is shown in the next stage (الرحلة نحو الرؤية). *@
 </div>
 
 <style>
-    #stage-3 .contrib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-    #stage-3 .contrib-card {
-        border: 2px solid #d5dbe4; border-radius: 12px; padding: 14px; background: #fff;
-        cursor: pointer; transition: border-color .15s, box-shadow .15s; display: block; margin: 0;
+    /* Phase 20.10 — initiative cards now match the colored chain style used
+       in the next stage. Selected initiative gets the brighter green; the
+       inner projects details panel keeps a soft translucent backdrop. */
+    #stage-4 .contrib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+    #stage-4 .contrib-card {
+        background: #5F9600;
+        color: #fff;
+        border: 2px solid transparent;
+        border-radius: 14px;
+        padding: 16px 18px;
+        cursor: pointer;
+        transition: background .15s, border-color .15s, box-shadow .15s, transform .12s;
+        display: block;
+        margin: 0;
+        box-shadow: 0 2px 10px rgba(95,150,0,.18);
     }
-    #stage-3 .contrib-card.is-selected { border-color: #067647; box-shadow: 0 2px 12px rgba(6,118,71,.2); }
-    #stage-3 .contrib-card input[type=radio] { width: 20px; height: 20px; accent-color: #067647; vertical-align: middle; }
-    #stage-3 .contrib-card .ci-name { font-weight: 700; color: #28334A; margin-inline-start: 8px; }
-    #stage-3 .contrib-card .ci-meta { display: block; margin-top: 8px; font-size: .82rem; color: #5a6b80; }
+    #stage-4 .contrib-card:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(95,150,0,.28); }
+    #stage-4 .contrib-card.is-selected { background: #067647; border-color: #fff; box-shadow: 0 4px 18px rgba(6,118,71,.35); }
+    #stage-4 .contrib-card input[type=radio] { width: 20px; height: 20px; accent-color: #fff; vertical-align: middle; }
+    #stage-4 .contrib-card .ci-name { font-weight: 800; color: #fff; margin-inline-start: 8px; font-size: 1rem; line-height: 1.6; }
+    #stage-4 .contrib-card .ci-meta { display: block; margin-top: 8px; font-size: .82rem; color: rgba(255,255,255,.92); line-height: 1.7; }
 
-    /* Phase 20.2 — expandable projects + KPIs section inside each initiative card. */
-    #stage-3 .ci-details {
+    /* Expandable projects under each initiative card. */
+    #stage-4 .ci-details {
         margin-top: 10px;
-        border-top: 1px dashed #d5dbe4;
+        border-top: 1px dashed rgba(255,255,255,.45);
         padding-top: 8px;
     }
-    #stage-3 .ci-details summary {
+    #stage-4 .ci-details summary {
         cursor: pointer;
         font-size: .85rem;
         font-weight: 700;
-        color: #067647;
+        color: #fff;
         list-style: none;
         padding: 4px 0;
         outline: none;
         user-select: none;
     }
-    #stage-3 .ci-details summary::-webkit-details-marker { display: none; }
-    #stage-3 .ci-details summary::before {
+    #stage-4 .ci-details summary::-webkit-details-marker { display: none; }
+    #stage-4 .ci-details summary::before {
         content: '◀';
         display: inline-block;
         margin-inline-end: 6px;
         font-size: .7rem;
         transition: transform .2s;
     }
-    #stage-3 .ci-details[open] summary::before { transform: rotate(-90deg); }
-    #stage-3 .ci-children { padding: 8px 0 4px; font-size: .82rem; color: #28334A; }
-    #stage-3 .ci-child-group { margin-bottom: 8px; }
-    #stage-3 .ci-child-group:last-child { margin-bottom: 0; }
-    #stage-3 .ci-child-group h6 {
+    #stage-4 .ci-details[open] summary::before { transform: rotate(-90deg); }
+    #stage-4 .ci-children { padding: 8px 0 4px; font-size: .82rem; color: #fff; }
+    #stage-4 .ci-child-group { margin-bottom: 8px; }
+    #stage-4 .ci-child-group:last-child { margin-bottom: 0; }
+    #stage-4 .ci-child-group h6 {
         font-size: .78rem;
         font-weight: 700;
-        color: #5a6b80;
+        color: rgba(255,255,255,.9);
         margin: 0 0 4px;
         text-transform: none;
     }
-    #stage-3 .ci-child-group ul {
+    #stage-4 .ci-child-group ul {
         list-style: none;
         padding: 0;
         margin: 0;
     }
-    #stage-3 .ci-child-group li {
-        padding: 4px 8px;
-        background: #f6f8fb;
-        border-radius: 6px;
-        margin-bottom: 3px;
+    #stage-4 .ci-child-group li {
+        padding: 6px 10px;
+        background: rgba(255,255,255,.2);
+        border-radius: 8px;
+        margin-bottom: 4px;
         line-height: 1.5;
+        color: #fff;
+        font-weight: 600;
     }
-    #stage-3 .ci-child-meta { color: #7a8699; font-size: .75rem; }
-    #stage-3 .link-chain { margin-top: 18px; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
-    #stage-3 .link-node {
-        border-radius: 12px; padding: 14px 16px; color: #fff; text-align: center;
-        opacity: 0; transform: translateY(8px); transition: opacity .4s ease, transform .4s ease;
-    }
-    #stage-3 .link-chain.is-shown .link-node { opacity: 1; transform: translateY(0); }
-    #stage-3 .link-node--init { background: #5F9600; }
-    #stage-3 .link-node--obj { background: #299ECE; }
-    #stage-3 .link-node--pillar { background: #0f8f5b; }
-    #stage-3 .link-node--vision { background: #067647; font-weight: 800; }
-    #stage-3 .link-label { display: block; font-size: .8rem; opacity: .9; }
-    #stage-3 .link-text { display: block; font-weight: 700; line-height: 1.6; margin-top: 4px; }
-    #stage-3 .link-arrow { text-align: center; color: #067647; font-size: 1.3rem; line-height: 1; opacity: 0; transition: opacity .4s ease; }
-    #stage-3 .link-chain.is-shown .link-arrow { opacity: 1; }
-    @@media (max-width: 576px) { #stage-3 .contrib-grid { grid-template-columns: 1fr; } }
+    #stage-4 .ci-child-meta { color: rgba(255,255,255,.8); font-size: .75rem; font-weight: 400; }
+    @@media (max-width: 576px) { #stage-4 .contrib-grid { grid-template-columns: 1fr; } }
 
-    /* Phase 19.13 — read-only department chip for stage 3 (the dept is already
-       known from the journey code, no need for a dropdown). */
-    #stage-3 .dept-chip {
+    /* Phase 19.13 — read-only department chip for stage 4 (the dept is already
+       known from the journey context, no need for a dropdown). */
+    #stage-4 .dept-chip {
         display: inline-flex; align-items: center; gap: 10px;
         background: rgba(6, 118, 71, .08);
         border: 1.5px solid rgba(6, 118, 71, .35);
@@ -161,12 +153,14 @@
         font-weight: 700; color: #28334A; min-height: 44px;
         max-width: 520px;
     }
-    #stage-3 .dept-chip__name { line-height: 1.4; }
+    #stage-4 .dept-chip__name { line-height: 1.4; }
 </style>
 
 <script>
-// Phase 18 — Stage 3 (دوري في الاستراتيجية). iOS Safari-safe ES5: IIFE, string concat,
-// for-loops, no template literals, no block scope, try/catch with fallback.
+// Phase 18 — Stage «دوري في الاستراتيجية» (was 3, now 4). iOS Safari-safe ES5:
+// IIFE, string concat, for-loops, no template literals, no block scope,
+// try/catch with fallback.
+// Phase 20.10 — removed the bottom linkage chain (shown in the next stage instead).
 (function () {
     var sessionId = '@Model.Session.Id';
     var savedInit = '@(savedInit ?? "")';
@@ -216,8 +210,8 @@
                     + '<span class="ci-name">' + (it.name || it.code) + '</span>'
                     + (meta ? '<span class="ci-meta">' + meta + '</span>' : '')
                     + detailsHtml;
-                // Phase 20.2 — clicking inside <details> (the summary or list)
-                // must NOT bubble up to the label and toggle the radio.
+                // Clicking inside <details> (the summary or list) must NOT bubble
+                // up to the label and toggle the radio.
                 var detailsEl = label.querySelector('details');
                 if (detailsEl) {
                     detailsEl.addEventListener('click', function (ev) { ev.stopPropagation(); });
@@ -230,10 +224,6 @@
                     selectedCode = it.code; selectedName = it.name || it.code;
                     selectedObj = it.objectiveName || ''; selectedPillar = it.pillarName || '';
                     if (el('impactBlock')) el('impactBlock').removeAttribute('hidden');
-                    // Phase 19.17 — the link tree now appears/updates automatically the
-                    // moment an initiative is chosen (the manual «إظهار الربط» button
-                    // was removed). Changing selection replaces the tree contents in place.
-                    showChain();
                     saveContribution();
                 });
                 if (savedInit && savedInit === it.code) { radio.checked = true; radio.dispatchEvent(new CustomEvent('change')); }
@@ -256,14 +246,6 @@
         } catch (e) { el('initiativesStatus').textContent = 'تعذّر تحميل المبادرات، حاول مرة أخرى.'; }
     }
 
-    function showChain() {
-        el('lcInit').textContent = selectedName || '—';
-        el('lcObj').textContent = selectedObj || '—';
-        el('lcPillar').textContent = selectedPillar || '—';
-        var chain = el('linkChain');
-        if (chain) { chain.removeAttribute('hidden'); setTimeout(function () { chain.className = 'link-chain is-shown'; }, 30); }
-    }
-
     function saveContribution() {
         var status = el('contribStatus');
         var impact = el('impactText') ? el('impactText').value.replace(/^\s+|\s+$/g, '') : '';
@@ -284,16 +266,11 @@
         var sel = el('deptSelect');
         if (sel && !sel.__bound) {
             sel.__bound = true;
-            // Hidden input (Phase 19.13) has no 'change' event from user input,
-            // but we still call loadInitiatives() once on init using its value.
             if (sel.tagName === 'SELECT') {
                 sel.addEventListener('change', function () { loadInitiatives(sel.value); });
             }
             if (sel.value) loadInitiatives(sel.value);
         }
-        // Phase 19.17 — autosave the optional impact text on edit (debounced),
-        // since the «إظهار الربط» button that used to trigger the save is gone.
-        // The «تم الحفظ ✓» indicator behavior is preserved.
         var impact = el('impactText');
         if (impact && !impact.__bound) {
             impact.__bound = true;
@@ -305,7 +282,7 @@
             });
         }
     }
-    document.addEventListener('stageReady', function (e) { if (e.detail && e.detail.stage === 3) init(); });
+    document.addEventListener('stageReady', function (e) { if (e.detail && e.detail.stage === 4) init(); });
     if (document.readyState !== 'loading') init();
     else document.addEventListener('DOMContentLoaded', init);
 })();

@@ -20,6 +20,8 @@ public class JourneyOnlyGuardMiddleware
         "/Admin/LiveDashboard", // landing executive dashboard (their main view)
         "/Admin/SessionDetail", // session drill-down from the dashboard
         "/Journey",             // start / continue a journey when picked from the dashboard
+        "/Quiz",                // Phase 20.10 — quiz access from VP journey complete
+        "/api",                 // Phase 20.10 — Sankey + strategy data APIs
         "/Account/Logout",      // sign out
         "/Account/Login",       // re-login if session expires mid-flow
         "/Account/AccessDenied",

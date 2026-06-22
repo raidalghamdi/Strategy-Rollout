@@ -11,7 +11,8 @@ namespace StrategyHouse.Web.Services;
 // all 17 department map thumbnails with status badges.
 public class ProgrammePosterPdfService
 {
-    private const string Font = "Noto Naskh Arabic";
+    // Phase 20.10 — unify exports on the website font (Cairo) for consistency.
+    private const string Font = "Cairo";
     private const string Primary = "#194F90";
     private const string Cyan = "#46BCCD";
     private const string Green = "#009845";

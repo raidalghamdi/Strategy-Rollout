@@ -264,8 +264,44 @@ public class JourneyController : Controller
         // (MSSQL mirror → SQLite → empty). DTOs are mapped to entity shapes for the
         // views; dedup is preserved at this read layer.
         var ct = HttpContext.RequestAborted;
-        var deptKpis = ToKpiEntities(await _source.GetKpisAsync(session.DeptCode, ct));
-        var deptProjects = ToProjectEntities(await _source.GetProjectsAsync(session.DeptCode, ct));
+        List<Kpi> deptKpis;
+        List<Project> deptProjects;
+        var sectorDisplay = SectorDisplayName(session.DeptCode);
+        if (sectorDisplay != null)
+        {
+            // Phase 20.10 (Fix 6) — for a synthetic sector session, aggregate KPIs +
+            // Projects from ALL departments whose ParentSector matches the sector's
+            // Arabic display name. The unified source is queried per department and
+            // results are deduped by code so the journey shows the full sector view.
+            var sectorDepts = await _db.Departments
+                .Where(d => d.ParentSector == sectorDisplay && d.IsActive)
+                .Select(d => d.NameAr)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Select(n => n!)
+                .Distinct()
+                .ToListAsync();
+
+            var aggKpis = new List<Kpi>();
+            var aggProjects = new List<Project>();
+            foreach (var deptName in sectorDepts)
+            {
+                aggKpis.AddRange(ToKpiEntities(await _source.GetKpisAsync(deptName, ct)));
+                aggProjects.AddRange(ToProjectEntities(await _source.GetProjectsAsync(deptName, ct)));
+            }
+            deptKpis = aggKpis
+                .GroupBy(k => string.IsNullOrWhiteSpace(k.KpiCode) ? k.KpiName : k.KpiCode, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+            deptProjects = aggProjects
+                .GroupBy(p => string.IsNullOrWhiteSpace(p.ProjectCode) ? p.ProjectName : p.ProjectCode, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+        }
+        else
+        {
+            deptKpis = ToKpiEntities(await _source.GetKpisAsync(session.DeptCode, ct));
+            deptProjects = ToProjectEntities(await _source.GetProjectsAsync(session.DeptCode, ct));
+        }
 
         return new JourneyRunViewModel
         {
@@ -326,13 +362,46 @@ public class JourneyController : Controller
         var objectives = StrategyDedup.ByObjectiveCode(ToObjectiveEntities(await _source.GetObjectivesAsync(ct)))
             .OrderBy(o => o.ObjectiveCode, StringComparer.Ordinal)
             .ToList();
+
+        // Phase 20.10 — also load initiatives + projects so the Strategic Map tree
+        // can render an expandable Pillar → Objective → Initiative → Project hierarchy.
+        var allInitiatives = StrategyDedup.ByInitiativeCode(ToInitiativeEntities(await _source.GetInitiativesAsync(null, ct)))
+            .OrderBy(i => i.InitiativeCode, StringComparer.Ordinal)
+            .ToList();
+        var allProjects = ToProjectEntities(await _source.GetProjectsAsync(null, ct))
+            .GroupBy(p => string.IsNullOrWhiteSpace(p.ProjectCode) ? p.ProjectName : p.ProjectCode, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+
         return pillars.Select(p => new StrategyPillarVm
         {
             Code = p.PlrCode,
             Name = p.PillarName ?? p.PlrCode,
             Objectives = objectives
                 .Where(o => o.PlrCode == p.PlrCode)
-                .Select(o => new StrategyObjectiveVm { Code = o.ObjectiveCode, Name = o.ObjectiveName ?? o.ObjectiveCode })
+                .Select(o => new StrategyObjectiveVm
+                {
+                    Code = o.ObjectiveCode,
+                    Name = o.ObjectiveName ?? o.ObjectiveCode,
+                    Initiatives = allInitiatives
+                        .Where(i => string.Equals(i.ObjectiveCode, o.ObjectiveCode, StringComparison.OrdinalIgnoreCase))
+                        .Select(i => new StrategyObjectiveInitiativeVm
+                        {
+                            Code = i.InitiativeCode,
+                            Name = i.InitiativeName ?? i.InitiativeCode,
+                            Projects = allProjects
+                                .Where(pr => !string.IsNullOrEmpty(pr.InitiativeCode)
+                                             && string.Equals(pr.InitiativeCode, i.InitiativeCode, StringComparison.OrdinalIgnoreCase))
+                                .Select(pr => new StrategyChildItemVm
+                                {
+                                    Code = pr.ProjectCode ?? string.Empty,
+                                    Name = pr.ProjectName ?? pr.ProjectCode ?? string.Empty,
+                                    Meta = string.IsNullOrEmpty(pr.ProjectType) ? pr.Division : ($"{pr.ProjectType}" + (string.IsNullOrEmpty(pr.Division) ? "" : $" · {pr.Division}")),
+                                })
+                                .ToList(),
+                        })
+                        .ToList(),
+                })
                 .ToList(),
         }).ToList();
     }
@@ -558,18 +627,47 @@ public class JourneyController : Controller
         {
             var ct = HttpContext.RequestAborted;
             var inits = await _source.GetInitiativesAsync(null, ct);
-            // The division acts as a department filter for that department's projects.
-            var projects = await _source.GetProjectsAsync(division, ct);
+
+            // Phase 20.10 (Fix 6) — if the division name matches a sector display
+            // name, aggregate projects across ALL departments whose ParentSector
+            // matches. Owner-name matching also widens to all department names in
+            // that sector + the sector name itself.
+            var sectorDeptNames = await _db.Departments
+                .Where(d => d.ParentSector == division && d.IsActive)
+                .Select(d => d.NameAr)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Select(n => n!)
+                .Distinct()
+                .ToListAsync();
+
+            List<StrategyHouse.Web.Services.Dtos.StrategyProjectDto> projects;
+            HashSet<string> ownerCandidates;
+            if (sectorDeptNames.Count > 0)
+            {
+                var agg = new List<StrategyHouse.Web.Services.Dtos.StrategyProjectDto>();
+                foreach (var name in sectorDeptNames)
+                    agg.AddRange(await _source.GetProjectsAsync(name, ct));
+                projects = agg;
+                ownerCandidates = sectorDeptNames
+                    .Concat(new[] { division })
+                    .Select(n => n.ToLowerInvariant())
+                    .ToHashSet();
+            }
+            else
+            {
+                projects = (await _source.GetProjectsAsync(division, ct)).ToList();
+                ownerCandidates = new HashSet<string> { division.ToLowerInvariant() };
+            }
 
             // Case-insensitive department matching (Fix 4): an initiative belongs to a
             // department if it lists the division as an owner OR one of the department's
             // projects rolls up to it.
-            var divLower = division.ToLowerInvariant();
             var projInitCodes = projects.Where(p => !string.IsNullOrEmpty(p.InitiativeCode))
                 .Select(p => p.InitiativeCode!).ToHashSet();
             // Phase 19.20 (Fix 2/4) — dedup initiatives by code (case-insensitive).
+            // Phase 20.10 (Fix 6) — owner match widened to any candidate name (sector + child depts).
             var matched = inits
-                .Where(i => (i.Owners != null && i.Owners.ToLowerInvariant().Contains(divLower))
+                .Where(i => (i.Owners != null && ownerCandidates.Any(o => i.Owners.ToLowerInvariant().Contains(o)))
                             || projInitCodes.Contains(i.Code))
                 .GroupBy(i => string.IsNullOrWhiteSpace(i.Code) ? i.Name : i.Code,
                          StringComparer.OrdinalIgnoreCase)
@@ -1114,6 +1212,15 @@ public class StrategyObjectiveVm
 {
     public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    // Phase 20.10 — expandable tree: initiatives + projects nested per objective
+    public List<StrategyObjectiveInitiativeVm> Initiatives { get; set; } = new();
+}
+
+public class StrategyObjectiveInitiativeVm
+{
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public List<StrategyChildItemVm> Projects { get; set; } = new();
 }
 
 public class StrategyInitiativeVm

@@ -48,6 +48,8 @@ public class AdminDbExportController : Controller
         }
 
         using var wb = new XLWorkbook();
+        // Phase 20.10 — unify exports on the website font (Cairo).
+        wb.Style.Font.FontName = "Cairo";
 
         // Cover sheet
         var cover = wb.Worksheets.Add("نظرة عامة");

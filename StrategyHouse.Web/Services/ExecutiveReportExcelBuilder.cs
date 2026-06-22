@@ -12,6 +12,7 @@ public class ExecutiveReportExcelBuilder
     public byte[] Build(ExecutiveReportViewModel m)
     {
         using var wb = new XLWorkbook();
+        wb.Style.Font.FontName = "Cairo"; // Phase 20.10 — unify exports on website font
         var s = m.Sections;
 
         if (s.Has(ExecReportSections.Overview)) BuildOverview(wb, m);
