@@ -313,11 +313,11 @@ static async Task SeedJourneyUsersAsync(
 
     var journeyUsers = new[]
     {
-        (User: "vp.support",  Pass: "Support@2026",  Name: "VP — قطاع الدعم المؤسسي",   Scope: "SECTOR:CORP_SUPPORT", Tag: "JourneyManager"),
-        (User: "vp.economic", Pass: "Economic@2026", Name: "VP — قطاع الشؤون الاقتصادية", Scope: "SECTOR:ECONOMIC",      Tag: "JourneyManager"),
-        (User: "vp.legal",    Pass: "Legal@2026",    Name: "VP — قطاع الشؤون القانونية",  Scope: "SECTOR:LEGAL",         Tag: "JourneyManager"),
-        (User: "gac.admin",   Pass: "General@2026",  Name: "الهيئة العامة للمنافسة",       Scope: "GLOBAL",              Tag: "JourneySuper"),
-        (User: "testing",     Pass: "Test@2026",     Name: "اختبار",                      Scope: "TEST",                Tag: "JourneySuper"),
+        (User: "vp.support",  Pass: "Support@2026Gac",  Name: "VP — قطاع الدعم المؤسسي",   Scope: "SECTOR:CORP_SUPPORT", Tag: "JourneyManager"),
+        (User: "vp.economic", Pass: "Economic@2026Gac", Name: "VP — قطاع الشؤون الاقتصادية", Scope: "SECTOR:ECONOMIC",      Tag: "JourneyManager"),
+        (User: "vp.legal",    Pass: "Legal@2026Gac",    Name: "VP — قطاع الشؤون القانونية",  Scope: "SECTOR:LEGAL",         Tag: "JourneyManager"),
+        (User: "gac.admin",   Pass: "General@2026Gac",  Name: "الهيئة العامة للمنافسة",       Scope: "GLOBAL",              Tag: "JourneySuper"),
+        (User: "testing",     Pass: "Testing@2026Gac",  Name: "اختبار",                      Scope: "TEST",                Tag: "JourneySuper"),
     };
 
     foreach (var u in journeyUsers)
@@ -335,7 +335,13 @@ static async Task SeedJourneyUsersAsync(
                 IsActive = true,
                 JourneyScopeKey = u.Scope,
             };
-            await userManager.CreateAsync(existing, u.Pass);
+            // Phase 20.8 — if password policy rejects the seed pass, skip this user instead of crashing startup.
+            var createResult = await userManager.CreateAsync(existing, u.Pass);
+            if (!createResult.Succeeded)
+            {
+                Console.WriteLine($"[SeedJourneyUsersAsync] Failed to create {u.User}: {string.Join("; ", createResult.Errors.Select(e => e.Description))}");
+                continue;
+            }
         }
         else if (existing.JourneyScopeKey != u.Scope)
         {

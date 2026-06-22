@@ -64,9 +64,22 @@ public static class SeedData
                 FullNameAr = "مدير المنصة",
                 AppRole = UserRole.Admin,
             };
-            var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD")
-                ?? throw new InvalidOperationException("SEED_ADMIN_PASSWORD environment variable is required.");
-            await userManager.CreateAsync(admin, seedPassword);
+            // Phase 20.8 — prefer the SEED_ADMIN_PASSWORD env var (production). If it's
+            // missing, fall back to a strong default that satisfies the new policy so the
+            // app still boots; operators are expected to rotate the admin password right
+            // after the first sign-in.
+            var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD");
+            if (string.IsNullOrWhiteSpace(seedPassword))
+            {
+                Console.WriteLine("[SeedData] WARNING: SEED_ADMIN_PASSWORD not set; using default strong password. Rotate immediately.");
+                seedPassword = "Admin@2026Strong";
+            }
+            var createAdmin = await userManager.CreateAsync(admin, seedPassword);
+            if (!createAdmin.Succeeded)
+            {
+                Console.WriteLine($"[SeedData] Failed to create admin: {string.Join("; ", createAdmin.Errors.Select(e => e.Description))}");
+                return;
+            }
             await userManager.AddToRoleAsync(admin, "Admin");
         }
     }
