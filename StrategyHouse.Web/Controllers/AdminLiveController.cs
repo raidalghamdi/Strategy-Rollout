@@ -8,7 +8,10 @@ namespace StrategyHouse.Web.Controllers;
 
 // Phase 9 / Phase 20 — live operations dashboard. Shows every department session in the
 // current user's scope, grouped by sector, with a KPI strip and 5-minute auto-refresh.
-[Authorize(Roles = "Admin,Facilitator")]
+// Phase 20.7 — this page is the landing page for journey accounts after sign-in. We drop
+// the role gate so journey-only accounts (JourneyScopeKey set) can view it; the scope
+// service already filters every query to only the departments their key permits.
+[Authorize]
 [Route("Admin")]
 public class AdminLiveController : Controller
 {

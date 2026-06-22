@@ -13,13 +13,17 @@ public class JourneyOnlyGuardMiddleware
 {
     private readonly RequestDelegate _next;
 
-    // Path prefixes a journey-only user may visit. Everything else bounces to /Journey/Pick.
+    // Path prefixes a journey-only user may visit. Everything else bounces to the
+    // executive live dashboard, which is their landing page.
     private static readonly string[] AllowedPrefixes = new[]
     {
-        "/Journey",          // the journey itself + Pick + PickStart
-        "/Account/Logout",   // sign out
-        "/Account/Login",    // re-login if session expires mid-flow
+        "/Admin/LiveDashboard", // landing executive dashboard (their main view)
+        "/Admin/SessionDetail", // session drill-down from the dashboard
+        "/Journey",             // start / continue a journey when picked from the dashboard
+        "/Account/Logout",      // sign out
+        "/Account/Login",       // re-login if session expires mid-flow
         "/Account/AccessDenied",
+        "/Account/Profile",     // self-service profile / change own password
         "/css", "/js", "/lib", "/images", "/img", "/favicon", "/static",
         "/_framework", "/_blazor", "/_vs",
     };
@@ -45,7 +49,7 @@ public class JourneyOnlyGuardMiddleware
                 var u = await users.GetUserAsync(ctx.User);
                 if (u != null && !string.IsNullOrEmpty(u.JourneyScopeKey))
                 {
-                    ctx.Response.Redirect("/Journey/Pick");
+                    ctx.Response.Redirect("/Admin/LiveDashboard");
                     return;
                 }
             }

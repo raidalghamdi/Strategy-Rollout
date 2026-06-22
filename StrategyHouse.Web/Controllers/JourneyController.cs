@@ -45,59 +45,8 @@ public class JourneyController : Controller
         _logger = logger;
     }
 
-    // Phase 20.6 — Journey-only signed-in user lands here after Login. Shows the list
-    // of departments their JourneyScopeKey permits, lets them pick one to start a
-    // brand-new session. No password page, no platform UI — pick → run.
-    [Authorize]
-    [HttpGet("Journey/Pick")]
-    public async Task<IActionResult> Pick()
-    {
-        if (User?.Identity?.IsAuthenticated != true)
-        {
-            return Redirect("/Account/Login");
-        }
-        var visible = await _scope.GetVisibleDeptCodesAsync(User);
-        var depts = await _db.Departments
-            .Where(d => visible.Contains(d.DeptCode))
-            .OrderBy(d => d.DeptCode)
-            .Select(d => new { d.DeptCode, NameAr = d.NameAr ?? d.DeptCode, ParentSector = d.ParentSector ?? "" })
-            .ToListAsync();
-        ViewBag.Departments = depts;
-        return View();
-    }
-
-    // Phase 20.6 — start a fresh journey session for the picked department. Same
-    // ownership stamp as POST /Journey/Start so AdminTestResults can scope deletions.
-    [Authorize]
-    [HttpPost("Journey/PickStart")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> PickStart(string deptCode)
-    {
-        if (User?.Identity?.IsAuthenticated != true)
-        {
-            return Redirect("/Account/Login");
-        }
-        var visible = await _scope.GetVisibleDeptCodesAsync(User);
-        if (string.IsNullOrWhiteSpace(deptCode) || !visible.Contains(deptCode))
-        {
-            TempData["Error"] = "ليس لديك صلاحية لبدء رحلة لهذه الإدارة.";
-            return RedirectToAction(nameof(Pick));
-        }
-
-        int? ownerId = null;
-        var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (int.TryParse(idClaim, out var uid)) ownerId = uid;
-
-        var session = new StrategySession
-        {
-            DeptCode = deptCode,
-            AccessCodeUsed = $"USER:{User.Identity?.Name}",
-            OwnerUserId = ownerId,
-        };
-        _db.StrategySessions.Add(session);
-        await _db.SaveChangesAsync();
-        return RedirectToAction(nameof(Run), new { sessionId = session.Id });
-    }
+    // Phase 20.7 — Pick removed. Journey accounts land on /Admin/LiveDashboard which
+    // already has a department dropdown and links into each department's sessions.
 
     // Phase 19.23 — map unified-source DTOs back to the entity shapes the journey
     // views, PDF service, and Sankey builder bind to. Only the properties those
