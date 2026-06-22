@@ -41,6 +41,9 @@
     <link rel="stylesheet" href="~/css/dga-theme.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/phase20.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/phase20_8-responsive.css" asp-append-version="true" />
+    @* Phase 20.12 — Tom Select for searchable dropdowns (self-hosted, offline). *@
+    <link rel="stylesheet" href="~/lib/tomselect/tom-select.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/phase20_12-pplx-select.css" asp-append-version="true" />
     @await RenderSectionAsync("Styles", required: false)
 </head>
 <body>
@@ -194,6 +197,10 @@ else
 }
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+@* Phase 20.12 — Tom Select + enhancer. Any <select> with data-pplx-search="1"
+   (or more than 10 options) becomes a searchable, RTL-aware combobox. *@
+<script src="~/lib/tomselect/tom-select.complete.min.js" asp-append-version="true"></script>
+<script src="~/js/pplx-select.js" asp-append-version="true"></script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

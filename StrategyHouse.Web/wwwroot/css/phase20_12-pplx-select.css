@@ -1,0 +1,87 @@
+/* Phase 20.12 — Tom Select RTL + Cairo theming + compact mobile sizing.
+   Keeps the search box readable on iOS Safari without inflating the
+   dropdown control height beyond ~40px. */
+
+.pplx-ts.ts-wrapper {
+    font-family: "Cairo", sans-serif !important;
+    direction: rtl;
+    text-align: start;
+    width: 100%;
+}
+
+.pplx-ts .ts-control {
+    min-height: 40px;
+    padding: 4px 12px;
+    border-radius: 8px;
+    border: 1px solid #c9d1de;
+    background: #fff;
+    font-size: .92rem;
+    font-family: "Cairo", sans-serif;
+    line-height: 1.4;
+}
+
+.pplx-ts.focus .ts-control,
+.pplx-ts.input-active .ts-control {
+    border-color: #067647;
+    box-shadow: 0 0 0 3px rgba(6,118,71,.15);
+}
+
+.pplx-ts .ts-control > input,
+.pplx-ts .ts-control > .item {
+    font-family: "Cairo", sans-serif;
+    font-size: .92rem;
+    color: #1d2939;
+}
+
+.pplx-ts .ts-dropdown {
+    direction: rtl;
+    text-align: start;
+    font-family: "Cairo", sans-serif;
+    border-radius: 8px;
+    border: 1px solid #c9d1de;
+    box-shadow: 0 6px 22px rgba(40,51,74,.16);
+    margin-top: 4px;
+}
+
+.pplx-ts .ts-dropdown .option {
+    padding: 9px 12px;
+    font-size: .92rem;
+    line-height: 1.4;
+    color: #1d2939;
+}
+
+.pplx-ts .ts-dropdown .option.active,
+.pplx-ts .ts-dropdown .option:hover {
+    background: #ECF6F0;
+    color: #067647;
+}
+
+.pplx-ts .ts-dropdown .selected.option {
+    background: #067647;
+    color: #fff;
+}
+
+.pplx-ts .ts-dropdown .no-results {
+    padding: 10px 12px;
+    color: #5a6b80;
+    font-style: italic;
+}
+
+/* The arrow is on the left in RTL by default — keep it but make sure it
+   never overlaps the placeholder text on narrow Arabic strings. */
+.pplx-ts.single .ts-control { padding-left: 30px; padding-right: 12px; }
+.pplx-ts.single .ts-control::after {
+    content: '\25BE';
+    position: absolute;
+    inset-inline-start: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #28334A;
+    pointer-events: none;
+}
+
+/* Compact mobile sizing for any auto-enhanced select. */
+@media (max-width: 575.98px) {
+    .pplx-ts .ts-control { min-height: 42px; font-size: .95rem; }
+    .pplx-ts .ts-dropdown .option { padding: 10px 12px; font-size: .95rem; }
+}

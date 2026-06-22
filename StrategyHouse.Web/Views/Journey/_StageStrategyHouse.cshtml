@@ -86,7 +86,12 @@
     #stage-2 .house-pillar__name { flex: 1 1 auto; overflow-wrap: anywhere; word-break: break-word; text-align: start; }
     #stage-2 .house-pillar__chev { transition: transform .2s; }
     #stage-2 .house-pillar.is-open .house-pillar__chev { transform: rotate(180deg); }
+    /* Phase 20.12 — the .house-objs class sets display:flex which beats the
+       native [hidden] attribute (HTML attr is overridden by any class
+       setting display). Add explicit [hidden]{display:none !important} so
+       collapse really hides the objectives panel on every pillar. */
     #stage-2 .house-objs { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+    #stage-2 .house-objs[hidden] { display: none !important; }
     #stage-2 .house-obj {
         background: #eef6f1; color: #1d4d39; border-radius: 10px; padding: 12px 14px;
         font-weight: 600; font-size: .92rem; line-height: 1.6; border-right: 4px solid #067647;
@@ -119,7 +124,18 @@
                     var open = pillar.className.indexOf('is-open') === -1;
                     pillar.className = open ? 'house-pillar is-open' : 'house-pillar';
                     head.setAttribute('aria-expanded', open ? 'true' : 'false');
-                    if (panel) { if (open) panel.removeAttribute('hidden'); else panel.setAttribute('hidden', 'hidden'); }
+                    if (panel) {
+                        // Phase 20.12 — toggle both the [hidden] attribute and an inline display
+                        // style. Some CSS frameworks set !important display values that beat the
+                        // attribute selector, so setting style.display='none' guarantees collapse.
+                        if (open) {
+                            panel.removeAttribute('hidden');
+                            panel.style.display = '';
+                        } else {
+                            panel.setAttribute('hidden', 'hidden');
+                            panel.style.display = 'none';
+                        }
+                    }
                 });
             })(heads[i]);
         }

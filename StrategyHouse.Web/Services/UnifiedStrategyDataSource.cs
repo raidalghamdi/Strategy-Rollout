@@ -191,8 +191,17 @@ public class UnifiedStrategyDataSource : IStrategyDataSource
 
     private List<string> DivisionsForDept(string deptCode)
     {
+        // Phase 20.12 — the division map is keyed by department code. When callers
+        // pass an Arabic department name directly (e.g. when a VP sector journey
+        // aggregates child departments by NameAr) the map lookup fails and we used
+        // to return an empty list, which made the .Where(Division IN [...]) filter
+        // match nothing — the root cause of "0 KPIs in every objective" for VPs.
+        // Now: if no mapping is found we fall back to treating the input itself as
+        // a division name. The Division column in Mirror/Sqlite stores the Arabic
+        // department name, so this lets passes-by-name work without configuration.
         var map = ReadDivisionMap();
-        return map.TryGetValue(deptCode, out var names) ? names : new List<string>();
+        if (map.TryGetValue(deptCode, out var names) && names.Count > 0) return names;
+        return new List<string> { deptCode };
     }
 
     private Dictionary<string, List<string>> ReadDivisionMap()

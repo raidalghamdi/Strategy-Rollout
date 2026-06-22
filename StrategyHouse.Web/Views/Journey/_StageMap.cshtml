@@ -1,6 +1,15 @@
-@* Phase 20.10 — stage 5 (الرحلة نحو الرؤية). Initiatives mode now uses TWO
-   dropdowns (initiative → project) and the chain reads project → initiative
-   → goal → pillar → vision. KPIs mode unchanged. *@
+@* Phase 20.12 — Stage 5 (الرحلة نحو الرؤية).
+
+   What changed vs 20.11:
+   * Dropdowns: real compact size on mobile (height ~40px, no inflated picker box),
+     appearance:none with custom RTL chevron so iOS Safari can't blow them up.
+   * Tom Select integration: every <select> on this stage becomes a searchable
+     combobox via the self-hosted offline library (wwwroot/lib/tomselect/*).
+   * The "مشروعك" node + its following arrow now only appear when the user has
+     actually picked a project from the picker. No orphan arrow.
+   * Initiatives ↔ KPIs toggle is fully exclusive: picker + chain of the inactive
+     mode are removed from the DOM flow (display:none).
+*@
 @model StrategyHouse.Web.Controllers.JourneyRunViewModel
 @{
     var sel = Model.SelectedInitiative;
@@ -9,9 +18,6 @@
 
     var scopedKpis = Model.Kpis ?? new List<StrategyHouse.Domain.Entities.Kpi>();
 
-    // Phase 20.11 — build initiative→projects map for the two-dropdown picker.
-    // Use FULL project + initiative lists (all departments) so each initiative can
-    // show every linked project regardless of the current user's department.
     var allProjects = Model.AllProjects ?? new List<StrategyHouse.Domain.Entities.Project>();
     var pickerInits = (Model.AllInitiatives ?? new List<StrategyHouse.Domain.Entities.Initiative>())
         .Select(i =>
@@ -67,7 +73,7 @@
 
         <div id="journeyInitPicker" class="jkpi-picker jkpi-picker--init">
             <label for="jInitPicker">اختر مبادرة:</label>
-            <select id="jInitPicker">
+            <select id="jInitPicker" data-pplx-search="1" data-placeholder="ابحث عن مبادرة...">
                 @foreach (var ini in pickerInits)
                 {
                     <option value="@ini.Code"
@@ -79,17 +85,19 @@
                 }
             </select>
             <label for="jProjPicker">اختر مشروعاً:</label>
-            <select id="jProjPicker">
-                <option value="">—</option>
+            <select id="jProjPicker" data-pplx-search="1" data-placeholder="ابحث عن مشروع...">
+                <option value="">— اختر مشروعاً —</option>
             </select>
         </div>
 
+        @* Phase 20.12 — "مشروعك" node + its arrow start hidden. They appear only when
+           the user picks a project from the project dropdown. *@
         <div id="journeyChain" class="jchain jchain--initiatives">
-            <div class="jnode jnode--proj" data-step="0">
+            <div class="jnode jnode--proj" data-step="0" id="jInitProjectNode" hidden style="display:none;">
                 <span class="jlabel">مشروعك</span>
                 <span class="jtext" id="jInitProjectName">—</span>
             </div>
-            <div class="jarrow" data-step="1">↓</div>
+            <div class="jarrow" data-step="1" id="jInitProjectArrow" hidden style="display:none;">↓</div>
             <div class="jnode jnode--init" data-step="2">
                 <span class="jlabel">المبادرة</span>
                 <span class="jtext" id="jInitName">@sel!.Name</span>
@@ -108,7 +116,7 @@
             <div class="jnode jnode--vision" data-step="8"><span class="jlabel">الرؤية</span><span class="jtext">@visionText</span></div>
         </div>
 
-        <div id="journeyChainKpis" class="jchain jchain--kpis" hidden>
+        <div id="journeyChainKpis" class="jchain jchain--kpis" hidden style="display:none;">
             @if (scopedKpis.Count == 0)
             {
                 <div class="alert alert-info text-center">
@@ -119,7 +127,7 @@
             {
                 <div class="jkpi-picker">
                     <label for="jkpiPicker">اختر مؤشّراً:</label>
-                    <select id="jkpiPicker">
+                    <select id="jkpiPicker" data-pplx-search="1" data-placeholder="ابحث عن مؤشّر...">
                         @foreach (var k in scopedKpis)
                         {
                             var oName = Model.Objectives.FirstOrDefault(o => o.ObjectiveCode == k.ObjectiveCode)?.ObjectiveName ?? "";
@@ -187,6 +195,9 @@
     #stage-5 .jtext { display: block; font-weight: 800; line-height: 1.7; margin-top: 4px; }
     #stage-5 .jarrow { text-align: center; color: #067647; font-size: 1.5rem; line-height: 1; opacity: 0; transition: opacity .5s ease; }
     #stage-5 .jarrow.is-in { opacity: 1; }
+    /* Phase 20.12 — guarantee a [hidden] node/arrow is really gone (animation class
+       must not re-enable display:flex/block). */
+    #stage-5 [hidden] { display: none !important; }
 
     #stage-5 .jmsg-wrap { display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 22px; }
     #stage-5 .jmsg {
@@ -210,28 +221,29 @@
     #stage-5 .jtoggle:hover { background: #ECF6F0; }
     #stage-5 .jtoggle.is-active:hover { background: #05623A; }
 
-    /* Phase 20.11 — compact dropdown picker (was oversized on mobile). */
+    /* Phase 20.12 — picker container is narrow + stacked. */
     #stage-5 .jkpi-picker {
-        max-width: 520px; margin: 0 auto 14px;
-        display: flex; flex-wrap: wrap; gap: 6px 12px;
-        align-items: center; justify-content: center;
+        max-width: 520px; margin: 0 auto 12px;
+        display: flex; flex-direction: column; gap: 6px;
+        align-items: stretch; justify-content: center;
     }
     #stage-5 .jkpi-picker label {
         font-weight: 700; color: #28334A; font-size: .9rem;
-        flex: 0 0 auto;
+        text-align: start; margin: 4px 0 -2px;
     }
+    /* Native <select> is hidden once Tom Select wraps it; this is the fallback
+       style for the brief moment before the script binds, plus any selects we
+       did not search-enable. */
     #stage-5 .jkpi-picker select {
-        flex: 1 1 200px; min-width: 0; max-width: 100%;
-        height: 38px; padding: 6px 10px; box-sizing: border-box;
+        width: 100%; height: 40px; padding: 6px 32px 6px 10px; box-sizing: border-box;
         border-radius: 8px; border: 1px solid #c9d1de; background: #fff;
-        font-family: "Cairo", sans-serif; font-size: .9rem; line-height: 1.4;
-        appearance: auto; -webkit-appearance: menulist;
+        font-family: "Cairo", sans-serif; font-size: .92rem; line-height: 1.4;
+        appearance: none !important; -webkit-appearance: none !important;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%2328334A' d='M6 8 0 0h12z'/></svg>");
+        background-repeat: no-repeat;
+        background-position: left 10px center;
     }
-    #stage-5 .jkpi-picker--init {
-        flex-direction: column; align-items: stretch; gap: 10px;
-        max-width: 520px;
-    }
-    #stage-5 .jkpi-picker--init label { text-align: start; margin-bottom: -4px; }
+    #stage-5 .jkpi-picker--init { max-width: 520px; }
 
     #stage-5 .jdetails {
         margin-top: 12px; text-align: start;
@@ -266,25 +278,27 @@
 </style>
 
 <script>
-// Phase 20.10 — Stage 5 (الرحلة نحو الرؤية). Animated reveal + Initiatives/KPIs
-// toggle. Initiatives mode now has TWO dropdowns (initiative → project).
+// Phase 20.12 — Stage 5. Animated reveal + truly-exclusive Initiatives/KPIs
+// toggle. "مشروعك" node + its arrow stay hidden until a project is picked.
+// All <select data-pplx-search="1"> become searchable via Tom Select (loaded
+// by _StageMapTomSelect partial).
 window.__stageMapInit = (function () {
     var done = false;
     function revealChain(scope) {
-        var steps = scope.querySelectorAll('[data-step]');
+        var steps = scope.querySelectorAll('[data-step]:not([hidden])');
         if (!steps || steps.length === 0) return;
         for (var i = 0; i < steps.length; i++) {
             (function (node, idx) {
                 setTimeout(function () {
                     node.className = node.className + ' is-in';
-                }, 220 * idx);
+                }, 180 * idx);
             })(steps[i], i);
         }
     }
     function showMsgOnce() {
         var msg = document.getElementById('journeyMsg');
         if (msg && msg.className.indexOf('is-in') === -1) {
-            setTimeout(function () { msg.className = 'jmsg is-in'; }, 1600);
+            setTimeout(function () { msg.className = 'jmsg is-in'; }, 1500);
         }
     }
     function resetReveal(scope) {
@@ -293,13 +307,12 @@ window.__stageMapInit = (function () {
             steps[i].className = steps[i].className.replace(/\s*is-in/g, '');
         }
     }
-    // Phase 20.11 — force-hide helper so leftover inline/CSS state can't leak
-    // between the Initiatives mode and the KPIs mode.
     function setShown(el, shown) {
         if (!el) return;
         if (shown) { el.removeAttribute('hidden'); el.style.display = ''; }
         else { el.setAttribute('hidden', 'hidden'); el.style.display = 'none'; }
     }
+
     function bindToggle() {
         var btns = document.querySelectorAll('#stage-5 .jtoggle');
         if (!btns || btns.length === 0) return;
@@ -314,10 +327,9 @@ window.__stageMapInit = (function () {
                     btns[j].classList.toggle('is-active', on);
                     btns[j].setAttribute('aria-selected', on ? 'true' : 'false');
                 }
-                // Phase 20.11 — exclusive: either Initiatives details OR KPIs details.
                 if (mode === 'kpis') {
-                    setShown(chainInit, false);
                     setShown(pickerInitWrap, false);
+                    setShown(chainInit, false);
                     setShown(chainKpi, true);
                     if (chainKpi) { resetReveal(chainKpi); revealChain(chainKpi); }
                 } else {
@@ -328,7 +340,7 @@ window.__stageMapInit = (function () {
                 }
             });
         }
-        // KPI dropdown
+
         var picker = document.getElementById('jkpiPicker');
         if (picker) {
             picker.addEventListener('change', function () {
@@ -343,9 +355,32 @@ window.__stageMapInit = (function () {
             });
         }
 
-        // Phase 20.10 — dual dropdown: initiative → projects.
         var iniPicker = document.getElementById('jInitPicker');
         var prjPicker = document.getElementById('jProjPicker');
+        var projectNode = document.getElementById('jInitProjectNode');
+        var projectArrow = document.getElementById('jInitProjectArrow');
+
+        function rebuildProjectOptions(opt) {
+            if (!prjPicker) return;
+            // Tear down Tom Select first (rebuilt at end).
+            if (prjPicker.tomselect) { prjPicker.tomselect.destroy(); }
+            while (prjPicker.firstChild) prjPicker.removeChild(prjPicker.firstChild);
+            var projsJson = opt.getAttribute('data-projects-json') || '[]';
+            var projs = [];
+            try { projs = JSON.parse(projsJson) || []; } catch (e) { projs = []; }
+            var blank = document.createElement('option');
+            blank.value = ''; blank.textContent = projs.length ? '— اختر مشروعاً —' : 'لا توجد مشاريع لهذه المبادرة';
+            prjPicker.appendChild(blank);
+            for (var k = 0; k < projs.length; k++) {
+                var o2 = document.createElement('option');
+                o2.value = projs[k].code || '';
+                o2.textContent = projs[k].name || projs[k].code || '—';
+                prjPicker.appendChild(o2);
+            }
+            // Re-enhance with Tom Select if available.
+            if (window.PplxEnhanceSelect) { window.PplxEnhanceSelect(prjPicker); }
+        }
+
         function refreshChainFromInit() {
             if (!iniPicker) return;
             var opt = iniPicker.options[iniPicker.selectedIndex];
@@ -356,33 +391,40 @@ window.__stageMapInit = (function () {
             if (name) name.textContent = opt.getAttribute('data-name') || opt.text;
             if (obj) obj.textContent = opt.getAttribute('data-objective') || '—';
             if (pil) pil.textContent = opt.getAttribute('data-pillar') || '—';
-            if (prjPicker) {
-                while (prjPicker.firstChild) prjPicker.removeChild(prjPicker.firstChild);
-                var projsJson = opt.getAttribute('data-projects-json') || '[]';
-                var projs = [];
-                try { projs = JSON.parse(projsJson) || []; } catch (e) { projs = []; }
-                var blank = document.createElement('option');
-                blank.value = ''; blank.textContent = projs.length ? '— اختر مشروعاً —' : 'لا توجد مشاريع';
-                prjPicker.appendChild(blank);
-                for (var k = 0; k < projs.length; k++) {
-                    var o2 = document.createElement('option');
-                    o2.value = projs[k].code || ''; o2.textContent = projs[k].name || projs[k].code || '—';
-                    prjPicker.appendChild(o2);
-                }
-                var pname = document.getElementById('jInitProjectName');
-                if (pname) pname.textContent = '—';
-            }
+            rebuildProjectOptions(opt);
+            // No project picked yet → hide the "مشروعك" node + the arrow after it.
+            setShown(projectNode, false);
+            setShown(projectArrow, false);
+            var pname = document.getElementById('jInitProjectName');
+            if (pname) pname.textContent = '—';
         }
+
         if (iniPicker) iniPicker.addEventListener('change', refreshChainFromInit);
         if (prjPicker) {
             prjPicker.addEventListener('change', function () {
                 var pname = document.getElementById('jInitProjectName');
-                if (!pname) return;
-                pname.textContent = prjPicker.value ? (prjPicker.options[prjPicker.selectedIndex].textContent || '—') : '—';
+                var hasValue = !!prjPicker.value;
+                if (pname) {
+                    pname.textContent = hasValue
+                        ? (prjPicker.options[prjPicker.selectedIndex].textContent || '—')
+                        : '—';
+                }
+                // Show the "مشروعك" node + its arrow only when a real project is picked.
+                setShown(projectNode, hasValue);
+                setShown(projectArrow, hasValue);
+                if (hasValue && projectNode) {
+                    projectNode.className = projectNode.className.replace(/\s*is-in/g, '');
+                    setTimeout(function () { projectNode.className = projectNode.className + ' is-in'; }, 20);
+                    if (projectArrow) {
+                        projectArrow.className = projectArrow.className.replace(/\s*is-in/g, '');
+                        setTimeout(function () { projectArrow.className = projectArrow.className + ' is-in'; }, 220);
+                    }
+                }
             });
         }
         if (iniPicker) refreshChainFromInit();
     }
+
     return function () {
         if (done) return; done = true;
         try {
@@ -391,7 +433,7 @@ window.__stageMapInit = (function () {
             showMsgOnce();
             bindToggle();
         } catch (err) {
-            var nodes = document.querySelectorAll('#stage-5 [data-step]');
+            var nodes = document.querySelectorAll('#stage-5 [data-step]:not([hidden])');
             for (var k = 0; k < nodes.length; k++) nodes[k].className = nodes[k].className + ' is-in';
             var m = document.getElementById('journeyMsg');
             if (m) m.className = 'jmsg is-in';
