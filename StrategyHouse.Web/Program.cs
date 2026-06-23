@@ -177,6 +177,8 @@ builder.Services.AddScoped<ExecutiveReportPowerPointBuilder>();
 builder.Services.AddScoped<SurveyReportExcelBuilder>();
 // Phase 20.18 — Excel results import → SurveyResponses + automatic analytics.
 builder.Services.AddScoped<SurveyImportService>();
+// Phase 20.21 — auto-categorise open-text answers (Q4/Q5/Q7) per official mechanism sheet.
+builder.Services.AddScoped<OpenTextAutoCategorizer>();
 builder.Services.AddScoped<SurveyReportPowerPointBuilder>();
 builder.Services.AddScoped<ReportEmailService>();
 // Phase 6 — DB-only chatbot

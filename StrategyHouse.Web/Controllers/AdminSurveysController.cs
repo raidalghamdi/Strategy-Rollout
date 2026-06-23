@@ -19,19 +19,22 @@ public class AdminSurveysController : Controller
     private readonly SurveyReportPdfService _report;
     private readonly PageContentService _pageContent;
     private readonly SurveyImportService _import;
+    private readonly OpenTextAutoCategorizer _autoCat;
 
     public AdminSurveysController(
         ApplicationDbContext db,
         QrService qr,
         SurveyReportPdfService report,
         PageContentService pageContent,
-        SurveyImportService import)
+        SurveyImportService import,
+        OpenTextAutoCategorizer autoCat)
     {
         _db = db;
         _qr = qr;
         _report = report;
         _pageContent = pageContent;
         _import = import;
+        _autoCat = autoCat;
     }
 
     // Phase 19.25 — PageContent keys for the survey link / custom QR feature.
@@ -399,6 +402,16 @@ public class AdminSurveysController : Controller
             var result = await _import.ApplyAsync(fs, null, ct);
             added = result.AddedResponses;
             targetId = result.TargetSurveyId;
+            // Phase 20.21 — auto-categorise open-text answers per official mechanism sheet.
+            try
+            {
+                var (auto, _, _) = await _autoCat.CategorizeActiveSurveyAsync(ct);
+                if (auto > 0)
+                {
+                    TempData["AutoCatInfo"] = $"تم تصنيف {auto} إجابة مفتوحة تلقائيًا (سـ 4، سـ 5، سـ 7).";
+                }
+            }
+            catch { /* best-effort; missing categorisation is recoverable */ }
         }
         finally
         {

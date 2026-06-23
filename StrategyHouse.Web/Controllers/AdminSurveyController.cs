@@ -27,6 +27,7 @@ public class AdminSurveyController : Controller
     private readonly SurveyReportExcelBuilder _excel;
     private readonly SurveyReportPowerPointBuilder _pptx;
     private readonly ReportEmailService _email;
+    private readonly OpenTextAutoCategorizer _autoCat;
 
     public AdminSurveyController(
         ApplicationDbContext db,
@@ -34,7 +35,8 @@ public class AdminSurveyController : Controller
         SurveyFinalReportPdfService pdf,
         SurveyReportExcelBuilder excel,
         SurveyReportPowerPointBuilder pptx,
-        ReportEmailService email)
+        ReportEmailService email,
+        OpenTextAutoCategorizer autoCat)
     {
         _db = db;
         _analytics = analytics;
@@ -42,6 +44,7 @@ public class AdminSurveyController : Controller
         _excel = excel;
         _pptx = pptx;
         _email = email;
+        _autoCat = autoCat;
     }
 
     private static string FileBase => $"Survey_Final_Report_{DateTime.UtcNow:yyyy-MM-dd}";
@@ -115,6 +118,18 @@ public class AdminSurveyController : Controller
                 await AssignAsync(questionId, rid, category);
         await _db.SaveChangesAsync();
         return RedirectToAction(nameof(Categorize), new { questionId });
+    }
+
+    // Phase 20.21 — one-click auto-categorisation per official mechanism sheet.
+    [HttpPost("Categorize/AutoAll")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AutoCategorizeAll(CancellationToken ct)
+    {
+        var (auto, skipped, total) = await _autoCat.CategorizeActiveSurveyAsync(ct);
+        TempData["SurveyMsg"] = total == 0
+            ? "لا توجد إجابات مفتوحة لتصنيفها."
+            : $"تم تصنيف {auto} إجابة جديدة تلقائيًا من إجمالي {total} (تم تجاهل {skipped} مصنّفة سابقًا).";
+        return RedirectToAction(nameof(CategorizeIndex));
     }
 
     private async Task AssignAsync(Guid questionId, Guid responseId, string? category)

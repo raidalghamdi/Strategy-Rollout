@@ -4,9 +4,19 @@
 }
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
     <h1 class="mb-0">تصنيف إجابات الاستبيان</h1>
-    <a href="/Admin/Survey/Analytics" class="btn btn--secondary btn-sm">⟶ التحليلات</a>
+    <div class="d-flex gap-2 flex-wrap">
+        <form method="post" action="/Admin/Survey/Categorize/AutoAll" class="d-inline">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn--primary btn-sm" title="تصنيف تلقائي حسب المحاور الرسمية">⚡ تصنيف تلقائي للكل</button>
+        </form>
+        <a href="/Admin/Survey/Analytics" class="btn btn--secondary btn-sm">⟶ التحليلات</a>
+    </div>
 </div>
-<p class="muted">اختر سؤالاً مفتوحاً لتصنيف إجاباته إلى الفئات المعتمدة.</p>
+<p class="muted">اختر سؤالاً مفتوحاً لتصنيف إجاباته يدويًا، أو اضغط زر «تصنيف تلقائي» لتطبيق المحاور الرسمية من ورقة الآلية (سـ 4 التحديات، سـ 5 القيم، سـ 7 التطلعات).</p>
+@if (TempData["SurveyMsg"] is string msg)
+{
+    <div class="card mb-2" style="border-color:#1f8a4c;background:#e9f6ec;color:#0c4d20"><strong>@msg</strong></div>
+}
 
 @if (!Model.Any())
 {
