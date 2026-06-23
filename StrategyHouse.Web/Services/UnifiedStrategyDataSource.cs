@@ -118,7 +118,13 @@ public class UnifiedStrategyDataSource : IStrategyDataSource
 
         var sqliteQuery = _db.Projects.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(deptCode))
-            sqliteQuery = sqliteQuery.Where(p => p.DepartmentCode == deptCode);
+        {
+            // Phase 20.14 — same fix as GetKpisAsync: accept either DepartmentCode
+            // or Division (Arabic name) so VP-sector aggregation — which passes
+            // dept NameAr — returns rows instead of an empty list.
+            sqliteQuery = sqliteQuery.Where(p =>
+                p.DepartmentCode == deptCode || p.Division == deptCode);
+        }
         var anySqlite = await _db.Projects.AsNoTracking().AnyAsync(ct);
         if (anySqlite)
         {
@@ -152,7 +158,15 @@ public class UnifiedStrategyDataSource : IStrategyDataSource
 
         var sqliteQuery = _db.Kpis.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(deptCode))
-            sqliteQuery = sqliteQuery.Where(k => k.DepartmentCode == deptCode);
+        {
+            // Phase 20.14 — callers pass either a dept code (DEPT-10) or, in the
+            // case of VP-sector aggregation, the Arabic department NAME stored
+            // in KPIs.Division. Previously this branch only matched on
+            // DepartmentCode, so VP sector journeys saw 0 KPIs on every goal in
+            // Stage 3 even though the data was in the DB. Match either column.
+            sqliteQuery = sqliteQuery.Where(k =>
+                k.DepartmentCode == deptCode || k.Division == deptCode);
+        }
         var anySqlite = await _db.Kpis.AsNoTracking().AnyAsync(ct);
         if (anySqlite)
         {
