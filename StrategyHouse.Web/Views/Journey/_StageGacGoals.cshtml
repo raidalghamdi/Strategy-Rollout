@@ -1,22 +1,22 @@
-@* Phase 20.9 — NEW read-only stage 3 (الأهداف الاستراتيجية للهيئة).
-   Shows every strategic objective of the authority, grouped by its parent
-   pillar. Each objective can be expanded to reveal the initiatives and KPIs
-   that fall under it — filtered to whatever scope the current visitor has
-   (department/sector). Linkage cards are intentionally NOT shown here; they
-   moved to stage 5 (الرحلة نحو الرؤية) per the Phase 20.9 spec. *@
+@* Phase 20.9 — read-only stage 3 (الأهداف الاستراتيجية للهيئة).
+   Phase 20.22 — this stage ALWAYS uses the full unfiltered initiative + KPI
+   lists (AllInitiativesForStage3 / AllKpisForStage3) so every user (employee,
+   VP, gac.admin) sees every initiative + every KPI in the strategy house here.
+   Other stages keep their per-user filtering. *@
 @model StrategyHouse.Web.Controllers.JourneyRunViewModel
 @{
     var pillars = Model.HousePillars;
     var objectives = Model.Objectives;
-    var initiatives = Model.Initiatives;
-    var kpis = Model.Kpis;
+    // Phase 20.22 — universal overview for stage 3 only.
+    var initiatives = Model.AllInitiativesForStage3;
+    var kpis = Model.AllKpisForStage3;
     var live = Model.StrategyDataLive;
 }
 <div class="gac-card" id="gac-goals-card">
     <h2 class="h4 h-md-2">الأهداف الاستراتيجية للهيئة العامة للمنافسة</h2>
     <p class="text-muted">
         تعرض هذه المرحلة جميع الأهداف الاستراتيجية للهيئة. اضغط أي هدف لمعرفة
-        المبادرات ومؤشرات الأداء المرتبطة به ضمن صلاحيتك.
+        المبادرات ومؤشرات الأداء المرتبطة به.
     </p>
 
     @if (!live)

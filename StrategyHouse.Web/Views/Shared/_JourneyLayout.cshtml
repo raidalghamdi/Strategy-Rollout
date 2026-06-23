@@ -33,6 +33,15 @@
         .gac-topbar { background: var(--gac-navy-dark); color: #fff; padding: 12px 20px; display:flex; align-items:center; gap:14px; box-shadow: var(--shadow-sm); border-bottom: 4px solid var(--gac-gold); }
         .gac-topbar .brand-logo { height: 48px; width: auto; display:block; }
         .gac-topbar .topbar-title { font-size: clamp(0.9rem, 3vw, 1.1rem); }
+        /* Phase 20.22 — push the logout action to the opposite end of the topbar. */
+        .gac-topbar .topbar-actions { margin-inline-start: auto; display:flex; align-items:center; gap:10px; }
+        .gac-topbar .topbar-logout {
+            background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.4);
+            border-radius: 999px; padding: 6px 14px; font-weight: 700; font-size: .85rem;
+            cursor: pointer; min-height: 36px; line-height: 1.2;
+            transition: background .15s, border-color .15s;
+        }
+        .gac-topbar .topbar-logout:hover { background: rgba(255,255,255,.22); border-color: #fff; }
         @@media (max-width: 575.98px) {
             .gac-topbar { padding: 8px 12px; gap: 8px; }
             .gac-topbar .brand-logo { height: 32px; }
@@ -54,6 +63,17 @@
     <div class="gac-topbar">
         <img src="~/images/gac-logo-white.png" alt="الهيئة العامة للمنافسة" class="brand-logo" />
         <span class="topbar-title">رحلة استراتيجية الهيئة — الهيئة العامة للمنافسة</span>
+        @* Phase 20.22 — logout button (visible on every journey stage) so users
+           can end their session without navigating back to the platform shell. *@
+        @if (User?.Identity?.IsAuthenticated == true)
+        {
+            <div class="topbar-actions">
+                <form method="post" action="/Account/Logout" style="margin:0;">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="topbar-logout">خروج</button>
+                </form>
+            </div>
+        }
     </div>
     <main class="container py-4">
         @RenderBody()

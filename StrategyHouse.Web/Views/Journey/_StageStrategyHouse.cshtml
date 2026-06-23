@@ -27,14 +27,16 @@
         </div>
 
         <div class="house-pillars pillars-grid">
+            @* Phase 20.22 — pillars are expanded by default (is-open + aria-expanded=true,
+               objectives panel rendered without [hidden]). Users can still collapse via click. *@
             @foreach (var p in pillars)
             {
-                <div class="house-pillar" data-code="@p.Code">
-                    <button type="button" class="house-pillar__head" aria-expanded="false">
+                <div class="house-pillar is-open" data-code="@p.Code">
+                    <button type="button" class="house-pillar__head" aria-expanded="true">
                         <span class="house-pillar__name">@p.Name</span>
                         <span class="house-pillar__chev">▾</span>
                     </button>
-                    <div class="house-objs" hidden>
+                    <div class="house-objs">
                         @if (p.Objectives.Count == 0)
                         {
                             <div class="house-obj house-obj--empty">لا توجد أهداف مرتبطة.</div>
@@ -75,12 +77,18 @@
     @@media (max-width: 1199px) { #stage-2 .house-pillars { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
     @@media (max-width: 767px)  { #stage-2 .house-pillars { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @@media (max-width: 479px)  { #stage-2 .house-pillars { grid-template-columns: 1fr; } }
-    #stage-2 .house-pillar { border: 2px solid #d5dbe4; border-radius: 14px; background: #fff; overflow: hidden; min-width: 0; }
+    /* Phase 20.22 — pillars are a flex column so the header can stretch to the
+       tallest header height in the grid row (equal-height heads regardless of
+       whether the title is one or two lines). */
+    #stage-2 .house-pillar { border: 2px solid #d5dbe4; border-radius: 14px; background: #fff; overflow: hidden; min-width: 0; display: flex; flex-direction: column; }
     #stage-2 .house-pillar.is-open { border-color: #067647; box-shadow: 0 2px 12px rgba(6,118,71,.18); }
     #stage-2 .house-pillar__head {
         width: 100%; border: none; background: #0f8f5b; color: #fff; cursor: pointer;
         display: flex; align-items: center; justify-content: space-between; gap: 8px;
-        padding: 14px 12px; font-weight: 800; font-size: .95rem; min-height: 56px;
+        padding: 14px 12px; font-weight: 800; font-size: .95rem;
+        /* Phase 20.22 — min-height upped from 56px to 76px so single-line and
+           two-line headers visually align (~2 lines × 1.4em × 0.95rem + padding). */
+        min-height: 76px;
         line-height: 1.4;
     }
     #stage-2 .house-pillar__name { flex: 1 1 auto; overflow-wrap: anywhere; word-break: break-word; text-align: start; }

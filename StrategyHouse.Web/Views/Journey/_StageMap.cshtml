@@ -17,8 +17,12 @@
 
     var scopedKpis = Model.Kpis ?? new List<StrategyHouse.Domain.Entities.Kpi>();
 
-    var allProjects = Model.AllProjects ?? new List<StrategyHouse.Domain.Entities.Project>();
-    var pickerInits = (Model.AllInitiatives ?? new List<StrategyHouse.Domain.Entities.Initiative>())
+    // Phase 20.22 — stage-5 pickers now use the SCOPED lists (employee = own dept,
+    // VP = sector aggregate, gac.admin = all). The user only sees initiatives
+    // and projects within their actual reach so the chain reflects their
+    // real path to the vision.
+    var allProjects = Model.ScopedProjects ?? new List<StrategyHouse.Domain.Entities.Project>();
+    var pickerInits = (Model.ScopedInitiatives ?? new List<StrategyHouse.Domain.Entities.Initiative>())
         .Select(i =>
         {
             var obj = Model.Objectives.FirstOrDefault(o => o.ObjectiveCode == i.ObjectiveCode);
@@ -94,7 +98,14 @@
             <button type="button" class="jtoggle" data-mode="kpis" role="tab" aria-selected="false">مؤشّرات الأداء</button>
         </div>
 
-        <div id="journeyInitPicker" class="jkpi-picker jkpi-picker--init">
+        @if (pickerInits.Count == 0)
+        {
+            <div class="alert alert-info text-center" role="note">
+                لا توجد مبادرات مرتبطة بإدارتك حالياً.
+            </div>
+        }
+
+        <div id="journeyInitPicker" class="jkpi-picker jkpi-picker--init" style="@(pickerInits.Count == 0 ? "display:none;" : "")">
             <label for="jInitPicker">اختر مبادرة:</label>
             <select id="jInitPicker" data-pplx-search="1" data-placeholder="ابحث عن مبادرة...">
                 @foreach (var ini in pickerInits)

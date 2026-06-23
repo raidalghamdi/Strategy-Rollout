@@ -319,6 +319,10 @@ public class JourneyController : Controller
         var ct = HttpContext.RequestAborted;
         List<Kpi> deptKpis;
         List<Project> deptProjects;
+        // Phase 20.22 — collect the user's reachable dept names so stage 5
+        // pickers can be scoped just like stage 4 (employee = own dept,
+        // VP = sector aggregate, gac.admin/SEC_ALL = every active dept).
+        List<string> userScopedDeptNames;
         var sectorDisplay = SectorDisplayName(session.DeptCode);
         if (sectorDisplay != null)
         {
@@ -339,6 +343,7 @@ public class JourneyController : Controller
                 .Select(n => n!)
                 .Distinct()
                 .ToListAsync();
+            userScopedDeptNames = sectorDepts.ToList();
 
             var aggKpis = new List<Kpi>();
             var aggProjects = new List<Project>();
@@ -360,6 +365,60 @@ public class JourneyController : Controller
         {
             deptKpis = ToKpiEntities(await _source.GetKpisAsync(session.DeptCode, ct));
             deptProjects = ToProjectEntities(await _source.GetProjectsAsync(session.DeptCode, ct));
+            // Phase 20.22 — regular employee: their only reachable dept is their own.
+            userScopedDeptNames = new List<string>();
+            if (!string.IsNullOrWhiteSpace(dept?.NameAr)) userScopedDeptNames.Add(dept!.NameAr!);
+        }
+
+        // Phase 20.22 — Stage 3 full unfiltered lists (no Take cap, no dept filter).
+        // Used by _StageGacGoals.cshtml so every user sees every initiative + KPI.
+        var allInitiativesFull = StrategyDedup
+            .ByInitiativeCode(ToInitiativeEntities(await _source.GetInitiativesAsync(null, ct)))
+            .ToList();
+        var allKpisFull = ToKpiEntities(await _source.GetKpisAsync(null, ct))
+            .GroupBy(k => string.IsNullOrWhiteSpace(k.KpiCode) ? k.KpiName : k.KpiCode, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+
+        // Phase 20.22 — Stage 5 scoped lists. gac.admin/SEC_ALL gets every project.
+        List<Project> scopedProjects;
+        List<Initiative> scopedInitiatives;
+        if (session.DeptCode == "SEC_ALL" || string.Equals(dept?.NameAr, "الهيئة الشاملة", StringComparison.Ordinal))
+        {
+            scopedProjects = ToProjectEntities(await _source.GetProjectsAsync(null, ct))
+                .GroupBy(p => string.IsNullOrWhiteSpace(p.ProjectCode) ? p.ProjectName : p.ProjectCode, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+            scopedInitiatives = allInitiativesFull;
+        }
+        else
+        {
+            var sp = new List<Project>();
+            foreach (var name in userScopedDeptNames)
+            {
+                sp.AddRange(ToProjectEntities(await _source.GetProjectsAsync(name, ct)));
+            }
+            scopedProjects = sp
+                .GroupBy(p => string.IsNullOrWhiteSpace(p.ProjectCode) ? p.ProjectName : p.ProjectCode, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+
+            // Initiative is in-scope when its Owners contains any reachable dept name
+            // OR a scoped project rolls up to it via InitiativeCode (same logic
+            // already used in /Journey/InitiativesForDepartment).
+            var ownerCandidates = userScopedDeptNames
+                .Select(n => n.ToLowerInvariant())
+                .ToHashSet();
+            var scopedInitCodes = scopedProjects
+                .Where(p => !string.IsNullOrEmpty(p.InitiativeCode))
+                .Select(p => p.InitiativeCode!)
+                .ToHashSet();
+            scopedInitiatives = allInitiativesFull
+                .Where(i =>
+                    (!string.IsNullOrEmpty(i.Owners) && ownerCandidates.Any(o => i.Owners!.ToLowerInvariant().Contains(o)))
+                    || (!string.IsNullOrEmpty(i.InitiativeCode) && scopedInitCodes.Contains(i.InitiativeCode))
+                )
+                .ToList();
         }
 
         return new JourneyRunViewModel
@@ -373,7 +432,9 @@ public class JourneyController : Controller
             Pillars = StrategyDedup.ByPillarCode(ToPillarEntities(await _source.GetPillarsAsync(ct))),
             Objectives = StrategyDedup.ByObjectiveCode(ToObjectiveEntities(await _source.GetObjectivesAsync(ct))),
             DeptObjectiveCodes = deptKpis.Select(k => k.ObjectiveCode).Distinct().ToList(),
-            Initiatives = StrategyDedup.ByInitiativeCode(ToInitiativeEntities(await _source.GetInitiativesAsync(null, ct))).Take(40).ToList(),
+            // Phase 20.22 — Initiatives now uses the already-fetched full list,
+            // and the arbitrary Take(40) cap is removed.
+            Initiatives = allInitiativesFull,
             Roster = await _db.DepartmentRoster
                 .Where(r => r.DeptCode == session.DeptCode && r.IsActive)
                 .OrderBy(r => r.NameAr).ToListAsync(),
@@ -385,7 +446,12 @@ public class JourneyController : Controller
                 .GroupBy(p => string.IsNullOrWhiteSpace(p.ProjectCode) ? p.ProjectName : p.ProjectCode, StringComparer.OrdinalIgnoreCase)
                 .Select(g => g.First())
                 .ToList(),
-            AllInitiatives = StrategyDedup.ByInitiativeCode(ToInitiativeEntities(await _source.GetInitiativesAsync(null, ct))).ToList(),
+            AllInitiatives = allInitiativesFull,
+            // Phase 20.22 — Stage 3 (universal overview) + Stage 5 (scoped).
+            AllInitiativesForStage3 = allInitiativesFull,
+            AllKpisForStage3 = allKpisFull,
+            ScopedProjects = scopedProjects,
+            ScopedInitiatives = scopedInitiatives,
             Map = map,
             InkAssets = map == null
                 ? new List<MapInkAsset>()
@@ -667,97 +733,101 @@ public class JourneyController : Controller
             var ct = HttpContext.RequestAborted;
             var inits = await _source.GetInitiativesAsync(null, ct);
 
-            // Phase 20.17 — unified agency journey (gac.admin / SEC_ALL): when the
-            // "department" is the special display name "الهيئة الشاملة", return
-            // EVERY initiative in the catalog (sector-linked + agency-level) deduped
-            // by code, with no owner/dept/sector filter. KPIs / Projects / Objectives
-            // / Sankey on other stages remain aggregated across active departments
-            // (handled in BuildRunViewModelAsync / BuildSankeyAsync).
-            if (string.Equals(division, "الهيئة الشاملة", StringComparison.Ordinal))
+            // Phase 20.22 — unified path for ALL user types. "الهيئة الشاملة" is
+            // handled in-line (owner candidates expand to every active dept) so the
+            // new A/B classification + owned-project filtering apply uniformly.
+            //   employee → { their dept name }
+            //   VP       → sector name + all child dept names
+            //   admin    → every active department name + literal "الهيئة الشاملة"
+            List<string> ownerDeptNames;
+            bool isAuthorityWide = string.Equals(division, "الهيئة الشاملة", StringComparison.Ordinal);
+            if (isAuthorityWide)
             {
-                var allInits = inits
-                    .GroupBy(i => string.IsNullOrWhiteSpace(i.Code) ? i.Name : i.Code,
-                             StringComparer.OrdinalIgnoreCase)
-                    .Select(g => g.First())
-                    .OrderBy(i => i.Code, StringComparer.Ordinal)
-                    .ToList();
-                var allResult = new List<object>();
-                foreach (var i in allInits)
-                {
-                    var vm = await ResolveInitiativeAsync(i.Code);
-                    if (vm == null) continue;
-                    allResult.Add(new
-                    {
-                        code = vm.Code,
-                        name = vm.Name,
-                        objectiveName = vm.ObjectiveName,
-                        pillarName = vm.PillarName,
-                        projects = vm.Projects.Select(p => new { code = p.Code, name = p.Name, meta = p.Meta }).ToList(),
-                        kpis = vm.Kpis.Select(k => new { code = k.Code, name = k.Name, meta = k.Meta }).ToList(),
-                    });
-                }
-                return Json(new { ok = true, live = true, initiatives = allResult });
-            }
-
-            // Phase 20.10 (Fix 6) — if the division name matches a sector display
-            // name, aggregate projects across ALL departments whose ParentSector
-            // matches. Owner-name matching also widens to all department names in
-            // that sector + the sector name itself.
-            var sectorDeptNames = await _db.Departments
-                .Where(d => d.ParentSector == division && d.IsActive)
-                .Select(d => d.NameAr)
-                .Where(n => !string.IsNullOrWhiteSpace(n))
-                .Select(n => n!)
-                .Distinct()
-                .ToListAsync();
-
-            List<StrategyHouse.Web.Services.Dtos.StrategyProjectDto> projects;
-            HashSet<string> ownerCandidates;
-            if (sectorDeptNames.Count > 0)
-            {
-                var agg = new List<StrategyHouse.Web.Services.Dtos.StrategyProjectDto>();
-                foreach (var name in sectorDeptNames)
-                    agg.AddRange(await _source.GetProjectsAsync(name, ct));
-                projects = agg;
-                ownerCandidates = sectorDeptNames
-                    .Concat(new[] { division })
-                    .Select(n => n.ToLowerInvariant())
-                    .ToHashSet();
+                ownerDeptNames = await _db.Departments
+                    .Where(d => d.IsActive)
+                    .Select(d => d.NameAr)
+                    .Where(n => !string.IsNullOrWhiteSpace(n))
+                    .Select(n => n!)
+                    .Distinct()
+                    .ToListAsync();
             }
             else
             {
-                projects = (await _source.GetProjectsAsync(division, ct)).ToList();
-                ownerCandidates = new HashSet<string> { division.ToLowerInvariant() };
+                var sectorDeptNames = await _db.Departments
+                    .Where(d => d.ParentSector == division && d.IsActive)
+                    .Select(d => d.NameAr)
+                    .Where(n => !string.IsNullOrWhiteSpace(n))
+                    .Select(n => n!)
+                    .Distinct()
+                    .ToListAsync();
+                ownerDeptNames = sectorDeptNames.Count > 0
+                    ? sectorDeptNames
+                    : new List<string> { division };
             }
 
-            // Case-insensitive department matching (Fix 4): an initiative belongs to a
-            // department if it lists the division as an owner OR one of the department's
-            // projects rolls up to it.
-            var projInitCodes = projects.Where(p => !string.IsNullOrEmpty(p.InitiativeCode))
-                .Select(p => p.InitiativeCode!).ToHashSet();
-            // Phase 19.20 (Fix 2/4) — dedup initiatives by code (case-insensitive).
-            // Phase 20.10 (Fix 6) — owner match widened to any candidate name (sector + child depts).
+            // Aggregate the projects reachable by this user across all their dept
+            // names; this is the single in-scope project set used for both the
+            // initiative match AND the per-card project filter below.
+            var scopeProjects = new List<StrategyHouse.Web.Services.Dtos.StrategyProjectDto>();
+            foreach (var name in ownerDeptNames)
+                scopeProjects.AddRange(await _source.GetProjectsAsync(name, ct));
+            var scopeProjectCodes = scopeProjects
+                .Where(p => !string.IsNullOrEmpty(p.Code))
+                .Select(p => p.Code!.ToLowerInvariant())
+                .ToHashSet();
+            var scopeProjectInitCodes = scopeProjects
+                .Where(p => !string.IsNullOrEmpty(p.InitiativeCode))
+                .Select(p => p.InitiativeCode!)
+                .ToHashSet();
+
+            var ownerCandidates = ownerDeptNames
+                .Concat(isAuthorityWide ? new[] { "الهيئة الشاملة" } : new[] { division })
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Select(n => n.ToLowerInvariant())
+                .ToHashSet();
+
+            // Match initiatives + classify each as "owner" (A) or "project" (B).
+            //   owner   → Owners string contains any of the user's reachable dept names
+            //   project → not an owner, but at least one user-scoped project rolls up to it
             var matched = inits
-                .Where(i => (i.Owners != null && ownerCandidates.Any(o => i.Owners.ToLowerInvariant().Contains(o)))
-                            || projInitCodes.Contains(i.Code))
-                .GroupBy(i => string.IsNullOrWhiteSpace(i.Code) ? i.Name : i.Code,
+                .Select(i => new
+                {
+                    init = i,
+                    ownerMatch = !string.IsNullOrEmpty(i.Owners)
+                                 && ownerCandidates.Any(o => i.Owners!.ToLowerInvariant().Contains(o)),
+                    projectMatch = !string.IsNullOrEmpty(i.Code)
+                                   && scopeProjectInitCodes.Contains(i.Code),
+                })
+                .Where(x => x.ownerMatch || x.projectMatch)
+                .GroupBy(x => string.IsNullOrWhiteSpace(x.init.Code) ? x.init.Name : x.init.Code,
                          StringComparer.OrdinalIgnoreCase)
                 .Select(g => g.First())
-                .OrderBy(i => i.Code, StringComparer.Ordinal)
+                .OrderBy(x => x.init.Code, StringComparer.Ordinal)
                 .ToList();
 
             var result = new List<object>();
-            foreach (var i in matched)
+            foreach (var m in matched)
             {
-                var vm = await ResolveInitiativeAsync(i.Code);
+                var vm = await ResolveInitiativeAsync(m.init.Code);
+                if (vm == null) continue;
+                // Phase 20.22 — per-card project list is now filtered to the user's
+                // own scope. Counter shows scoped count, NOT full initiative count.
+                var ownedProjects = vm.Projects
+                    .Where(p => !string.IsNullOrEmpty(p.Code)
+                                && scopeProjectCodes.Contains(p.Code.ToLowerInvariant()))
+                    .ToList();
+                var matchKind = m.ownerMatch ? "owner" : "project";
                 result.Add(new
                 {
-                    code = vm!.Code,
+                    code = vm.Code,
                     name = vm.Name,
                     objectiveName = vm.ObjectiveName,
                     pillarName = vm.PillarName,
-                    // Phase 20.2 — expandable child lists under each initiative card.
-                    projects = vm.Projects.Select(p => new { code = p.Code, name = p.Name, meta = p.Meta }).ToList(),
+                    // Phase 20.22 — new fields: A/B classification + owned-project count.
+                    matchKind,
+                    ownedProjectCount = ownedProjects.Count,
+                    // Phase 20.22 — only show projects the user actually owns.
+                    projects = ownedProjects.Select(p => new { code = p.Code, name = p.Name, meta = p.Meta }).ToList(),
                     kpis = vm.Kpis.Select(k => new { code = k.Code, name = k.Name, meta = k.Meta }).ToList(),
                 });
             }
@@ -1294,6 +1364,19 @@ public class JourneyRunViewModel
     // project regardless of the current user's department.
     public List<Project> AllProjects { get; set; } = new();
     public List<Initiative> AllInitiatives { get; set; } = new();
+
+    // Phase 20.22 — Stage 3 ONLY: full unfiltered lists so every user (employee,
+    // VP, gac.admin) sees every initiative + every KPI on the "الأهداف
+    // الاستراتيجية للهيئة" screen. Other stages keep their existing scoping.
+    public List<Initiative> AllInitiativesForStage3 { get; set; } = new();
+    public List<Kpi> AllKpisForStage3 { get; set; } = new();
+
+    // Phase 20.22 — Stage 5: project + initiative lists scoped to the user's
+    // actual reach (employee = dept, VP = sector aggregate, gac.admin = all).
+    // Replaces AllProjects/AllInitiatives for the stage-5 pickers so a regular
+    // user only sees their own initiatives + projects in the journey diagram.
+    public List<Project> ScopedProjects { get; set; } = new();
+    public List<Initiative> ScopedInitiatives { get; set; } = new();
     public DepartmentStrategyMap? Map { get; set; }
     public List<MapInkAsset> InkAssets { get; set; } = new();
     public string? SelectedTeamValue { get; set; } // Phase 16 — the team's chosen Big Picture value (Ar text)

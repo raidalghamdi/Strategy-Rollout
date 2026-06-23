@@ -58,6 +58,11 @@
     <div id="initiativesBlock" class="mb-3" hidden>
         <label class="form-label fw-bold" style="color:#28334A;">المبادرة الأقرب لعملك</label>
         <div id="initiativesStatus" class="small text-muted mb-2"></div>
+        @* Phase 20.22 — A/B color coding legend (shown when initiatives exist) *@
+        <div id="initiativesLegend" class="contrib-legend" hidden>
+            <span class="legend-item"><span class="legend-swatch swatch--owner"></span>مبادرة تملكها إدارتك</span>
+            <span class="legend-item"><span class="legend-swatch swatch--project"></span>مبادرة تساهم فيها إدارتك بمشاريع</span>
+        </div>
         <div id="initiativesGrid" class="contrib-grid"></div>
     </div>
 
@@ -92,7 +97,24 @@
         box-shadow: 0 2px 10px rgba(95,150,0,.18);
     }
     #stage-4 .contrib-card:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(95,150,0,.28); }
-    #stage-4 .contrib-card.is-selected { background: #067647; border-color: #fff; box-shadow: 0 4px 18px rgba(6,118,71,.35); }
+    /* Phase 20.22 — A (owner) cards are dark green, B (project-only) cards are olive (default).
+       Selected card uses navy to clearly distinguish from both classes. */
+    #stage-4 .contrib-card.kind-owner { background: #067647; box-shadow: 0 2px 10px rgba(6,118,71,.22); }
+    #stage-4 .contrib-card.kind-owner:hover { box-shadow: 0 4px 14px rgba(6,118,71,.32); }
+    #stage-4 .contrib-card.is-selected { background: #28334A; border-color: #fff; box-shadow: 0 4px 18px rgba(40,51,74,.45); }
+
+    /* Phase 20.22 — A/B legend chips */
+    #stage-4 .contrib-legend {
+        display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+        margin: 4px 0 12px; font-size: .85rem; color: #28334A;
+    }
+    #stage-4 .legend-item { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+    #stage-4 .legend-swatch {
+        display: inline-block; width: 14px; height: 14px; border-radius: 4px;
+        border: 1px solid rgba(0,0,0,.08);
+    }
+    #stage-4 .legend-swatch.swatch--owner { background: #067647; }
+    #stage-4 .legend-swatch.swatch--project { background: #5F9600; }
     #stage-4 .contrib-card input[type=radio] { width: 20px; height: 20px; accent-color: #fff; vertical-align: middle; }
     #stage-4 .contrib-card .ci-name { font-weight: 800; color: #fff; margin-inline-start: 8px; font-size: 1rem; line-height: 1.6; }
     #stage-4 .contrib-card .ci-meta { display: block; margin-top: 8px; font-size: .82rem; color: rgba(255,255,255,.92); line-height: 1.7; }
@@ -176,18 +198,25 @@
 
     function renderInitiatives(items) {
         var grid = el('initiativesGrid');
+        var legend = el('initiativesLegend');
         if (!grid) return;
         grid.innerHTML = '';
+        if (legend) legend.setAttribute('hidden', 'hidden');
         if (!items || items.length === 0) {
             el('initiativesStatus').textContent = 'لا توجد مبادرات مرتبطة بهذه الإدارة.';
             return;
         }
         el('initiativesStatus').textContent = '';
+        // Phase 20.22 — show the A/B legend whenever there are initiatives to render.
+        if (legend) legend.removeAttribute('hidden');
         for (var i = 0; i < items.length; i++) {
             (function (it) {
                 var label = document.createElement('label');
-                label.className = 'contrib-card';
+                // Phase 20.22 — A (owner) vs B (project-only) color coding.
+                var kindClass = (it.matchKind === 'owner') ? ' kind-owner' : ' kind-project';
+                label.className = 'contrib-card' + kindClass;
                 label.setAttribute('data-code', it.code);
+                label.setAttribute('data-kind', it.matchKind || 'project');
                 var meta = '';
                 if (it.objectiveName) meta += 'الهدف: ' + it.objectiveName;
                 if (it.pillarName) meta += (meta ? ' · ' : '') + 'الركيزة: ' + it.pillarName;
@@ -195,7 +224,10 @@
                 // Phase 20.9 — step "دوري في الاستراتيجية" (was 3, now 4) now shows projects
                 // only. KPI linkage moved to the next stage (الرحلة نحو الرؤية)
                 // where users toggle between Initiatives and KPIs.
+                // Phase 20.22 — projects are pre-filtered server-side to the user's scope;
+                // ownedProjectCount tells the user how many belong to their department.
                 var projects = it.projects || [];
+                var ownedCount = (typeof it.ownedProjectCount === 'number') ? it.ownedProjectCount : projects.length;
                 var detailsHtml = '';
                 if (projects.length > 0) {
                     var projLis = '';
@@ -205,7 +237,7 @@
                         projLis += '<li>' + (pr.name || pr.code) + pmeta + '</li>';
                     }
                     detailsHtml = '<details class="ci-details" onclick="event.stopPropagation();">'
-                        + '<summary>عرض المشاريع (' + projects.length + ' مشروع)</summary>'
+                        + '<summary>عرض المشاريع (' + ownedCount + ' مشروع لإدارتك)</summary>'
                         + '<div class="ci-children">'
                         +   '<div class="ci-child-group"><h6>المشاريع</h6><ul>' + projLis + '</ul></div>'
                         + '</div>'
@@ -225,8 +257,12 @@
                 var radio = label.querySelector('input');
                 radio.addEventListener('change', function () {
                     var cards = grid.querySelectorAll('.contrib-card');
-                    for (var j = 0; j < cards.length; j++) cards[j].className = 'contrib-card';
-                    label.className = 'contrib-card is-selected';
+                    // Phase 20.22 — preserve each card's kind-* class while clearing is-selected.
+                    for (var j = 0; j < cards.length; j++) {
+                        var ck = cards[j].getAttribute('data-kind') === 'owner' ? ' kind-owner' : ' kind-project';
+                        cards[j].className = 'contrib-card' + ck;
+                    }
+                    label.className = 'contrib-card' + kindClass + ' is-selected';
                     selectedCode = it.code; selectedName = it.name || it.code;
                     selectedObj = it.objectiveName || ''; selectedPillar = it.pillarName || '';
                     if (el('impactBlock')) el('impactBlock').removeAttribute('hidden');
