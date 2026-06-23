@@ -140,23 +140,23 @@ public class JourneyController : Controller
         string? effectiveScope = scopeKey;
         if (isGlobal)
         {
+            // Phase 20.16 — by default executive / GLOBAL accounts walk ONE unified
+            // journey that aggregates all sectors. Passing ?sector=SECTOR:* is still
+            // supported (e.g. for QA-ing a single sector) and overrides the default.
             if (string.IsNullOrEmpty(sector))
             {
-                // No sector specified — render a small chooser page.
-                return View("SectorChooser", new List<string>
-                {
-                    "SECTOR:CORP_SUPPORT",
-                    "SECTOR:ECONOMIC",
-                    "SECTOR:LEGAL",
-                });
+                effectiveScope = "SECTOR:ALL"; // → SEC_ALL synthetic dept code
             }
-            if (!sector.StartsWith("SECTOR:", StringComparison.Ordinal)
-                || SyntheticSectorCode(sector) == "SEC_UNKNOWN")
+            else if (!sector.StartsWith("SECTOR:", StringComparison.Ordinal)
+                     || SyntheticSectorCode(sector) == "SEC_UNKNOWN")
             {
                 TempData["Error"] = "القطاع غير صالح.";
                 return Redirect("/Admin/LiveDashboard");
             }
-            effectiveScope = sector;
+            else
+            {
+                effectiveScope = sector;
+            }
         }
         else if (string.IsNullOrEmpty(scopeKey) || !scopeKey.StartsWith("SECTOR:", StringComparison.Ordinal))
         {
@@ -199,16 +199,23 @@ public class JourneyController : Controller
         "SECTOR:CORP_SUPPORT" => "SEC_CORP_SUPP",
         "SECTOR:ECONOMIC" => "SEC_ECONOMIC",
         "SECTOR:LEGAL" => "SEC_LEGAL",
+        // Phase 20.16 — unified journey for executive / GLOBAL accounts (gac.admin):
+        // a single synthetic DeptCode that aggregates ALL sectors / ALL departments.
+        "GLOBAL" => "SEC_ALL",
+        "TEST" => "SEC_ALL",
+        "SECTOR:ALL" => "SEC_ALL",
         _ => "SEC_UNKNOWN",
     };
 
     // Phase 20.9 — reverse map: synthetic sector dept code → Arabic display name.
     // Used by BuildRunViewModelAsync so the journey header shows "رحلة قطاع ...".
+    // Phase 20.16 — SEC_ALL is the unified executive scope (all sectors combined).
     private static string? SectorDisplayName(string deptCode) => deptCode switch
     {
         "SEC_CORP_SUPP" => "قطاع الدعم المؤسسي",
         "SEC_ECONOMIC" => "قطاع الشؤون الاقتصادية",
         "SEC_LEGAL" => "قطاع الشؤون القانونية",
+        "SEC_ALL" => "جميع القطاعات",
         _ => null,
     };
 
@@ -316,8 +323,14 @@ public class JourneyController : Controller
             // Projects from ALL departments whose ParentSector matches the sector's
             // Arabic display name. The unified source is queried per department and
             // results are deduped by code so the journey shows the full sector view.
-            var sectorDepts = await _db.Departments
-                .Where(d => d.ParentSector == sectorDisplay && d.IsActive)
+            // Phase 20.16 — SEC_ALL (executive / gac.admin unified journey) aggregates
+            // across EVERY active department regardless of ParentSector.
+            var sectorDeptsQuery = _db.Departments.Where(d => d.IsActive);
+            if (session.DeptCode != "SEC_ALL")
+            {
+                sectorDeptsQuery = sectorDeptsQuery.Where(d => d.ParentSector == sectorDisplay);
+            }
+            var sectorDepts = await sectorDeptsQuery
                 .Select(d => d.NameAr)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .Select(n => n!)
@@ -1114,9 +1127,45 @@ public class JourneyController : Controller
     private async Task<object> BuildSankeyAsync(string deptCode)
     {
         // Phase 19.23 — Sankey reads route through the unified source (mirror → SQLite → empty).
+        // Phase 20.16 — for synthetic sector sessions (SEC_CORP_SUPP / SEC_ECONOMIC /
+        // SEC_LEGAL / SEC_ALL) aggregate across the constituent departments so the
+        // Sankey shows the full sector / executive view, not zero nodes.
         var ct = HttpContext.RequestAborted;
-        var kpis = ToKpiEntities(await _source.GetKpisAsync(deptCode, ct));
-        var projects = ToProjectEntities(await _source.GetProjectsAsync(deptCode, ct));
+        List<Kpi> kpis;
+        List<Project> projects;
+        var sectorDisplay = SectorDisplayName(deptCode);
+        if (sectorDisplay != null)
+        {
+            var sectorDeptsQuery = _db.Departments.Where(d => d.IsActive);
+            if (deptCode != "SEC_ALL")
+            {
+                sectorDeptsQuery = sectorDeptsQuery.Where(d => d.ParentSector == sectorDisplay);
+            }
+            var sectorDepts = await sectorDeptsQuery
+                .Select(d => d.NameAr)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Select(n => n!)
+                .Distinct()
+                .ToListAsync();
+            var aggK = new List<Kpi>();
+            var aggP = new List<Project>();
+            foreach (var dn in sectorDepts)
+            {
+                aggK.AddRange(ToKpiEntities(await _source.GetKpisAsync(dn, ct)));
+                aggP.AddRange(ToProjectEntities(await _source.GetProjectsAsync(dn, ct)));
+            }
+            kpis = aggK
+                .GroupBy(k => string.IsNullOrWhiteSpace(k.KpiCode) ? k.KpiName : k.KpiCode, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First()).ToList();
+            projects = aggP
+                .GroupBy(p => string.IsNullOrWhiteSpace(p.ProjectCode) ? p.ProjectName : p.ProjectCode, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First()).ToList();
+        }
+        else
+        {
+            kpis = ToKpiEntities(await _source.GetKpisAsync(deptCode, ct));
+            projects = ToProjectEntities(await _source.GetProjectsAsync(deptCode, ct));
+        }
         // Phase 19.20 (Fix 2) — dedup so the flow chart doesn't draw duplicate nodes.
         var objectives = StrategyDedup.ByObjectiveCode(ToObjectiveEntities(await _source.GetObjectivesAsync(ct)));
         var pillars = StrategyDedup.ByPillarCode(ToPillarEntities(await _source.GetPillarsAsync(ct)));
