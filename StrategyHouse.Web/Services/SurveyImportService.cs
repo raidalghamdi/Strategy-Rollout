@@ -10,14 +10,16 @@ using StrategyHouse.Infrastructure.Persistence;
 namespace StrategyHouse.Web.Services;
 
 // Phase 20.18 — uploaded Excel results → SurveyResponses + automatic analytics.
-//
-// Input format (long: one row per (respondent × question)):
-//   Survey | Email | Name (= question text) | Answer | Notes | Suggestions | SubmittionDateTime
-//
-// We group rows by Email + SubmittionDateTime into one SurveyResponse, match each
-// row's question text against the active survey's SurveyQuestions, and append every
-// response — no dedup check (user requested "add all every time"). Analytics pages
-// recompute on every render from SurveyResponses, so uploads surface immediately.
+// Phase 20.20 — three critical fixes after first real-world upload returned an empty
+// PDF (25 responses logged but every metric 0):
+//   1) AnswersJson now uses field name "value" (not "answer") so SurveyAnalyticsService
+//      can read it back. AnswerItem in SurveyAnalyticsService is { Qid, Value }.
+//   2) Smarter question matching: section markers ("القسم الأول: …") are dropped on
+//      BOTH sides, then we try exact → contains → word-Jaccard (≥ 0.55) fallback.
+//   3) Likert text answers ("مطلع بشكل كامل", "بدرجة عالية جداً") are mapped to 1..5,
+//      and the free-text placeholder ":أضف اجابة في الحقل المخصص" is replaced with
+//      the row's Notes/Suggestions value so OpenText questions don't store the
+//      placeholder as the answer.
 public class SurveyImportService
 {
     private readonly ApplicationDbContext _db;
@@ -29,8 +31,6 @@ public class SurveyImportService
         _log = log;
     }
 
-    // -- Column lookup table (header → index). Matches the sample file exactly but is
-    //    case/whitespace-insensitive and tolerates alternative header names. --
     private static readonly Dictionary<string, string[]> HeaderAliases = new(StringComparer.OrdinalIgnoreCase)
     {
         ["survey"]     = new[] { "Survey", "Survey Title", "Survey Name", "الاستبيان" },
@@ -53,8 +53,6 @@ public class SurveyImportService
         public List<string> UnmatchedQuestions { get; set; } = new();
         public List<RespondentSummary> Respondents { get; set; } = new();
         public List<QuestionMatch> QuestionMatches { get; set; } = new();
-        // Pre-built responses, ready to apply. We stash them between Preview and Apply via
-        // a session token (caller can also re-parse — both are safe).
         public List<PreparedResponse> Prepared { get; set; } = new();
     }
 
@@ -87,21 +85,103 @@ public class SurveyImportService
         public string? Notes { get; set; }
     }
 
-    // Normalize question text for matching. Excel sometimes injects "_x000D_" (carriage
-    // returns) and stray whitespace; we strip both. Comparison is case-insensitive on the
-    // collapsed Arabic text.
+    // ---- normalization ----------------------------------------------------
+
+    // Strip "_x000D_", CR/LF, collapse spaces, then DROP any leading "القسم … :" marker.
     private static string Norm(string? s)
     {
         if (string.IsNullOrEmpty(s)) return "";
         var x = s.Replace("_x000D_", " ").Replace("\r", " ").Replace("\n", " ").Replace("\t", " ");
         x = Regex.Replace(x, @"\s+", " ").Trim();
-        // Drop common leading section markers ("القسم الأول: …") so the body text matches
-        // even when one side carries the section label and the other doesn't.
+        // Drop any leading "القسم <anything> : " — covers Arabic colon ":" or "："
         x = Regex.Replace(x, @"^القسم[^:：]+[:：]\s*", "", RegexOptions.CultureInvariant);
-        // Strip trailing punctuation that may differ between Excel and DB strings.
+        // Some files put leading punctuation on cell values (".منع …"); strip it.
+        x = x.TrimStart('.', '،', '؟', '?', ' ', ':');
         x = x.TrimEnd('.', '،', '؟', '?', ' ');
         return x;
     }
+
+    // Token set for Jaccard similarity. Removes punctuation, drops tokens shorter than 2 chars.
+    private static HashSet<string> Tokens(string s)
+    {
+        var stripped = Regex.Replace(Norm(s), @"[\p{P}\p{S}]", " ");
+        return stripped.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(t => t.Length >= 2)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    private static double Jaccard(HashSet<string> a, HashSet<string> b)
+    {
+        if (a.Count == 0 || b.Count == 0) return 0;
+        var inter = a.Intersect(b).Count();
+        var union = a.Count + b.Count - inter;
+        return union == 0 ? 0 : (double)inter / union;
+    }
+
+    // ---- Likert text → 1..5 mapping ---------------------------------------
+
+    private static readonly Dictionary<string, int> LikertMap = new(StringComparer.Ordinal)
+    {
+        // High-end
+        ["بدرجة عالية جداً"] = 5,
+        ["بدرجة عالية جدا"]  = 5,
+        ["مطلع بشكل كامل"]   = 5,
+        ["موافق بشدة"]       = 5,
+        // 4
+        ["بدرجة عالية"]      = 4,
+        ["مطلع بشكل جيد"]    = 4,
+        ["موافق"]            = 4,
+        // 3
+        ["بدرجة متوسطة"]     = 3,
+        ["مطلع بشكل إلى حد ما"] = 3,
+        ["محايد"]            = 3,
+        // 2
+        ["بدرجة منخفضة"]     = 2,
+        ["مطلع بشكل محدود"]  = 2,
+        ["غير موافق"]        = 2,
+        // 1
+        ["بدرجة منخفضة جداً"] = 1,
+        ["بدرجة منخفضة جدا"]  = 1,
+        ["غير مطلع"]          = 1,
+        ["غير موافق بشدة"]    = 1,
+    };
+
+    // Convert any Likert cell value to "1".."5" or "" (empty -> ignored downstream).
+    private static string LikertNormalize(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "";
+        var v = raw.Trim().TrimEnd('.', '،', '؟', '?', ' ').TrimStart('.', '،', ' ', ':');
+        // Already a number 1..5?
+        if (int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) && n is >= 1 and <= 5)
+            return n.ToString(CultureInfo.InvariantCulture);
+        // Try the table.
+        if (LikertMap.TryGetValue(v, out var mapped))
+            return mapped.ToString(CultureInfo.InvariantCulture);
+        // Fuzzy: longest matching key.
+        foreach (var (k, score) in LikertMap.OrderByDescending(kv => kv.Key.Length))
+        {
+            if (v.Contains(k, StringComparison.Ordinal)) return score.ToString(CultureInfo.InvariantCulture);
+        }
+        return "";
+    }
+
+    // The Excel template uses a literal placeholder for open-text questions
+    // (":أضف اجابة في الحقل المخصص"). Treat that as an empty answer.
+    private static bool IsPlaceholder(string v)
+    {
+        if (string.IsNullOrWhiteSpace(v)) return true;
+        var n = v.Trim().TrimStart(':', ' ', '.', '،').TrimEnd(':', ' ', '.', '،');
+        return n.Contains("أضف اجابة", StringComparison.Ordinal)
+            || n.Contains("أضف إجابة", StringComparison.Ordinal)
+            || n.Contains("اضف اجابة", StringComparison.Ordinal)
+            || n.Contains("اضف إجابة", StringComparison.Ordinal);
+    }
+
+    // Clean MCQ cell value: drop leading punctuation, trim whitespace. Used both
+    // for matching against OptionsJson and for storing the canonical choice text.
+    private static string CleanChoice(string v) => Norm(v);
+
+    // ---- main analyze -----------------------------------------------------
 
     public async Task<ImportPreview> AnalyzeAsync(Stream xlsxStream, Guid? surveyIdOverride, CancellationToken ct)
     {
@@ -138,7 +218,7 @@ public class SurveyImportService
             preview.TargetSurvey = active[0];
         }
 
-        // 2) Open workbook and find header row on the first sheet.
+        // 2) Open workbook.
         using var wb = new XLWorkbook(xlsxStream);
         var ws = wb.Worksheets.First();
         var headerRow = ws.FirstRowUsed();
@@ -170,17 +250,36 @@ public class SurveyImportService
             return preview;
         }
 
-        // 3) Build question-text → SurveyQuestion lookup (normalized).
-        var qByNorm = new Dictionary<string, SurveyQuestion>(StringComparer.OrdinalIgnoreCase);
-        foreach (var q in preview.TargetSurvey.Questions)
+        // 3) Build DB-side question lookups: by normalized text + tokens (for fuzzy).
+        var qIndex = preview.TargetSurvey.Questions
+            .OrderBy(q => q.Order)
+            .Select(q => (Q: q, Norm: Norm(q.QuestionAr), Tokens: Tokens(q.QuestionAr)))
+            .ToList();
+        var qByNorm = qIndex.ToDictionary(x => x.Norm, x => x.Q, StringComparer.OrdinalIgnoreCase);
+
+        SurveyQuestion? MatchQuestion(string fileQ)
         {
-            var key = Norm(q.QuestionAr);
-            if (!qByNorm.ContainsKey(key)) qByNorm[key] = q;
+            var nf = Norm(fileQ);
+            if (string.IsNullOrEmpty(nf)) return null;
+            // a) exact post-normalization
+            if (qByNorm.TryGetValue(nf, out var direct)) return direct;
+            // b) substring either way
+            foreach (var (q, n, _) in qIndex)
+            {
+                if (n.Length < 10) continue;
+                if (nf.Contains(n, StringComparison.Ordinal) || n.Contains(nf, StringComparison.Ordinal))
+                    return q;
+            }
+            // c) Jaccard ≥ 0.55 → best DB question
+            var fileToks = Tokens(fileQ);
+            var best = qIndex
+                .Select(x => (x.Q, Score: Jaccard(fileToks, x.Tokens)))
+                .OrderByDescending(x => x.Score)
+                .FirstOrDefault();
+            return best.Score >= 0.55 ? best.Q : null;
         }
 
-        // 4) Walk data rows, group by (email + submitted-at). Substring matching falls back
-        //    to longest-common-substring across DB questions when the file/DB texts differ
-        //    only in length (we trim section labels on both sides via Norm).
+        // 4) Walk rows.
         var grouped = new Dictionary<string, PreparedResponse>(StringComparer.OrdinalIgnoreCase);
         var matchByFileQ = new Dictionary<string, QuestionMatch>(StringComparer.Ordinal);
         var unmatched = new HashSet<string>(StringComparer.Ordinal);
@@ -197,46 +296,21 @@ public class SurveyImportService
 
             var email = Get("email");
             var fileQ = Get("question");
-            var answer = Get("answer");
+            var rawAnswer = Get("answer");
             var notes = Get("notes");
             var suggest = Get("suggest");
             var submittedRaw = Get("submitted");
 
-            if (string.IsNullOrWhiteSpace(email) && string.IsNullOrWhiteSpace(fileQ) && string.IsNullOrWhiteSpace(answer))
-                continue; // blank row
+            if (string.IsNullOrWhiteSpace(email) && string.IsNullOrWhiteSpace(fileQ) && string.IsNullOrWhiteSpace(rawAnswer))
+                continue;
 
-            // "NULL" cells become empty strings.
             if (string.Equals(notes, "NULL", StringComparison.OrdinalIgnoreCase)) notes = "";
             if (string.Equals(suggest, "NULL", StringComparison.OrdinalIgnoreCase)) suggest = "";
-            if (string.Equals(answer, "NULL", StringComparison.OrdinalIgnoreCase)) answer = "";
-
-            // Concatenate Notes + Suggestions into a single freetext value.
-            var notesCombined = string.Join(" — ",
-                new[] { notes, suggest }.Where(s => !string.IsNullOrWhiteSpace(s)));
+            if (string.Equals(rawAnswer, "NULL", StringComparison.OrdinalIgnoreCase)) rawAnswer = "";
 
             totalRows++;
 
-            // Match question.
-            var normFile = Norm(fileQ);
-            SurveyQuestion? match = null;
-            if (qByNorm.TryGetValue(normFile, out var direct))
-            {
-                match = direct;
-            }
-            else
-            {
-                // Loose match: does the file text *contain* a DB question (or vice versa)?
-                foreach (var (k, q) in qByNorm)
-                {
-                    if (k.Length < 12) continue;
-                    if (normFile.Contains(k, StringComparison.Ordinal) || k.Contains(normFile, StringComparison.Ordinal))
-                    {
-                        match = q;
-                        break;
-                    }
-                }
-            }
-
+            var match = MatchQuestion(fileQ);
             if (!matchByFileQ.TryGetValue(fileQ, out var qm))
             {
                 qm = new QuestionMatch { FileQuestion = fileQ };
@@ -255,6 +329,42 @@ public class SurveyImportService
                 continue;
             }
 
+            // ---- transform answer per question type ----
+            string finalAnswer;
+            string? finalNotes;
+            // Combine Notes + Suggestions once.
+            var notesCombined = string.Join(" — ",
+                new[] { notes, suggest }.Where(s => !string.IsNullOrWhiteSpace(s)));
+            finalNotes = string.IsNullOrWhiteSpace(notesCombined) ? null : notesCombined;
+
+            switch (match.Type)
+            {
+                case "Likert5":
+                    finalAnswer = LikertNormalize(rawAnswer);
+                    break;
+                case "Text":
+                    // The template puts a placeholder in Answer and the actual text in
+                    // Notes/Suggestions. Promote the freetext to the answer in that case.
+                    if (IsPlaceholder(rawAnswer))
+                    {
+                        finalAnswer = notesCombined ?? "";
+                        // notes already promoted; don't duplicate.
+                        finalNotes = null;
+                    }
+                    else
+                    {
+                        finalAnswer = rawAnswer.Trim();
+                    }
+                    break;
+                case "MCQ":
+                default:
+                    finalAnswer = CleanChoice(rawAnswer);
+                    break;
+            }
+
+            if (string.IsNullOrWhiteSpace(finalAnswer) && string.IsNullOrWhiteSpace(finalNotes))
+                continue; // nothing to store
+
             DateTime submittedAt = DateTime.UtcNow;
             if (!string.IsNullOrWhiteSpace(submittedRaw))
             {
@@ -264,23 +374,17 @@ public class SurveyImportService
                     submittedAt = DateTime.FromOADate(oa);
             }
 
-            // Group key: email + minute-precision submitted time. Some platforms emit slightly
-            // different sub-second values for rows from the same respondent.
             var groupKey = email + "|" + submittedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
             if (!grouped.TryGetValue(groupKey, out var pr))
             {
-                pr = new PreparedResponse
-                {
-                    Email = email,
-                    SubmittedAt = submittedAt,
-                };
+                pr = new PreparedResponse { Email = email, SubmittedAt = submittedAt };
                 grouped[groupKey] = pr;
             }
             pr.Answers.Add(new PreparedAnswer
             {
                 QuestionId = match.Id,
-                Answer = answer,
-                Notes = string.IsNullOrWhiteSpace(notesCombined) ? null : notesCombined,
+                Answer = finalAnswer,
+                Notes = finalNotes,
             });
         }
 
@@ -310,8 +414,6 @@ public class SurveyImportService
         public string? TargetSurveyTitle { get; set; }
     }
 
-    // Apply: re-parses the workbook then inserts every prepared response. No dedup,
-    // matches user's stated "add all every time" behavior.
     public async Task<ApplyResult> ApplyAsync(Stream xlsxStream, Guid? surveyIdOverride, CancellationToken ct)
     {
         var preview = await AnalyzeAsync(xlsxStream, surveyIdOverride, ct);
@@ -321,17 +423,20 @@ public class SurveyImportService
         int inserted = 0;
         foreach (var pr in preview.Prepared)
         {
+            // Phase 20.20 — Critical: SurveyAnalyticsService.AnswerItem expects { Qid, Value }
+            // (NOT { qid, answer }). Use lowercase property names; the deserialiser is
+            // configured with PropertyNameCaseInsensitive=true so this is read back fine.
             var answersJson = JsonSerializer.Serialize(pr.Answers.Select(a => new
             {
-                qid = a.QuestionId,
-                answer = a.Answer,
+                qid   = a.QuestionId.ToString(),
+                value = a.Answer,
                 notes = a.Notes,
             }));
             var resp = new SurveyResponse
             {
                 Id = Guid.NewGuid(),
                 SurveyId = preview.TargetSurvey.Id,
-                RespondentName = pr.Email,            // best available identifier in the file
+                RespondentName = pr.Email,
                 AnswersJson = answersJson,
                 SubmittedAt = pr.SubmittedAt,
                 ClientFingerprint = "import:xlsx",
