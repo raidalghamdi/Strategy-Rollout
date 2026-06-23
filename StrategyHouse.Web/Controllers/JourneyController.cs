@@ -119,12 +119,46 @@ public class JourneyController : Controller
     [HttpGet("Journey/Sector")]
     [Microsoft.AspNetCore.Authorization.Authorize]
     public async Task<IActionResult> Sector(
-        [FromServices] Microsoft.AspNetCore.Identity.UserManager<StrategyHouse.Domain.Entities.AppUser> users)
+        [FromServices] Microsoft.AspNetCore.Identity.UserManager<StrategyHouse.Domain.Entities.AppUser> userManager,
+        string? sector = null)
     {
-        var appUser = await users.GetUserAsync(User);
+        var appUser = await userManager.GetUserAsync(User);
         if (appUser == null) return Challenge();
         var scopeKey = appUser.JourneyScopeKey;
-        if (string.IsNullOrEmpty(scopeKey) || !scopeKey.StartsWith("SECTOR:", StringComparison.Ordinal))
+
+        // Phase 20.15 — the original implementation required scopeKey to start
+        // with "SECTOR:" so only VP accounts could launch a sector journey.
+        // gac.admin (scope = GLOBAL, role JourneySuper) and platform Admins now
+        // get access too — either by picking a sector from a chooser when no
+        // ?sector=… is provided, or by passing the desired sector key directly
+        // (e.g. /Journey/Sector?sector=SECTOR:CORP_SUPPORT). This lets executive
+        // accounts walk the exact same Stage 1–6 flow VPs see for QA.
+        bool isGlobal = User.IsInRole("Admin")
+                        || scopeKey == "GLOBAL"
+                        || scopeKey == "TEST";
+
+        string? effectiveScope = scopeKey;
+        if (isGlobal)
+        {
+            if (string.IsNullOrEmpty(sector))
+            {
+                // No sector specified — render a small chooser page.
+                return View("SectorChooser", new List<string>
+                {
+                    "SECTOR:CORP_SUPPORT",
+                    "SECTOR:ECONOMIC",
+                    "SECTOR:LEGAL",
+                });
+            }
+            if (!sector.StartsWith("SECTOR:", StringComparison.Ordinal)
+                || SyntheticSectorCode(sector) == "SEC_UNKNOWN")
+            {
+                TempData["Error"] = "القطاع غير صالح.";
+                return Redirect("/Admin/LiveDashboard");
+            }
+            effectiveScope = sector;
+        }
+        else if (string.IsNullOrEmpty(scopeKey) || !scopeKey.StartsWith("SECTOR:", StringComparison.Ordinal))
         {
             TempData["Error"] = "حسابك غير مرتبط بقطاع. تواصل مع المسؤول.";
             return Redirect("/Admin/LiveDashboard");
@@ -133,13 +167,15 @@ public class JourneyController : Controller
         // Synthetic dept code so the existing session-keyed pipeline works without
         // creating real Department rows. The code fits the MaxLength(15) on
         // StrategySession.DeptCode (e.g. "SEC_CORP_SUPP").
-        var sectorCode = SyntheticSectorCode(scopeKey);
+        var sectorCode = SyntheticSectorCode(effectiveScope!);
 
-        // Resume the latest in-progress sector session for this VP if any.
+        // Resume the latest in-progress sector session for this user if any.
         var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         int? ownerId = int.TryParse(idClaim, out var uid) ? uid : (int?)null;
         var existing = await _db.StrategySessions
-            .Where(s => s.DeptCode == sectorCode && s.Status == "InProgress")
+            .Where(s => s.DeptCode == sectorCode
+                        && s.Status == "InProgress"
+                        && (s.OwnerUserId == ownerId || s.OwnerUserId == null))
             .OrderByDescending(s => s.StartedAt)
             .FirstOrDefaultAsync();
         if (existing != null)
@@ -148,7 +184,7 @@ public class JourneyController : Controller
         var session = new StrategySession
         {
             DeptCode = sectorCode,
-            AccessCodeUsed = scopeKey,
+            AccessCodeUsed = effectiveScope!,
             OwnerUserId = ownerId,
         };
         _db.StrategySessions.Add(session);

@@ -24,6 +24,12 @@
     var _isVpSector = _layoutUser != null
         && !string.IsNullOrEmpty(_layoutUser.JourneyScopeKey)
         && _layoutUser.JourneyScopeKey.StartsWith("SECTOR:", StringComparison.Ordinal);
+    // Phase 20.15 — JourneySuper / GLOBAL scope (e.g. gac.admin) should also
+    // see the journey launcher, mirroring VP behavior across all sectors.
+    var _isJourneySuper = _layoutUser != null
+        && !string.IsNullOrEmpty(_layoutUser.JourneyScopeKey)
+        && (_layoutUser.JourneyScopeKey.Equals("GLOBAL", StringComparison.OrdinalIgnoreCase)
+            || _layoutUser.JourneyScopeKey.Equals("TEST", StringComparison.OrdinalIgnoreCase));
 }
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -70,6 +76,12 @@
                     @if (_isVpSector)
                     {
                         <a class="@activeIf("Journey")" href="/Journey/Sector">رحلة القطاع</a>
+                    }
+                    @* Phase 20.15 — JourneySuper / GLOBAL accounts (gac.admin)
+                       get a chooser link so they can launch any sector's journey. *@
+                    else if (_isJourneySuper)
+                    {
+                        <a class="@activeIf("Journey")" href="/Journey/Sector">رحلات القطاعات</a>
                     }
                 }
                 else
