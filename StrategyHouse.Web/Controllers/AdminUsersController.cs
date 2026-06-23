@@ -26,12 +26,12 @@ public class AdminUsersController : Controller
     [HttpGet("")]
     public async Task<IActionResult> Index()
     {
-        // Phase 20.6 — journey-only accounts (JourneyScopeKey set) are not platform
-        // users; hide them from the admin user list entirely. They’re managed via the
-        // seeded Journey accounts list, not as people who belong on the platform.
+        // Phase 20.19 — show ALL accounts (platform + journey/VP) so an admin can
+        // edit and reset passwords from one place. Journey accounts are flagged
+        // visually in the view via JourneyScopeKey.
         var users = await _users.Users
-            .Where(u => u.JourneyScopeKey == null)
-            .OrderBy(u => u.UserName)
+            .OrderBy(u => u.JourneyScopeKey != null)
+            .ThenBy(u => u.UserName)
             .ToListAsync();
         return View(users.Select(u => new UserRow
         {

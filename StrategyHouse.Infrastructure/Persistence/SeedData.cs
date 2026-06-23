@@ -54,33 +54,71 @@ public static class SeedData
                 await roleManager.CreateAsync(new IdentityRole<int>(role));
         }
 
-        if (await userManager.FindByEmailAsync("admin@gac.gov.sa") == null)
+        // Phase 20.8 — prefer the SEED_ADMIN_PASSWORD env var (production). If it's
+        // missing, fall back to a strong default that satisfies the new policy so the
+        // app still boots; operators are expected to rotate the admin password right
+        // after the first sign-in.
+        // Phase 20.19 — also USED as a forced reset target on every boot, so an admin
+        // who forgot the password can recover by redeploying. Set SEED_ADMIN_RESET=false
+        // in production to disable the unconditional reset once the password is known.
+        var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD");
+        if (string.IsNullOrWhiteSpace(seedPassword))
         {
-            var admin = new AppUser
+            Console.WriteLine("[SeedData] WARNING: SEED_ADMIN_PASSWORD not set; using default strong password. Rotate immediately.");
+            seedPassword = "Admin@2026Strong";
+        }
+
+        var adminUser = await userManager.FindByEmailAsync("admin@gac.gov.sa");
+        if (adminUser == null)
+        {
+            adminUser = new AppUser
             {
                 UserName = "admin@gac.gov.sa",
                 Email = "admin@gac.gov.sa",
                 EmailConfirmed = true,
                 FullNameAr = "مدير المنصة",
                 AppRole = UserRole.Admin,
+                IsActive = true,
             };
-            // Phase 20.8 — prefer the SEED_ADMIN_PASSWORD env var (production). If it's
-            // missing, fall back to a strong default that satisfies the new policy so the
-            // app still boots; operators are expected to rotate the admin password right
-            // after the first sign-in.
-            var seedPassword = Environment.GetEnvironmentVariable("SEED_ADMIN_PASSWORD");
-            if (string.IsNullOrWhiteSpace(seedPassword))
-            {
-                Console.WriteLine("[SeedData] WARNING: SEED_ADMIN_PASSWORD not set; using default strong password. Rotate immediately.");
-                seedPassword = "Admin@2026Strong";
-            }
-            var createAdmin = await userManager.CreateAsync(admin, seedPassword);
+            var createAdmin = await userManager.CreateAsync(adminUser, seedPassword);
             if (!createAdmin.Succeeded)
             {
                 Console.WriteLine($"[SeedData] Failed to create admin: {string.Join("; ", createAdmin.Errors.Select(e => e.Description))}");
                 return;
             }
-            await userManager.AddToRoleAsync(admin, "Admin");
+            await userManager.AddToRoleAsync(adminUser, "Admin");
+        }
+        else
+        {
+            // Phase 20.19 — forced password reset on boot (opt-out via SEED_ADMIN_RESET=false).
+            var resetFlag = Environment.GetEnvironmentVariable("SEED_ADMIN_RESET");
+            var shouldReset = string.IsNullOrWhiteSpace(resetFlag) ||
+                              !string.Equals(resetFlag, "false", StringComparison.OrdinalIgnoreCase);
+            if (shouldReset)
+            {
+                var token = await userManager.GeneratePasswordResetTokenAsync(adminUser);
+                var resetResult = await userManager.ResetPasswordAsync(adminUser, token, seedPassword);
+                if (resetResult.Succeeded)
+                {
+                    Console.WriteLine("[SeedData] Admin password reset to SEED_ADMIN_PASSWORD on boot.");
+                    // Make sure the account is unlocked + active + email-confirmed so logins succeed.
+                    if (await userManager.IsLockedOutAsync(adminUser))
+                        await userManager.SetLockoutEndDateAsync(adminUser, null);
+                    if (!adminUser.EmailConfirmed || !adminUser.IsActive)
+                    {
+                        adminUser.EmailConfirmed = true;
+                        adminUser.IsActive = true;
+                        await userManager.UpdateAsync(adminUser);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"[SeedData] Failed to reset admin password: {string.Join("; ", resetResult.Errors.Select(e => e.Description))}");
+                }
+            }
+            // Ensure the Admin role assignment exists even on legacy DBs.
+            if (!await userManager.IsInRoleAsync(adminUser, "Admin"))
+                await userManager.AddToRoleAsync(adminUser, "Admin");
         }
     }
 
