@@ -175,6 +175,8 @@ builder.Services.AddScoped<ExecutiveReportPdfDocument>();
 builder.Services.AddScoped<ExecutiveReportExcelBuilder>();
 builder.Services.AddScoped<ExecutiveReportPowerPointBuilder>();
 builder.Services.AddScoped<SurveyReportExcelBuilder>();
+// Phase 20.18 — Excel results import → SurveyResponses + automatic analytics.
+builder.Services.AddScoped<SurveyImportService>();
 builder.Services.AddScoped<SurveyReportPowerPointBuilder>();
 builder.Services.AddScoped<ReportEmailService>();
 // Phase 6 — DB-only chatbot

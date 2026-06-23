@@ -18,17 +18,20 @@ public class AdminSurveysController : Controller
     private readonly QrService _qr;
     private readonly SurveyReportPdfService _report;
     private readonly PageContentService _pageContent;
+    private readonly SurveyImportService _import;
 
     public AdminSurveysController(
         ApplicationDbContext db,
         QrService qr,
         SurveyReportPdfService report,
-        PageContentService pageContent)
+        PageContentService pageContent,
+        SurveyImportService import)
     {
         _db = db;
         _qr = qr;
         _report = report;
         _pageContent = pageContent;
+        _import = import;
     }
 
     // Phase 19.25 — PageContent keys for the survey link / custom QR feature.
@@ -316,6 +319,97 @@ public class AdminSurveysController : Controller
         await _pageContent.SaveAsync(_db, KeyUseCustom, "false");
         TempData["Success"] = "تم حذف الصورة المخصّصة وإعادة التوليد التلقائي.";
         return RedirectToAction(nameof(Link));
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 20.18 — رفع نتائج Excel وتحليلها تلقائياً (single-button)
+    // ------------------------------------------------------------------
+    [HttpGet("Import")]
+    public IActionResult Import()
+    {
+        return View();
+    }
+
+    [HttpPost("Import/Preview")]
+    [ValidateAntiForgeryToken]
+    [RequestSizeLimit(20_000_000)]
+    public async Task<IActionResult> ImportPreview(IFormFile? file, CancellationToken ct)
+    {
+        if (file == null || file.Length == 0)
+        {
+            TempData["Error"] = "يرجى اختيار ملف Excel للرفع.";
+            return RedirectToAction(nameof(Import));
+        }
+        var ext = (Path.GetExtension(file.FileName) ?? "").ToLowerInvariant();
+        if (ext != ".xlsx")
+        {
+            TempData["Error"] = "الملف يجب أن يكون بصيغة .xlsx فقط.";
+            return RedirectToAction(nameof(Import));
+        }
+        // Stash bytes in TempData so the Apply step doesn't need a re-upload.
+        byte[] bytes;
+        using (var ms = new MemoryStream())
+        {
+            await file.CopyToAsync(ms, ct);
+            bytes = ms.ToArray();
+        }
+        SurveyImportService.ImportPreview preview;
+        using (var inMs = new MemoryStream(bytes))
+        {
+            preview = await _import.AnalyzeAsync(inMs, null, ct);
+        }
+        // Persist the uploaded file for the Apply step.
+        var stashDir = Path.Combine(Path.GetTempPath(), "sh_import_stash");
+        Directory.CreateDirectory(stashDir);
+        var stashId = Guid.NewGuid().ToString("N");
+        var stashPath = Path.Combine(stashDir, stashId + ".xlsx");
+        await System.IO.File.WriteAllBytesAsync(stashPath, bytes, ct);
+        TempData["ImportStashId"] = stashId;
+        TempData["ImportFileName"] = file.FileName;
+        return View("Preview", preview);
+    }
+
+    [HttpPost("Import/Apply")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ImportApply(string stashId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(stashId))
+        {
+            TempData["Error"] = "انتهت صلاحية الرفع. يرجى رفع الملف مجدداً.";
+            return RedirectToAction(nameof(Import));
+        }
+        // Defensive: stashId must be a hex GUID, no path separators.
+        if (!System.Text.RegularExpressions.Regex.IsMatch(stashId, "^[a-f0-9]{32}$"))
+        {
+            TempData["Error"] = "معرّف الرفع غير صالح.";
+            return RedirectToAction(nameof(Import));
+        }
+        var stashDir = Path.Combine(Path.GetTempPath(), "sh_import_stash");
+        var stashPath = Path.Combine(stashDir, stashId + ".xlsx");
+        if (!System.IO.File.Exists(stashPath))
+        {
+            TempData["Error"] = "لم يتم العثور على الملف المؤقت. يرجى رفع الملف مجدداً.";
+            return RedirectToAction(nameof(Import));
+        }
+        int added;
+        Guid? targetId;
+        try
+        {
+            using var fs = System.IO.File.OpenRead(stashPath);
+            var result = await _import.ApplyAsync(fs, null, ct);
+            added = result.AddedResponses;
+            targetId = result.TargetSurveyId;
+        }
+        finally
+        {
+            try { System.IO.File.Delete(stashPath); } catch { /* best-effort */ }
+        }
+        TempData["Success"] = $"تم استيراد {added} استجابة وإضافتها إلى الاستبيان.";
+        if (targetId.HasValue)
+        {
+            return RedirectToAction(nameof(Analytics), new { id = targetId.Value });
+        }
+        return RedirectToAction(nameof(Index));
     }
 
     private async Task<SurveyReportPdfService.ReportModel?> BuildReportAsync(Guid id)

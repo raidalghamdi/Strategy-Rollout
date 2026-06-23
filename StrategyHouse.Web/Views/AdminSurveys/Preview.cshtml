@@ -1,0 +1,163 @@
+@model StrategyHouse.Web.Services.SurveyImportService.ImportPreview
+@{
+    ViewData["Title"] = "معاينة نتائج الرفع";
+    var stashId = TempData["ImportStashId"] as string ?? "";
+    var fileName = TempData["ImportFileName"] as string ?? "";
+    // Keep stash + name available for one more turn in case the user navigates back.
+    TempData.Keep("ImportStashId");
+    TempData.Keep("ImportFileName");
+}
+
+@section Styles {
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
+}
+
+<div class="container py-3" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center">
+        <h1 style="color:#28334A;">🔍 معاينة نتائج الرفع</h1>
+        <div>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="Import">رفع ملف آخر</a>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="Index">رجوع للاستبيانات</a>
+        </div>
+    </div>
+
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="alert alert-danger mt-3">
+        <strong>تعذّر التحليل:</strong> @Model.Error
+    </div>
+    <a class="btn btn-primary" asp-action="Import">عودة لصفحة الرفع</a>
+}
+else
+{
+    <div class="card my-3">
+        <div class="card-body">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-6">
+                    <div class="text-muted small">الاستبيان الهدف</div>
+                    <div class="h5 mb-0" style="color:#28334A;">@Model.TargetSurvey?.TitleAr</div>
+                    @if (!string.IsNullOrEmpty(fileName))
+                    {
+                        <div class="text-muted small mt-1">من الملف: <code>@fileName</code></div>
+                    }
+                </div>
+                <div class="col-md-2 text-center">
+                    <div class="text-muted small">إجمالي الصفوف</div>
+                    <div class="h4 mb-0">@Model.TotalRows</div>
+                </div>
+                <div class="col-md-2 text-center">
+                    <div class="text-muted small">المشاركون</div>
+                    <div class="h4 mb-0">@Model.UniqueRespondents</div>
+                </div>
+                <div class="col-md-2 text-center">
+                    <div class="text-muted small">أسئلة مطابقة</div>
+                    <div class="h4 mb-0">
+                        @Model.MatchedQuestions
+                        @if (Model.UnmatchedQuestionCount > 0)
+                        {
+                            <span class="text-danger small"> / @(Model.MatchedQuestions + Model.UnmatchedQuestionCount)</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (Model.UnmatchedQuestionCount > 0)
+    {
+        <div class="alert alert-warning">
+            <strong>⚠️ تنبيه:</strong>
+            هناك <strong>@Model.UnmatchedQuestionCount</strong> سؤال في الملف لا يتطابق نصه مع أي سؤال
+            في الاستبيان الهدف وسيتم تجاهل إجاباته. راجع القائمة أدناه قبل الاعتماد.
+            <ul class="mb-0 mt-2">
+                @foreach (var uq in Model.UnmatchedQuestions)
+                {
+                    <li><code>@uq</code></li>
+                }
+            </ul>
+        </div>
+    }
+
+    <h5 class="mt-4" style="color:#28334A;">مطابقة الأسئلة</h5>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover">
+            <thead>
+                <tr>
+                    <th>نص السؤال (من الملف)</th>
+                    <th>السؤال المطابق في الاستبيان</th>
+                    <th class="text-center">عدد الصفوف</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var qm in Model.QuestionMatches)
+                {
+                    <tr>
+                        <td style="max-width:420px;">@qm.FileQuestion</td>
+                        <td>
+                            @if (qm.MatchedQuestionId.HasValue)
+                            {
+                                <span class="badge bg-success">مطابق</span>
+                                <span>@qm.MatchedQuestionText</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger">غير مطابق</span>
+                            }
+                        </td>
+                        <td class="text-center">@qm.RowCount</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <h5 class="mt-4" style="color:#28334A;">المشاركون (@Model.Respondents.Count)</h5>
+    <div class="table-responsive" style="max-height:300px;overflow:auto;">
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>البريد الإلكتروني</th>
+                    <th class="text-center">عدد الإجابات</th>
+                    <th>وقت التسليم</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model.Respondents)
+                {
+                    <tr>
+                        <td><code>@r.Email</code></td>
+                        <td class="text-center">@r.AnswerCount</td>
+                        <td>@r.SubmittedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card mt-4" style="background:#eaf6ef;border:1px solid #1f8a4c;">
+        <div class="card-body">
+            <h5 class="card-title mb-2" style="color:#1f8a4c;">جاهز للاعتماد</h5>
+            <p class="mb-3">
+                سيتم إضافة <strong>@Model.UniqueRespondents</strong> استجابة جديدة إلى
+                الاستبيان <strong>@Model.TargetSurvey?.TitleAr</strong>،
+                مع <strong>إضافة الكل دائماً</strong> (لا فحص تكرار).
+                بعد الاعتماد ستُحوَّل إلى صفحة التحليلات تلقائياً.
+            </p>
+            <form method="post" asp-action="ImportApply" class="d-flex gap-2">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="stashId" value="@stashId" />
+                <button type="submit" class="btn btn-lg"
+                        style="background:#1f8a4c;color:#fff;font-weight:700;border:none;"
+                        @(string.IsNullOrEmpty(stashId) ? "disabled" : "")>
+                    ✅ اعتماد وإضافة @Model.UniqueRespondents استجابة
+                </button>
+                <a class="btn btn-outline-secondary btn-lg" asp-action="Import">إلغاء</a>
+            </form>
+            @if (string.IsNullOrEmpty(stashId))
+            {
+                <div class="text-danger small mt-2">انتهت صلاحية المعاينة. يرجى رفع الملف من جديد.</div>
+            }
+        </div>
+    </div>
+}
+</div>
