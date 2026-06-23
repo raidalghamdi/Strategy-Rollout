@@ -215,7 +215,10 @@ public class JourneyController : Controller
         "SEC_CORP_SUPP" => "قطاع الدعم المؤسسي",
         "SEC_ECONOMIC" => "قطاع الشؤون الاقتصادية",
         "SEC_LEGAL" => "قطاع الشؤون القانونية",
-        "SEC_ALL" => "جميع القطاعات",
+        // Phase 20.17 — the unified executive scope (gac.admin) reframes from
+        // "all sectors" to "the agency as a whole". Header becomes
+        // "رحلة الهيئة الشاملة".
+        "SEC_ALL" => "الهيئة الشاملة",
         _ => null,
     };
 
@@ -663,6 +666,38 @@ public class JourneyController : Controller
         {
             var ct = HttpContext.RequestAborted;
             var inits = await _source.GetInitiativesAsync(null, ct);
+
+            // Phase 20.17 — unified agency journey (gac.admin / SEC_ALL): when the
+            // "department" is the special display name "الهيئة الشاملة", return
+            // EVERY initiative in the catalog (sector-linked + agency-level) deduped
+            // by code, with no owner/dept/sector filter. KPIs / Projects / Objectives
+            // / Sankey on other stages remain aggregated across active departments
+            // (handled in BuildRunViewModelAsync / BuildSankeyAsync).
+            if (string.Equals(division, "الهيئة الشاملة", StringComparison.Ordinal))
+            {
+                var allInits = inits
+                    .GroupBy(i => string.IsNullOrWhiteSpace(i.Code) ? i.Name : i.Code,
+                             StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .OrderBy(i => i.Code, StringComparer.Ordinal)
+                    .ToList();
+                var allResult = new List<object>();
+                foreach (var i in allInits)
+                {
+                    var vm = await ResolveInitiativeAsync(i.Code);
+                    if (vm == null) continue;
+                    allResult.Add(new
+                    {
+                        code = vm.Code,
+                        name = vm.Name,
+                        objectiveName = vm.ObjectiveName,
+                        pillarName = vm.PillarName,
+                        projects = vm.Projects.Select(p => new { code = p.Code, name = p.Name, meta = p.Meta }).ToList(),
+                        kpis = vm.Kpis.Select(k => new { code = k.Code, name = k.Name, meta = k.Meta }).ToList(),
+                    });
+                }
+                return Json(new { ok = true, live = true, initiatives = allResult });
+            }
 
             // Phase 20.10 (Fix 6) — if the division name matches a sector display
             // name, aggregate projects across ALL departments whose ParentSector

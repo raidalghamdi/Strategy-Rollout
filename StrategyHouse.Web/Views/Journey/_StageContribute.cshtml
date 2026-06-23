@@ -15,6 +15,12 @@
     var lockedDept = !string.IsNullOrWhiteSpace(savedDept) ? savedDept
                     : !string.IsNullOrWhiteSpace(sessionDeptName) ? sessionDeptName
                     : null;
+    // Phase 20.17 — unified agency journey (gac.admin). The journey context is
+    // "الهيئة الشاملة" (used by the API to load ALL initiatives), but the
+    // dept-chip label reads "الهيئة بالكامل" for clarity to executive users.
+    var lockedDeptLabel = string.Equals(lockedDept, "الهيئة الشاملة", StringComparison.Ordinal)
+        ? "الهيئة بالكامل"
+        : lockedDept;
 }
 <div class="gac-card" id="contribute-card">
     <h2 class="h4 h-md-2">دوري في الاستراتيجية</h2>
@@ -33,7 +39,7 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" stroke="#067647" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                <span class="dept-chip__name">@lockedDept</span>
+                <span class="dept-chip__name">@lockedDeptLabel</span>
             </div>
             <input type="hidden" id="deptSelect" value="@lockedDept" />
         }
