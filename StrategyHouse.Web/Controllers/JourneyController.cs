@@ -380,6 +380,41 @@ public class JourneyController : Controller
             .Select(g => g.First())
             .ToList();
 
+        // Phase 20.23 — Stage 3 per-user filtering. SEC_ALL (admin / ChiefStrategy /
+        // الهيئة الشاملة) sees every objective. Everyone else (VP sector aggregate,
+        // GM, regular employee) sees only the objectives their دائرة/قطاع actually
+        // touches — derived from (a) KPIs already loaded for their scope and
+        // (b) initiatives whose Owners contains a reachable dept name.
+        List<Initiative> stage3Initiatives;
+        List<Kpi> stage3Kpis;
+        HashSet<string> stage3ObjectiveCodes;
+        bool stage3SeesAll = session.DeptCode == "SEC_ALL"
+            || string.Equals(dept?.NameAr, "الهيئة الشاملة", StringComparison.Ordinal);
+        if (stage3SeesAll)
+        {
+            stage3Initiatives = allInitiativesFull;
+            stage3Kpis = allKpisFull;
+            stage3ObjectiveCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // sentinel: empty set + flag means "show every objective" downstream.
+        }
+        else
+        {
+            var ownerNeedles = userScopedDeptNames
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Select(n => n!.ToLowerInvariant())
+                .ToHashSet();
+            stage3Initiatives = allInitiativesFull
+                .Where(i => !string.IsNullOrEmpty(i.Owners)
+                            && ownerNeedles.Any(o => i.Owners!.ToLowerInvariant().Contains(o)))
+                .ToList();
+            stage3Kpis = deptKpis;
+            stage3ObjectiveCodes = new HashSet<string>(
+                stage3Kpis.Select(k => k.ObjectiveCode ?? string.Empty)
+                    .Concat(stage3Initiatives.Select(i => i.ObjectiveCode ?? string.Empty))
+                    .Where(c => !string.IsNullOrWhiteSpace(c)),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
         // Phase 20.22 — Stage 5 scoped lists. gac.admin/SEC_ALL gets every project.
         List<Project> scopedProjects;
         List<Initiative> scopedInitiatives;
@@ -450,6 +485,11 @@ public class JourneyController : Controller
             // Phase 20.22 — Stage 3 (universal overview) + Stage 5 (scoped).
             AllInitiativesForStage3 = allInitiativesFull,
             AllKpisForStage3 = allKpisFull,
+            // Phase 20.23 — Stage 3 per-user scope (admin/SEC_ALL → all, else dept/sector).
+            Stage3SeesAllObjectives = stage3SeesAll,
+            Stage3ObjectiveCodes = stage3ObjectiveCodes.ToList(),
+            ScopedInitiativesForStage3 = stage3Initiatives,
+            ScopedKpisForStage3 = stage3Kpis,
             ScopedProjects = scopedProjects,
             ScopedInitiatives = scopedInitiatives,
             Map = map,
@@ -1365,11 +1405,19 @@ public class JourneyRunViewModel
     public List<Project> AllProjects { get; set; } = new();
     public List<Initiative> AllInitiatives { get; set; } = new();
 
-    // Phase 20.22 — Stage 3 ONLY: full unfiltered lists so every user (employee,
-    // VP, gac.admin) sees every initiative + every KPI on the "الأهداف
-    // الاستراتيجية للهيئة" screen. Other stages keep their existing scoping.
+    // Phase 20.22 — Stage 3 ONLY: full unfiltered lists kept for backwards
+    // compatibility / admin views. Phase 20.23 introduces per-user filtering on
+    // top of these via Stage3SeesAllObjectives + Stage3ObjectiveCodes below.
     public List<Initiative> AllInitiativesForStage3 { get; set; } = new();
     public List<Kpi> AllKpisForStage3 { get; set; } = new();
+
+    // Phase 20.23 — Stage 3 per-user scope. SEC_ALL (admin/ChiefStrategy/
+    // الهيئة الشاملة) sees every objective; everyone else only sees the
+    // objectives their dept/sector touches via KPIs or initiatives.
+    public bool Stage3SeesAllObjectives { get; set; }
+    public List<string> Stage3ObjectiveCodes { get; set; } = new();
+    public List<Initiative> ScopedInitiativesForStage3 { get; set; } = new();
+    public List<Kpi> ScopedKpisForStage3 { get; set; } = new();
 
     // Phase 20.22 — Stage 5: project + initiative lists scoped to the user's
     // actual reach (employee = dept, VP = sector aggregate, gac.admin = all).

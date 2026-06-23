@@ -1,22 +1,41 @@
 @* Phase 20.9 — read-only stage 3 (الأهداف الاستراتيجية للهيئة).
-   Phase 20.22 — this stage ALWAYS uses the full unfiltered initiative + KPI
-   lists (AllInitiativesForStage3 / AllKpisForStage3) so every user (employee,
-   VP, gac.admin) sees every initiative + every KPI in the strategy house here.
-   Other stages keep their per-user filtering. *@
+   Phase 20.23 — per-user filtering. SEC_ALL (admin/ChiefStrategy/
+   الهيئة الشاملة) sees all 12 objectives. Everyone else (VP sector
+   aggregate, GM, regular employee) only sees the objectives their
+   دائرة/قطاع actually touches — derived from KPIs + initiatives owned
+   by the user's reachable departments. *@
 @model StrategyHouse.Web.Controllers.JourneyRunViewModel
 @{
     var pillars = Model.HousePillars;
-    var objectives = Model.Objectives;
-    // Phase 20.22 — universal overview for stage 3 only.
-    var initiatives = Model.AllInitiativesForStage3;
-    var kpis = Model.AllKpisForStage3;
+    var seesAll = Model.Stage3SeesAllObjectives;
+    // Phase 20.23 — filter objectives to the user's scope unless they're SEC_ALL.
+    var visibleObjectiveCodes = new HashSet<string>(
+        Model.Stage3ObjectiveCodes ?? new List<string>(),
+        StringComparer.OrdinalIgnoreCase);
+    var objectives = seesAll
+        ? Model.Objectives
+        : Model.Objectives
+            .Where(o => visibleObjectiveCodes.Contains(o.ObjectiveCode))
+            .ToList();
+    // Phase 20.23 — use scoped initiative + KPI lists for non-admin users so
+    // counts under each objective only include the user's own work.
+    var initiatives = seesAll ? Model.AllInitiativesForStage3 : Model.ScopedInitiativesForStage3;
+    var kpis = seesAll ? Model.AllKpisForStage3 : Model.ScopedKpisForStage3;
     var live = Model.StrategyDataLive;
 }
 <div class="gac-card" id="gac-goals-card">
     <h2 class="h4 h-md-2">الأهداف الاستراتيجية للهيئة العامة للمنافسة</h2>
     <p class="text-muted">
-        تعرض هذه المرحلة جميع الأهداف الاستراتيجية للهيئة. اضغط أي هدف لمعرفة
-        المبادرات ومؤشرات الأداء المرتبطة به.
+        @if (seesAll)
+        {
+            <text>تعرض هذه المرحلة جميع الأهداف الاستراتيجية للهيئة. اضغط أي هدف لمعرفة
+            المبادرات ومؤشرات الأداء المرتبطة به.</text>
+        }
+        else
+        {
+            <text>تعرض هذه المرحلة الأهداف الاستراتيجية التي ترتبط بإدارتك، سواءً عبر
+            المبادرات أو مؤشرات الأداء.</text>
+        }
     </p>
 
     @if (!live)
@@ -49,7 +68,14 @@
     <div class="gac-goal-grid">
         @if (!objectives.Any())
         {
-            <div class="gac-goal__empty">لا توجد أهداف لعرضها حالياً.</div>
+            @if (seesAll)
+            {
+                <div class="gac-goal__empty">لا توجد أهداف لعرضها حالياً.</div>
+            }
+            else
+            {
+                <div class="gac-goal__empty">لا توجد أهداف استراتيجية مرتبطة بإدارتك بعد. تواصل مع مسؤول الاستراتيجية لربط إدارتك بأهداف الهيئة.</div>
+            }
         }
         else
         {
