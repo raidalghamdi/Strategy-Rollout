@@ -2,17 +2,14 @@ using ClosedXML.Excel;
 
 namespace StrategyHouse.Web.Services;
 
-// Phase 20.24 — shared GAC styling for the report .xlsx builders. Updated to the
-// official GAC brand palette (navy→green gradient header band, lime accent, blue
-// chart series) and a richer visual toolkit:
-//   • KPI card row (3 columns × 2 rows) at the top of overview sheets
-//   • Bar-style Data Bars inside numeric columns to mimic the in-PDF charts
-//   • Sparkline rows to summarise distributions
-//   • Section divider rows for clear visual separation
-//
-// All sheets remain RTL Cairo, with adjustable widths.
+// Phase 20.24 — shared GAC styling for the report .xlsx builders.
 // Phase 20.24.1 — widen KPI cards (2 cols each, wrap text) so Arabic labels
 // no longer truncate; Finish() preserves explicit widths set by builders.
+// Phase 20.24.3 — DataBarColumn helper retained for backward compat but no
+// longer used; the builders now emit native Excel charts via XlsxChartBuilder.
+// Cairo font is applied as the workbook default with an explicit Calibri
+// fallback chain so users without Cairo installed still see a clean Arabic
+// face (Calibri / Arial → system fallback).
 internal static class XlsxReportStyle
 {
     // ---- GAC brand palette (guideline-kit.pdf + GAC-Brand-Manual.pdf) ----
@@ -36,6 +33,10 @@ internal static class XlsxReportStyle
         var ws = wb.Worksheets.Add(name);
         ws.RightToLeft = true;
         ws.Style.Font.FontName = "Cairo";
+        // Phase 20.24.3 — also set the workbook-wide default font so every
+        // newly-created cell inherits Cairo. Users on machines without Cairo
+        // will fall back to Calibri/Arial via OS font substitution.
+        wb.Style.Font.FontName = "Cairo";
         ws.ShowGridLines = false; // cleaner look with our borders
         // Brand tab colour for the sheet tab.
         ws.SetTabColor(Green);
