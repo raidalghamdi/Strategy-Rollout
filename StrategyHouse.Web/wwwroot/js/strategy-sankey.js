@@ -276,9 +276,17 @@
 
                         // Horizontal-scroll wrapper so dense graphs don't break the
                         // page layout on phones/tablets.
+                        // Phase 20.24.2 — default scroll position: left (Vision).
+                        // The chart flows Vision → Pillar → Objective → Initiative → Project
+                        // left-to-right. Because the page is RTL, the scroller would
+                        // otherwise open pre-scrolled to the right (Projects) and force
+                        // the user to scroll back to see the Vision root. We force the
+                        // scroller itself to LTR so default scrollLeft = 0 aligns with
+                        // the Vision column on the visual left.
                         var scroller = document.createElement('div');
                         scroller.className = 'sankey-scroller';
-                        scroller.style.cssText = 'width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;border:1px solid #e5e9f2;border-radius:8px;background:#fff;';
+                        scroller.setAttribute('dir', 'ltr');
+                        scroller.style.cssText = 'width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;border:1px solid #e5e9f2;border-radius:8px;background:#fff;direction:ltr;';
                         el.appendChild(scroller);
 
                         var chartHost = document.createElement('div');
@@ -317,6 +325,15 @@
                         });
 
                         repaint();
+                        // Phase 20.24.2 — force the scroller to start at the Vision
+                        // (visual-left) column. Run multiple times because ECharts
+                        // resolves canvas width asynchronously after init.
+                        function scrollToVision() {
+                            try { scroller.scrollLeft = 0; } catch (eS) {}
+                        }
+                        try { setTimeout(scrollToVision, 80); } catch (eS1) {}
+                        try { setTimeout(scrollToVision, 300); } catch (eS2) {}
+                        try { setTimeout(scrollToVision, 900); } catch (eS3) {}
                         el.__sankeyRendered = true;
                     });
                 })

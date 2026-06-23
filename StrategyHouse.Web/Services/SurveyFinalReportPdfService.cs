@@ -23,7 +23,8 @@ public class SurveyFinalReportPdfService
     public SurveyFinalReportPdfService(IWebHostEnvironment env)
     {
         QuestPDF.Settings.License = LicenseType.Community;
-        var logoPath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "gac-logo-color.png");
+        // Phase 20.24.2 — use the official white logo over the navy PDF header.
+        var logoPath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "gac-logo-white.png");
         if (File.Exists(logoPath))
         {
             try { _logoColor = File.ReadAllBytes(logoPath); } catch { _logoColor = null; }
