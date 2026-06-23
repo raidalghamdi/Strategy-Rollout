@@ -17,12 +17,41 @@ if (File.Exists(arabicFontPath))
     using var fontStream = File.OpenRead(arabicFontPath);
     QuestPDF.Drawing.FontManager.RegisterFont(fontStream);
 }
-// Phase 12 — register Cairo for the survey final-report PDF (GAC brand typeface).
+// Phase 12 — register Cairo as the legacy/fallback typeface for QuestPDF.
 var cairoFontPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "fonts", "cairo", "Cairo-Variable.ttf");
 if (File.Exists(cairoFontPath))
 {
     using var cairoStream = File.OpenRead(cairoFontPath);
     QuestPDF.Drawing.FontManager.RegisterFont(cairoStream);
+}
+// Phase 20.25 — register the official GAC brand typeface Frutiger LT Arabic
+// (Light 45 / Roman 55 / Bold 65) for all PDF exports. Cairo stays registered
+// above as the automatic substitute if any glyph is missing.
+// Register under the exact family names BrandFonts.* uses, so QuestPDF's
+// font lookup by FontFamily("Frutiger LT Arabic 55 Roman") finds them.
+// RegisterFontWithCustomName bypasses Skia's family-name normalisation.
+var frutigerMap = new (string Name, string File)[]
+{
+    ("Frutiger LT Arabic 45 Light",  "FrutigerLTArabic-45Light.ttf"),
+    ("Frutiger LT Arabic 55 Roman",  "FrutigerLTArabic-55Roman.ttf"),
+    ("Frutiger LT Arabic 65 Bold",   "FrutigerLTArabic-65Bold.ttf"),
+    // Generic "Frutiger LT Arabic" alias points at the Roman weight so
+    // shorter family lookups still resolve.
+    ("Frutiger LT Arabic",           "FrutigerLTArabic-55Roman.ttf"),
+};
+foreach (var (name, file) in frutigerMap)
+{
+    var path = Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "fonts", "frutiger", file);
+    if (File.Exists(path))
+    {
+        using var s = File.OpenRead(path);
+        QuestPDF.Drawing.FontManager.RegisterFontWithCustomName(name, s);
+        Console.WriteLine($"[Phase 20.25] Registered as '{name}' -> {file}");
+    }
+    else
+    {
+        Console.WriteLine($"[Phase 20.25] MISSING Frutiger TTF: {path}");
+    }
 }
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 

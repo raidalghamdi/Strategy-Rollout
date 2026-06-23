@@ -178,7 +178,8 @@
 
     /* Typography — GAC (GE SS Two licensed → Cairo web fallback) */
     --font-en: "Exo 2", "IBM Plex Sans", system-ui, -apple-system, sans-serif;
-    --font-ar: "GE SS Two", "Cairo", tahoma, "IBM Plex Sans", system-ui, sans-serif;
+    /* Phase 20.25 — prefer the official Frutiger LT Arabic brand typeface. */
+    --font-ar: "Frutiger LT Arabic", "GE SS Two", "Cairo", tahoma, "IBM Plex Sans", system-ui, sans-serif;
 }
 
 /* ============================================================

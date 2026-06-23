@@ -7,9 +7,9 @@ namespace StrategyHouse.Web.Services;
 // no longer truncate; Finish() preserves explicit widths set by builders.
 // Phase 20.24.3 — DataBarColumn helper retained for backward compat but no
 // longer used; the builders now emit native Excel charts via XlsxChartBuilder.
-// Cairo font is applied as the workbook default with an explicit Calibri
-// fallback chain so users without Cairo installed still see a clean Arabic
-// face (Calibri / Arial → system fallback).
+// Phase 20.25 — official GAC brand typeface (Frutiger LT Arabic 55 Roman) is
+// applied as the workbook default. Cairo / Calibri / Arial remain the OS-side
+// fallback chain for users without Frutiger installed.
 internal static class XlsxReportStyle
 {
     // ---- GAC brand palette (guideline-kit.pdf + GAC-Brand-Manual.pdf) ----
@@ -32,11 +32,11 @@ internal static class XlsxReportStyle
     {
         var ws = wb.Worksheets.Add(name);
         ws.RightToLeft = true;
-        ws.Style.Font.FontName = "Cairo";
-        // Phase 20.24.3 — also set the workbook-wide default font so every
-        // newly-created cell inherits Cairo. Users on machines without Cairo
-        // will fall back to Calibri/Arial via OS font substitution.
-        wb.Style.Font.FontName = "Cairo";
+        ws.Style.Font.FontName = BrandFonts.Regular;
+        // Phase 20.25 — also set the workbook-wide default font so every
+        // newly-created cell inherits the brand face. Users on machines
+        // without Frutiger fall back to Cairo / Calibri / Arial.
+        wb.Style.Font.FontName = BrandFonts.Regular;
         ws.ShowGridLines = false; // cleaner look with our borders
         // Brand tab colour for the sheet tab.
         ws.SetTabColor(Green);

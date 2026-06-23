@@ -9,7 +9,9 @@ namespace StrategyHouse.Web.Services;
 // Navy header with the GAC colour logo, gold accent rule, Cairo font, page numbers.
 public class ExecutiveReportPdfDocument
 {
-    private const string Font = "Cairo";
+    // Phase 20.25 — GAC brand typeface (Frutiger LT Arabic 55 Roman).
+    private const string Font = BrandFonts.Regular;
+    private const string FontBold = BrandFonts.Bold;
     private const string Navy = "#0E2A47";
     private const string Gold = "#FAC126";
     private const string Cyan = "#46BCCD";

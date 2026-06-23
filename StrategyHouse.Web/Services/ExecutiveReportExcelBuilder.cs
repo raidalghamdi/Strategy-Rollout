@@ -16,7 +16,8 @@ public class ExecutiveReportExcelBuilder
         byte[] raw;
         using (var wb = new XLWorkbook())
         {
-            wb.Style.Font.FontName = "Cairo";
+            // Phase 20.25 — official GAC brand typeface.
+            wb.Style.Font.FontName = BrandFonts.Regular;
             var s = m.Sections;
 
             if (s.Has(ExecReportSections.Overview)) BuildOverview(wb, m, charts);

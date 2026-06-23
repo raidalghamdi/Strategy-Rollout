@@ -23,7 +23,8 @@ namespace StrategyHouse.Web.Services;
 //   • Pie                    — part-of-whole (strategic alignment shares)
 //   • Bar    (horizontal)    — long category labels (Arabic department names)
 //
-// All charts are styled with the GAC palette and the Cairo (Arabic) font.
+// Phase 20.25 — chart titles + axis tick labels use the official GAC brand
+// typeface (Frutiger LT Arabic 55 Roman). Cairo is the graceful fallback.
 internal static class XlsxChartBuilder
 {
     // GAC palette (must match XlsxReportStyle constants — hex without #).
@@ -157,7 +158,7 @@ internal static class XlsxChartBuilder
                 new A.Paragraph(
                     new A.ParagraphProperties { Alignment = A.TextAlignmentTypeValues.Right },
                     new A.Run(
-                        new A.RunProperties(new A.LatinFont { Typeface = "Cairo" }) { Language = "ar-SA", FontSize = 1100, Bold = true },
+                        new A.RunProperties(new A.LatinFont { Typeface = BrandFonts.Bold }) { Language = "ar-SA", FontSize = 1100, Bold = true },
                         new A.Text(req.Title))))),
             new C.Overlay { Val = false }));
         chart.Append(new C.AutoTitleDeleted { Val = false });
@@ -253,7 +254,7 @@ internal static class XlsxChartBuilder
                 new A.BodyProperties(),
                 new A.ListStyle(),
                 new A.Paragraph(new A.ParagraphProperties(
-                    new A.DefaultRunProperties(new A.LatinFont { Typeface = "Cairo" }) { FontSize = 900, Language = "ar-SA" }))),
+                    new A.DefaultRunProperties(new A.LatinFont { Typeface = BrandFonts.Regular }) { FontSize = 900, Language = "ar-SA" }))),
             new C.CrossingAxis { Val = 222222222U }));
 
         // Value axis.
@@ -271,7 +272,7 @@ internal static class XlsxChartBuilder
                 new A.BodyProperties(),
                 new A.ListStyle(),
                 new A.Paragraph(new A.ParagraphProperties(
-                    new A.DefaultRunProperties(new A.LatinFont { Typeface = "Cairo" }) { FontSize = 900, Language = "ar-SA" }))),
+                    new A.DefaultRunProperties(new A.LatinFont { Typeface = BrandFonts.Regular }) { FontSize = 900, Language = "ar-SA" }))),
             new C.CrossingAxis { Val = 111111111U }));
     }
 

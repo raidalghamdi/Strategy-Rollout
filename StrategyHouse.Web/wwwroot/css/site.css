@@ -3,24 +3,60 @@
    Clean, corporate, government. Arabic RTL throughout.
    =========================================================== */
 
-/* Phase 9 — self-hosted Cairo, zero external font dependency, no synthesized oblique.
-   The remote Google Fonts link was removed from both layouts; this @font-face is the
-   single source so the font cannot fall back to a synthesized-italic system face. */
+/* Phase 20.25 — official GAC brand typeface: Frutiger LT Arabic.
+   Three licensed weights are bundled in wwwroot/fonts/frutiger/. We declare
+   each as its OWN @font-face family (matching the exact internal family name
+   reported by the TTF) so OS-level matching works in print-to-PDF and copy-
+   paste-to-Office workflows. A second "Frutiger LT Arabic" alias spans all
+   three weights so generic CSS `font-weight: bold` still picks the right cut. */
+@font-face {
+    font-family: "Frutiger LT Arabic 45 Light";
+    src: url("../fonts/frutiger/FrutigerLTArabic-45Light.ttf") format("truetype");
+    font-weight: 300; font-style: normal; font-display: swap;
+}
+@font-face {
+    font-family: "Frutiger LT Arabic 55 Roman";
+    src: url("../fonts/frutiger/FrutigerLTArabic-55Roman.ttf") format("truetype");
+    font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+    font-family: "Frutiger LT Arabic 65 Bold";
+    src: url("../fonts/frutiger/FrutigerLTArabic-65Bold.ttf") format("truetype");
+    font-weight: 700; font-style: normal; font-display: swap;
+}
+/* Single-family alias spanning all three weights. */
+@font-face {
+    font-family: "Frutiger LT Arabic";
+    src: url("../fonts/frutiger/FrutigerLTArabic-45Light.ttf") format("truetype");
+    font-weight: 300; font-style: normal; font-display: swap;
+}
+@font-face {
+    font-family: "Frutiger LT Arabic";
+    src: url("../fonts/frutiger/FrutigerLTArabic-55Roman.ttf") format("truetype");
+    font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+    font-family: "Frutiger LT Arabic";
+    src: url("../fonts/frutiger/FrutigerLTArabic-65Bold.ttf") format("truetype");
+    font-weight: 700; font-style: normal; font-display: swap;
+}
+
+/* Phase 9 — self-hosted Cairo, kept as graceful fallback only. */
 @font-face {
     font-family: "Cairo";
     src: url("../fonts/cairo/Cairo-Variable.ttf") format("truetype-variations"),
          url("../fonts/cairo/Cairo-Variable.ttf") format("truetype");
     font-weight: 100 900;
-    font-style: normal;        /* explicit normal — there is no italic file to swap to */
+    font-style: normal;
     font-display: swap;
 }
 
-:root { --font: "Cairo", system-ui, "Segoe UI", Tahoma, Arial, sans-serif; }
+:root { --font: "Frutiger LT Arabic", "Cairo", system-ui, "Segoe UI", Tahoma, Arial, sans-serif; }
 
-/* Nuclear option: every element renders upright in Cairo, period.
+/* Every element renders upright in Frutiger — Cairo only fires as fallback.
    font-synthesis:none stops the browser faux-italicising when a face is missing. */
 html, body, *, *::before, *::after {
-    font-family: "Cairo", system-ui, "Segoe UI", Tahoma, Arial, sans-serif !important;
+    font-family: "Frutiger LT Arabic", "Cairo", system-ui, "Segoe UI", Tahoma, Arial, sans-serif !important;
     font-style: normal !important;
     font-synthesis: none !important;
 }

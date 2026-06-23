@@ -12,7 +12,10 @@ namespace StrategyHouse.Web.Services;
 // cross-question insights section.
 public class SurveyFinalReportPdfService
 {
-    private const string Font = "Cairo";
+    // Phase 20.25 — GAC brand typeface (Frutiger LT Arabic 55 Roman). Cairo
+    // stays in the QuestPDF FontManager as the fallback for any missing glyph.
+    private const string Font = BrandFonts.Regular;
+    private const string FontBold = BrandFonts.Bold;
     private const string Navy = "#0E2A47";
     private const string Gold = "#FAC126";
     private const string Cyan = "#46BCCD";

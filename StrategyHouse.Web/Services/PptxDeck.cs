@@ -342,7 +342,10 @@ internal sealed class PptxDeck
             portion.Font!.Size = list[i].Size;
             portion.Font.IsBold = list[i].Bold;
             portion.Font.Color.Set(list[i].Color);
-            portion.Font.LatinName = "Cairo";
+            // Phase 20.25 — official GAC brand typeface. PPTX cannot embed
+            // fonts in most viewers; the user must have Frutiger installed.
+            // Cairo is preserved as a graceful fallback via OS font matching.
+            portion.Font.LatinName = BrandFonts.Regular;
         }
     }
 }

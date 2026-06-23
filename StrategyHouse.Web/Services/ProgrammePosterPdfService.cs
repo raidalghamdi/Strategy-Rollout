@@ -11,8 +11,8 @@ namespace StrategyHouse.Web.Services;
 // all 17 department map thumbnails with status badges.
 public class ProgrammePosterPdfService
 {
-    // Phase 20.10 — unify exports on the website font (Cairo) for consistency.
-    private const string Font = "Cairo";
+    // Phase 20.25 — unify exports on the official GAC brand typeface.
+    private const string Font = BrandFonts.Regular;
     private const string Primary = "#194F90";
     private const string Cyan = "#46BCCD";
     private const string Green = "#009845";

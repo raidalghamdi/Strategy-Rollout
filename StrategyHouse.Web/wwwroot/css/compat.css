@@ -113,7 +113,8 @@ body { font-size: 1rem; }
 }
 
 /* ── Phase 6: sankey ────────────────────────────────────────────────────────── */
-#sankey svg text { font-family: 'Cairo', sans-serif; font-style: normal !important; }
+/* Phase 20.25 — Sankey SVG text uses official GAC brand typeface. */
+#sankey svg text { font-family: 'Frutiger LT Arabic', 'Cairo', sans-serif; font-style: normal !important; }
 
 /* ── Phase 6: Chatbot widget ────────────────────────────────────────────────── */
 .chatbot-fab {

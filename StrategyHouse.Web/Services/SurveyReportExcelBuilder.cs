@@ -12,8 +12,8 @@ namespace StrategyHouse.Web.Services;
 // via DocumentFormat.OpenXml. Editing values in the table auto-redraws the
 // chart — no human interaction needed.
 //
-// Cairo font is applied globally; explicit Calibri fallback ensures legibility
-// for users without the Cairo font installed.
+// Phase 20.25 — official GAC brand typeface (Frutiger LT Arabic 55 Roman)
+// applied globally; Cairo/Calibri/Arial provide OS-side fallback.
 public class SurveyReportExcelBuilder
 {
     public byte[] Build(FinalReportViewModel m)
@@ -23,7 +23,7 @@ public class SurveyReportExcelBuilder
         byte[] raw;
         using (var wb = new XLWorkbook())
         {
-            wb.Style.Font.FontName = "Cairo";
+            wb.Style.Font.FontName = BrandFonts.Regular;
             BuildSummary(wb, m, chartRequests);
             BuildLikert(wb, m, chartRequests);
             BuildChoice(wb, m, chartRequests);
