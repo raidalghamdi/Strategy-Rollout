@@ -82,7 +82,7 @@
         <div class="card"><h3>@Model.Overview.AvgQuizScore.ToString("0.##") / 5</h3><p class="muted small">متوسط الاختبار</p></div>
         <div class="card"><h3>@(Model.Overview.AvgSurveyClarity > 0 ? Model.Overview.AvgSurveyClarity.ToString("0.##") + " / 5" : "—")</h3><p class="muted small">وضوح الاستراتيجية</p></div>
         <div class="card"><h3>@(Model.Overview.AvgContributionCapability > 0 ? Model.Overview.AvgContributionCapability.ToString("0.##") + " / 5" : "—")</h3><p class="muted small">القدرة على المساهمة</p></div>
-        <div class="card"><h3>@Model.GroupSignatures.TotalCount</h3><p class="muted small">تواقيع الفرق</p></div>
+        <div class="card"><h3>@(Model.Overview.AvgCompletionMinutes > 0 ? Model.Overview.AvgCompletionMinutes.ToString("0.#") + " د" : "—")</h3><p class="muted small">متوسط وقت الإكمال</p></div>
     </div>
     @if (Model.Overview.NotEngagedDepartments.Any())
     {
@@ -442,12 +442,13 @@
 
     var deptLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DepartmentBreakdown.Select(d => d.DeptName)));
     var deptAttendees = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DepartmentBreakdown.Select(d => d.AttendeesCount)));
+    var deptSessions = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DepartmentBreakdown.Select(d => d.SessionsCount)));
     var quizBuckets = [@Model.QuizAnalytics.Bucket0to2, @Model.QuizAnalytics.Bucket3to4, @Model.QuizAnalytics.Bucket5];
     var clarityDist = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Overview.SurveyClarityDistribution));
 
     var elDepts = document.getElementById('chart-depts');
     if (elDepts && deptLabels.length) {
-        new Chart(elDepts, { type: 'bar', data: { labels: deptLabels, datasets: [{ label: 'الحضور', data: deptAttendees, backgroundColor: '#0069A7' }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } } });
+        new Chart(elDepts, { type: 'bar', data: { labels: deptLabels, datasets: [{ label: 'الجلسات', data: deptSessions, backgroundColor: '#FAC126' }, { label: 'الحضور', data: deptAttendees, backgroundColor: '#0069A7' }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } } });
     }
 
     var elQuiz = document.getElementById('chart-quiz');

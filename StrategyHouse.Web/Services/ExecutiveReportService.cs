@@ -45,6 +45,9 @@ public class ExecutiveReportService
         vm.Overview.TotalDepartments = activeDepts.Count;
         vm.Overview.CompletionPercentage = sessions.Count > 0
             ? Math.Round(100.0 * vm.Overview.TotalCompletedSessions / sessions.Count, 1) : 0;
+        var completedSessions = sessions.Where(s => s.CompletedAt != null).ToList();
+        vm.Overview.AvgCompletionMinutes = completedSessions.Count > 0
+            ? Math.Round(completedSessions.Average(s => (s.CompletedAt!.Value - s.StartedAt).TotalMinutes), 1) : 0;
         if (sessions.Count > 0)
         {
             vm.Overview.SessionsFrom = sessions.Min(s => s.StartedAt);
@@ -127,22 +130,26 @@ public class ExecutiveReportService
                 .Where(q => allIds.Contains(q.Id))
                 .ToDictionaryAsync(q => q.Id, q => q.QuestionAr);
 
+            // Phase 20.32: drop orphan question IDs (re-seeded questions leave old attempt rows
+            // pointing to deleted GUIDs). Only show rows whose question text we can resolve.
+            var resolvedIds = allIds.Where(id => questions.ContainsKey(id) && !string.IsNullOrWhiteSpace(questions[id])).ToList();
+
             ExecMissedQuestion Row(Guid id)
             {
                 int seen = seenCount.GetValueOrDefault(id);
                 int miss = missCount.GetValueOrDefault(id);
                 return new ExecMissedQuestion
                 {
-                    QuestionAr = questions.TryGetValue(id, out var t) ? t : id.ToString(),
+                    QuestionAr = questions[id],
                     Attempts = seen,
                     MissRate = seen > 0 ? Math.Round(100.0 * miss / seen, 1) : 0,
                 };
             }
 
-            qa.Top3MostMissed = allIds
+            qa.Top3MostMissed = resolvedIds
                 .Select(Row).OrderByDescending(r => r.MissRate).ThenByDescending(r => r.Attempts)
                 .Take(3).ToList();
-            qa.Top3Strongest = allIds
+            qa.Top3Strongest = resolvedIds
                 .Select(Row).OrderBy(r => r.MissRate).ThenByDescending(r => r.Attempts)
                 .Take(3).ToList();
         }

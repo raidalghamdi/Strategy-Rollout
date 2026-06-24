@@ -37,6 +37,7 @@ public class ExecOverview
     public int TotalDepartmentsEngaged { get; set; }
     public int TotalDepartments { get; set; }                  // Phase 14 — denominator (active depts)
     public double CompletionPercentage { get; set; }            // Phase 14 — completed / total sessions, 0..100
+    public double AvgCompletionMinutes { get; set; }           // Phase 20.32 — average minutes between StartedAt and CompletedAt (completed sessions only)
     public double AvgQuizScore { get; set; }                    // mean score out of 5
     public double AvgSurveyClarity { get; set; }                // Q1 Likert mean (1..5)
     public double AvgContributionCapability { get; set; }       // Q8 Likert mean (1..5)
