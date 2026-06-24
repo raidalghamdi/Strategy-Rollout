@@ -316,11 +316,61 @@ public class DbImportService
 
         var nonPkCols = writeCols.Where(c => !pkCols.Contains(c, StringComparer.OrdinalIgnoreCase)).ToList();
 
+        // Phase 20.25.2 — NEVER touch the admin Identity row from an Excel
+        // import. Excel mangles long PasswordHash strings (cuts >255 chars,
+        // strips trailing '+'/'='/'/' base64 padding, or normalises stamps to
+        // scientific notation), which has locked admins out of production
+        // after merge+reimport workflows. Protecting the row keeps the seed
+        // admin login working regardless of what the user does in Excel.
+        const int AdminUserId = 1;
+        bool isUsersTable = string.Equals(table, "AspNetUsers", StringComparison.OrdinalIgnoreCase);
+        bool isAdminRelatedTable =
+            string.Equals(table, "AspNetUserRoles", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(table, "AspNetUserTokens", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(table, "AspNetUserClaims", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(table, "AspNetUserLogins", StringComparison.OrdinalIgnoreCase);
+        int? userNameColIndex = isUsersTable && headerToDb.TryGetValue("UserName", out var unIdx) ? unIdx : null;
+        int? userIdColIndex = isAdminRelatedTable && headerToDb.TryGetValue("UserId", out var uidIdx) ? uidIdx : null;
+        bool RowIsProtectedAdmin(List<string> row)
+        {
+            if (isUsersTable && userNameColIndex != null
+                && userNameColIndex.Value >= 0 && userNameColIndex.Value < row.Count)
+            {
+                var uname = (row[userNameColIndex.Value] ?? string.Empty).Trim();
+                if (string.Equals(uname, "admin@gac.gov.sa", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(uname, "admin", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            if (isAdminRelatedTable && userIdColIndex != null
+                && userIdColIndex.Value >= 0 && userIdColIndex.Value < row.Count)
+            {
+                if (int.TryParse(row[userIdColIndex.Value]?.Trim(), out var uid) && uid == AdminUserId)
+                    return true;
+            }
+            return false;
+        }
+        bool DbKeyIsProtectedAdmin(string key)
+        {
+            if (isUsersTable && key == AdminUserId.ToString()) return true;
+            if (isAdminRelatedTable)
+            {
+                var first = key.Split(KeySep)[0];
+                if (first == AdminUserId.ToString()) return true;
+            }
+            return false;
+        }
+
         foreach (var row in rows)
         {
             var key = BuildKey(pkCols, headerToDb, row);
             if (key == null) continue;
             if (!excelKeys.Add(key)) continue; // ignore duplicate PK rows in Excel
+
+            // Protect admin: skip any Excel row that targets the admin user
+            // (whether by row identity or PK match) — also protect his role
+            // and token rows so a re-import can't strip admin privileges.
+            if ((isUsersTable || isAdminRelatedTable) && (RowIsProtectedAdmin(row) || DbKeyIsProtectedAdmin(key)))
+                continue;
 
             var exists = dbKeys.Contains(key);
             if (exists)
@@ -357,6 +407,9 @@ public class DbImportService
         foreach (var key in dbKeys)
         {
             if (excelKeys.Contains(key)) continue;
+            // Never delete the seed admin row or its role/token/claim/login
+            // rows even if they are missing from Excel.
+            if ((isUsersTable || isAdminRelatedTable) && DbKeyIsProtectedAdmin(key)) continue;
             var parts = key.Split(KeySep);
             using var cmd = conn.CreateCommand();
             cmd.Transaction = tx;
