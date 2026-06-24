@@ -70,13 +70,12 @@ public class JourneyController : Controller
     private static List<Project> ToProjectEntities(IReadOnlyList<Dtos.StrategyProjectDto> src) =>
         src.Select(p => new Project { ProjectCode = p.Code, ProjectName = p.Name, InitiativeCode = p.InitiativeCode, Division = p.Division, ProjectType = p.Type, ProjectStatus = p.Status, Budget = p.Budget, Liquidity = p.Liquidity, GacBudget = p.GacBudget }).ToList();
 
-    // GET /Journey — landing page with code entry.
+    // GET /Journey — Phase 20.31: code-entry landing page removed. All journey
+    // login is now by email. /Journey redirects to /Journey/Access.
     [HttpGet("Journey")]
     public IActionResult Index(string? code)
     {
-        ViewBag.Code = code;
-        ViewBag.Content = _content;
-        return View();
+        return RedirectToAction("Index", "JourneyAccess");
     }
 
     // POST /Journey/Start — validate code, create session.

@@ -2,16 +2,12 @@
 @{ ViewData["Title"] = "إضافة وتحديث الأعضاء بالجملة"; }
 
 @*
-    Phase 20.29 — Bulk add / update roster emails.
-    User instruction: "Continue doing it and make sure there is a feature
-    to add bulk at once."
+    Phase 20.31 — Bulk add roster members by email only.
 
-    Two paths to bulk add:
-      1. Excel import via /Admin/DbImport (sheet name: DepartmentRoster)
-      2. This page — paste lines like:
-            email,deptcode
-            email,deptcode,namear
-            email,deptcode,namear,role
+    Paste lines like:
+        email                    (creates an UNASSIGNED member; name = email local-part)
+        email, namear            (creates an UNASSIGNED member with a custom display name)
+    Admin links them to a department later from /Admin/Roster.
 *@
 
 <div class="d-flex justify-content-between align-items-center mb-3" style="flex-wrap:wrap;gap:.5rem;">
@@ -53,34 +49,20 @@
 }
 
 <div class="alert alert-info" style="font-size:.9rem;">
-    <strong>صيغة المدخلات</strong> — سطر لكل عضو، الفاصل فاصلة (,) أو Tab، الأسطر التي تبدأ بـ <code>#</code> تُعد تعليقات:
+    <strong>صيغة المدخلات</strong> — سطر لكل عضو، إيميل فقط (أو إيميل + اسم). الأسطر التي تبدأ بـ <code>#</code> تُعد تعليقات:
     <pre style="background:#f8f9fa;border:1px solid #ddd;padding:.6rem;margin:.5rem 0 0;border-radius:4px;direction:ltr;text-align:left;">
-# email, deptcode  (يحدّث أو يضيف باستخدام جزء البريد كاسم)
-ahmad@@gac.gov.sa, DEPT-02
+# email فقط (يستخدم جزء البريد كاسم)
+ahmad@@gac.gov.sa
 
-# email, deptcode, namear  (يطابق بالاسم العربي ويحدّث/يضيف)
-sarah@@gac.gov.sa, DEPT-02, سارة الأحمد
-
-# email, deptcode, namear, role  (مع تحديد الدور)
-omar@@gac.gov.sa, DEPT-03, عمر الفهد, مدير إدارة
+# email, namear (مع تحديد اسم العرض)
+sarah@@gac.gov.sa, سارة الأحمد
+omar@@gac.gov.sa, عمر الفهد
 </pre>
-    البريد الإلكتروني فريد على مستوى المنصة كلها — لا يمكن استخدام نفس البريد لعضوين.
+    الأعضاء الجدد يُضافون بحالة <strong>بدون إدارة</strong> — ربطهم بإدارة يتم لاحقاً من صفحة الأعضاء. البريد الإلكتروني فريد على مستوى المنصة كلها.
 </div>
 
 <form method="post" asp-action="BulkEmailsSubmit">
     @Html.AntiForgeryToken()
-
-    <div class="mb-3">
-        <label class="form-label fw-bold">رموز الإدارات المتاحة</label>
-        <div class="muted" style="font-size:.85rem;line-height:1.8;">
-            @foreach (var d in Model.Departments)
-            {
-                <span style="display:inline-block;margin-left:.5rem;background:#f0f0f0;padding:.15rem .5rem;border-radius:4px;">
-                    <code>@d.Code</code> — @d.NameAr
-                </span>
-            }
-        </div>
-    </div>
 
     <div class="mb-3">
         <label class="form-label fw-bold">المدخلات</label>
@@ -88,9 +70,9 @@ omar@@gac.gov.sa, DEPT-03, عمر الفهد, مدير إدارة
                   class="form-control"
                   rows="14"
                   style="direction:ltr;text-align:left;font-family:monospace;font-size:.9rem;"
-                  placeholder="ahmad@@gac.gov.sa, DEPT-02
-sarah@@gac.gov.sa, DEPT-02, سارة الأحمد
-omar@@gac.gov.sa, DEPT-03, عمر الفهد, مدير إدارة">@Model.Payload</textarea>
+                  placeholder="ahmad@@gac.gov.sa
+sarah@@gac.gov.sa, سارة الأحمد
+omar@@gac.gov.sa, عمر الفهد">@Model.Payload</textarea>
     </div>
 
     <div class="d-flex gap-2">

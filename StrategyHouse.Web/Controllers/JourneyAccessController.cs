@@ -74,6 +74,18 @@ public class JourneyAccessController : Controller
             return RedirectToAction(nameof(Index), new { email = raw });
         }
 
+        // Phase 20.31 — the member exists but has not yet been linked to a real
+        // department (UNASSIGNED sentinel set by the bulk-add flow). Show a
+        // friendly message instead of minting a session against a non-existent dept.
+        if (string.Equals(member.DeptCode, "UNASSIGNED", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogInformation(
+                "Journey email-access: unassigned member {MemberId} ({Email}) attempted to log in",
+                member.MemberId, member.EmailNormalized);
+            TempData["Error"] = "حسابك مسجّل ولكن لم يتم ربطه بإدارة بعد. سيتواصل معك مسؤول المنصة لتفعيل حسابك.";
+            return RedirectToAction(nameof(Index), new { email = raw });
+        }
+
         // Mirror /Journey/Start: stamp ownership if a platform user
         // happens to be signed in (rare for kiosk flow, but kept for parity).
         int? ownerId = null;

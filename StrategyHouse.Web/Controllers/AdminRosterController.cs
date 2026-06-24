@@ -78,15 +78,20 @@ public class AdminRosterController : Controller
 
     // POST /Admin/Roster/BulkEmails — parse the textarea, apply, report stats.
     //
+    // Phase 20.31 — USERS-only input. Admin pastes email lines, optionally with
+    // a display name. No DeptCode required.
+    //
     // Accepted line formats (one per line, comma OR tab separated):
-    //   email,deptcode                          → updates existing row matched
-    //                                             by DeptCode + a UNIQUE NameAr
-    //                                             match OR inserts a new row
-    //                                             with NameAr = email local-part
-    //   email,deptcode,namear                   → upsert by (deptcode, namear)
-    //   email,deptcode,namear,role              → same + role
+    //   email                  → if email already on a roster row → no-op (already added).
+    //                            Otherwise insert a brand-new UNASSIGNED roster member
+    //                            (DeptCode = "UNASSIGNED", NameAr = email local-part).
+    //                            Admin needs to link them to a department later.
+    //   email, namear          → same, but use the provided display name.
     //
     // Lines starting with # or // are treated as comments and skipped.
+    //
+    // The UNASSIGNED sentinel lets new members still log in by email; the admin
+    // gets a visible "pending assignment" badge on /Admin/Roster.
     [HttpPost("BulkEmails")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> BulkEmailsSubmit(string? payload, bool dryRun = false)
@@ -103,11 +108,10 @@ public class AdminRosterController : Controller
             return View("BulkEmails", vm);
         }
 
-        // Pre-load roster + dept codes for fast lookups.
-        var rosterByDept = await _db.DepartmentRoster
+        // Phase 20.31 — preload existing roster for email lookups only.
+        var rosterAll = await _db.DepartmentRoster
             .ToListAsync();
-        var deptCodes = new HashSet<string>(depts.Select(d => d.Code), StringComparer.OrdinalIgnoreCase);
-        var emailsInDb = rosterByDept
+        var emailsInDb = rosterAll
             .Where(r => !string.IsNullOrWhiteSpace(r.EmailNormalized))
             .Select(r => r.EmailNormalized!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -123,18 +127,10 @@ public class AdminRosterController : Controller
             var line = rawLine.Trim();
             if (line.Length == 0 || line.StartsWith("#") || line.StartsWith("//")) continue;
 
-            // Split on comma OR tab.
+            // Split on comma OR tab. First token = email. Second token (optional) = name.
             var parts = line.Split(new[] { ',', '\t' }, StringSplitOptions.TrimEntries);
-            if (parts.Length < 2)
-            {
-                vm.Errors.Add($"السطر {lineNo}: تنسيق غير صالح — يجب أن يحتوي على البريد ورمز الإدارة على الأقل.");
-                continue;
-            }
-
-            var email = parts[0].Trim();
-            var deptCode = parts[1].Trim();
-            var nameAr = parts.Length >= 3 ? parts[2].Trim() : string.Empty;
-            var role = parts.Length >= 4 ? parts[3].Trim() : null;
+            var email = parts.Length >= 1 ? parts[0].Trim() : string.Empty;
+            var nameAr = parts.Length >= 2 ? parts[1].Trim() : string.Empty;
 
             // Validate email.
             if (!IsValidEmail(email))
@@ -151,86 +147,37 @@ public class AdminRosterController : Controller
                 continue;
             }
 
-            // Validate dept exists.
-            if (!deptCodes.Contains(deptCode))
+            // If the email already exists on a roster row → no-op (already added).
+            var existing = rosterAll.FirstOrDefault(r =>
+                string.Equals(r.EmailNormalized, emailNorm, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
             {
-                vm.Errors.Add($"السطر {lineNo}: رمز الإدارة \"{deptCode}\" غير موجود.");
+                vm.Warnings.Add($"السطر {lineNo}: البريد \"{email}\" موجود بالفعل للعضو \"{existing.NameAr}\" (إدارة {existing.DeptCode}).");
                 continue;
             }
 
-            // Locate target row.
-            DepartmentRoster? target = null;
-
-            // 1) If NameAr provided, match by (DeptCode, NameAr).
-            if (!string.IsNullOrWhiteSpace(nameAr))
+            // Insert a brand-new UNASSIGNED roster member. The admin will link
+            // them to a department later from /Admin/Roster.
+            if (string.IsNullOrWhiteSpace(nameAr))
             {
-                target = rosterByDept.FirstOrDefault(r =>
-                    string.Equals(r.DeptCode, deptCode, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(r.NameAr, nameAr, StringComparison.Ordinal));
+                nameAr = email.Split('@')[0];
             }
-
-            // 2) If no NameAr OR no match, AND the email already exists somewhere,
-            //    update that row in place (and verify dept matches).
-            if (target == null)
+            var target = new DepartmentRoster
             {
-                var byEmail = rosterByDept.FirstOrDefault(r =>
-                    string.Equals(r.EmailNormalized, emailNorm, StringComparison.OrdinalIgnoreCase));
-                if (byEmail != null)
-                {
-                    if (!string.Equals(byEmail.DeptCode, deptCode, StringComparison.OrdinalIgnoreCase))
-                    {
-                        vm.Errors.Add($"السطر {lineNo}: البريد \"{email}\" مرتبط بإدارة أخرى ({byEmail.DeptCode}).");
-                        continue;
-                    }
-                    target = byEmail;
-                }
-            }
-
-            // 3) Otherwise: insert a brand-new row.
-            if (target == null)
-            {
-                if (string.IsNullOrWhiteSpace(nameAr))
-                {
-                    // Use email local-part as a placeholder name when none provided.
-                    nameAr = email.Split('@')[0];
-                }
-                target = new DepartmentRoster
-                {
-                    MemberId = Guid.NewGuid(),
-                    DeptCode = deptCode,
-                    NameAr = nameAr,
-                    Role = role,
-                    IsDefaultAttending = true,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow,
-                };
-                if (!dryRun) _db.DepartmentRoster.Add(target);
-                rosterByDept.Add(target);
-                vm.InsertedCount++;
-            }
-            else
-            {
-                // Update path: warn if email is changing on top of another existing one.
-                if (!string.IsNullOrEmpty(target.EmailNormalized)
-                    && !string.Equals(target.EmailNormalized, emailNorm, StringComparison.OrdinalIgnoreCase))
-                {
-                    vm.Warnings.Add($"السطر {lineNo}: تم استبدال البريد القديم \"{target.Email}\" بـ \"{email}\" للعضو \"{target.NameAr}\".");
-                }
-                if (!string.IsNullOrWhiteSpace(role)) target.Role = role;
-                vm.UpdatedCount++;
-            }
-
-            // Cross-row uniqueness check (excluding self).
-            if (emailsInDb.Contains(emailNorm)
-                && !string.Equals(target.EmailNormalized, emailNorm, StringComparison.OrdinalIgnoreCase))
-            {
-                vm.Errors.Add($"السطر {lineNo}: البريد \"{email}\" مستخدم بالفعل لعضو آخر.");
-                continue;
-            }
-
-            target.Email = email;
-            target.EmailNormalized = emailNorm;
+                MemberId = Guid.NewGuid(),
+                DeptCode = "UNASSIGNED",
+                NameAr = nameAr,
+                Role = null,
+                IsDefaultAttending = true,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                Email = email,
+                EmailNormalized = emailNorm,
+            };
+            if (!dryRun) _db.DepartmentRoster.Add(target);
+            rosterAll.Add(target);
             emailsInDb.Add(emailNorm);
+            vm.InsertedCount++;
         }
 
         if (vm.Errors.Count > 0)
@@ -266,6 +213,43 @@ public class AdminRosterController : Controller
             details: new { vm.InsertedCount, vm.UpdatedCount, Lines = lineNo });
 
         TempData["Success"] = $"تم بنجاح: {vm.InsertedCount} إضافة جديدة و {vm.UpdatedCount} تحديث.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    // POST /Admin/Roster/AssignDept — Phase 20.31: assign an UNASSIGNED member
+    // to a real department from the roster index dropdown.
+    [HttpPost("AssignDept")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AssignDept(Guid memberId, string deptCode)
+    {
+        var row = await _db.DepartmentRoster.FindAsync(memberId);
+        if (row == null)
+        {
+            TempData["Error"] = "العضو غير موجود.";
+            return RedirectToAction(nameof(Index));
+        }
+        var code = (deptCode ?? string.Empty).Trim();
+        if (code.Length == 0 || string.Equals(code, "UNASSIGNED", StringComparison.OrdinalIgnoreCase))
+        {
+            TempData["Error"] = "الرجاء اختيار إدارة صالحة.";
+            return RedirectToAction(nameof(Index));
+        }
+        var deptExists = await _db.Departments.AnyAsync(d => d.DeptCode == code);
+        if (!deptExists)
+        {
+            TempData["Error"] = $"رمز الإدارة \"{code}\" غير موجود.";
+            return RedirectToAction(nameof(Index));
+        }
+        var oldDept = row.DeptCode;
+        row.DeptCode = code;
+        await _db.SaveChangesAsync();
+        await _audit.LogAsync(
+            actor: User.Identity?.Name ?? "unknown",
+            actionType: "ROSTER_ASSIGN_DEPT",
+            targetType: "DepartmentRoster",
+            targetId: row.MemberId.ToString(),
+            details: new { FromDept = oldDept, ToDept = code, row.NameAr, row.Email });
+        TempData["Success"] = $"تم ربط \"{row.NameAr}\" بالإدارة {code}.";
         return RedirectToAction(nameof(Index));
     }
 
