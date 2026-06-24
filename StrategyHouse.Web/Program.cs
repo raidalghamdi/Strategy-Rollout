@@ -114,6 +114,11 @@ builder.Services.AddScoped<IStrategyDataSource, UnifiedStrategyDataSource>();
 // Phase 19.7 — external MSSQL connection diagnostics (startup probe + admin endpoint).
 builder.Services.AddScoped<ExternalDbDiagnostics>();
 
+// Phase 20.27 — SMTP email sender for password reset / first-time setup.
+var smtpOpts = builder.Configuration.GetSection("Smtp").Get<SmtpOptions>() ?? new SmtpOptions();
+builder.Services.AddSingleton(smtpOpts);
+builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+
 // Identity — three roles: Admin, Facilitator, Viewer.
 // Phase 20.8 — production password policy + 5-strikes / 15-minute lockout (enforced via
 // AccountController which now passes lockoutOnFailure=true to PasswordSignInAsync).

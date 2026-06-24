@@ -24,16 +24,26 @@
             }
         </select>
     </div>
-    <div>
-        <label class="muted small d-block">القطاع</label>
-        <select id="fSector" class="form-select form-select-sm">
-            <option value="All" selected="@(Model.Sector == "All")">كل القطاعات</option>
-            @foreach (var s in Model.SectorOptions)
-            {
-                <option value="@s" selected="@(Model.Sector == s)">@s</option>
-            }
-        </select>
-    </div>
+    @* Phase 20.26 — hide sector dropdown for users with only one sector in scope (VPs).
+       The Admin / GLOBAL view keeps the dropdown so they can narrow across sectors. *@
+    @if (Model.IsGlobal || Model.SectorOptions.Count > 1)
+    {
+        <div>
+            <label class="muted small d-block">القطاع</label>
+            <select id="fSector" class="form-select form-select-sm">
+                <option value="All" selected="@(Model.Sector == "All")">كل القطاعات</option>
+                @foreach (var s in Model.SectorOptions)
+                {
+                    <option value="@s" selected="@(Model.Sector == s)">@s</option>
+                }
+            </select>
+        </div>
+    }
+    else
+    {
+        @* Hidden field keeps the JS query-string code happy without showing a useless dropdown. *@
+        <input type="hidden" id="fSector" value="All" />
+    }
     <div>
         <label class="muted small d-block">الإدارة</label>
         <select id="fDept" class="form-select form-select-sm">

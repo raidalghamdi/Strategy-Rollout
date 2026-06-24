@@ -2,9 +2,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
+using System.Text.Encodings.Web;
 using StrategyHouse.Domain.Entities;
 using StrategyHouse.Infrastructure.Persistence;
+using StrategyHouse.Web.Services;
 
 namespace StrategyHouse.Web.Controllers;
 
@@ -13,12 +17,26 @@ public class AccountController : Controller
     private readonly SignInManager<AppUser> _signInManager;
     private readonly UserManager<AppUser> _userManager;
     private readonly ApplicationDbContext _db;
+    private readonly IEmailSender _email;
+    private readonly ILogger<AccountController> _log;
 
-    public AccountController(SignInManager<AppUser> signInManager, UserManager<AppUser> userManager, ApplicationDbContext db)
+    // Phase 20.27 — admin accounts that are EXCLUDED from password reset / first-time
+    // self-service flows. These accounts must only be managed by a database admin.
+    private static readonly HashSet<string> ProtectedAdminUserNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "admin@gac.gov.sa",
+        "admin",
+        "gac.admin",
+    };
+
+    public AccountController(SignInManager<AppUser> signInManager, UserManager<AppUser> userManager,
+        ApplicationDbContext db, IEmailSender email, ILogger<AccountController> log)
     {
         _signInManager = signInManager;
         _userManager = userManager;
         _db = db;
+        _email = email;
+        _log = log;
     }
 
     [HttpGet]
@@ -44,6 +62,21 @@ public class AccountController : Controller
                 .FirstOrDefaultAsync(c => c.Code == input && c.IsActive && c.RevokedAt == null);
             if (code != null)
                 return RedirectToAction("Index", "Journey", new { code = code.Code });
+        }
+
+        // Phase 20.27 — first-time setup: if the username/email exists but PasswordHash
+        // is NULL, route the user to the SetPassword page. Admin-protected accounts are
+        // NEVER redirected here.
+        if (!string.IsNullOrEmpty(input))
+        {
+            var existing = await _userManager.FindByNameAsync(input)
+                            ?? await _userManager.FindByEmailAsync(input);
+            if (existing != null
+                && !ProtectedAdminUserNames.Contains(existing.UserName ?? "")
+                && string.IsNullOrEmpty(existing.PasswordHash))
+            {
+                return RedirectToAction(nameof(SetPassword), new { u = existing.UserName });
+            }
         }
 
         var result = await _signInManager.PasswordSignInAsync(input, password, true, true);
@@ -87,6 +120,165 @@ public class AccountController : Controller
     }
 
     public IActionResult AccessDenied() => View();
+
+    // ==================================================================================
+    // Phase 20.27 — First-time password setup (no email required)
+    // ==================================================================================
+    [HttpGet]
+    public async Task<IActionResult> SetPassword(string u)
+    {
+        if (string.IsNullOrWhiteSpace(u)) return RedirectToAction(nameof(Login));
+        var user = await _userManager.FindByNameAsync(u);
+        if (user == null || ProtectedAdminUserNames.Contains(user.UserName ?? ""))
+            return RedirectToAction(nameof(Login));
+        if (!string.IsNullOrEmpty(user.PasswordHash))
+            return RedirectToAction(nameof(Login));
+        return View(new SetPasswordViewModel { UserName = user.UserName ?? u });
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    [EnableRateLimiting("login")]
+    public async Task<IActionResult> SetPassword(SetPasswordViewModel m)
+    {
+        if (m == null || string.IsNullOrWhiteSpace(m.UserName))
+            return RedirectToAction(nameof(Login));
+
+        var user = await _userManager.FindByNameAsync(m.UserName);
+        if (user == null || ProtectedAdminUserNames.Contains(user.UserName ?? ""))
+            return RedirectToAction(nameof(Login));
+
+        if (!string.IsNullOrEmpty(user.PasswordHash))
+        {
+            TempData["Error"] = "لديك كلمة مرور بالفعل. استخدم رابط 'نسيت كلمة المرور؟' إذا نسيتها.";
+            return RedirectToAction(nameof(Login));
+        }
+
+        if (m.NewPassword != m.ConfirmPassword)
+        {
+            ModelState.AddModelError("", "كلمتا المرور غير متطابقتين.");
+            return View(m);
+        }
+
+        var res = await _userManager.AddPasswordAsync(user, m.NewPassword ?? "");
+        if (!res.Succeeded)
+        {
+            foreach (var e in res.Errors) ModelState.AddModelError("", e.Description);
+            return View(m);
+        }
+
+        await _signInManager.SignInAsync(user, isPersistent: true);
+        user.LastLoginAt = DateTime.UtcNow;
+        await _userManager.UpdateAsync(user);
+        _log.LogInformation("First-time password set for {User}", user.UserName);
+
+        if (!string.IsNullOrEmpty(user.JourneyScopeKey))
+            return Redirect("/Admin/LiveDashboard");
+        return Redirect("/");
+    }
+
+    // ==================================================================================
+    // Phase 20.27 — Forgot password / password reset (email-based)
+    // ==================================================================================
+    [HttpGet]
+    public IActionResult ForgotPassword() => View();
+
+    [HttpPost, ValidateAntiForgeryToken]
+    [EnableRateLimiting("login")]
+    public async Task<IActionResult> ForgotPassword(string email)
+    {
+        var input = (email ?? "").Trim();
+        if (!string.IsNullOrEmpty(input))
+        {
+            var user = await _userManager.FindByEmailAsync(input)
+                       ?? await _userManager.FindByNameAsync(input);
+
+            if (user != null
+                && !ProtectedAdminUserNames.Contains(user.UserName ?? "")
+                && !string.IsNullOrEmpty(user.Email))
+            {
+                try
+                {
+                    var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                    var encoded = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
+                    var url = Url.Action(nameof(ResetPassword), "Account",
+                        new { u = user.UserName, t = encoded }, Request.Scheme);
+                    var safeName = HtmlEncoder.Default.Encode(user.FullNameAr ?? user.UserName ?? "");
+                    var safeUrl = HtmlEncoder.Default.Encode(url ?? "");
+                    var html = $@"<div dir='rtl' style='font-family:Tahoma,Arial,sans-serif;font-size:14px;line-height:1.8;'>
+                        <p>مرحباً {safeName}،</p>
+                        <p>استلمنا طلباً لإعادة تعيين كلمة المرور لحسابك في منصة الاستراتيجية.</p>
+                        <p>اضغط على الرابط التالي لإعادة تعيين كلمة المرور (صالح لمدة ساعة):</p>
+                        <p><a href='{safeUrl}' style='background:#5F9600;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;'>إعادة تعيين كلمة المرور</a></p>
+                        <p style='color:#666;font-size:12px;'>أو انسخ والصق هذا الرابط: {safeUrl}</p>
+                        <p style='color:#666;font-size:12px;'>إذا لم تطلب إعادة التعيين، تجاهل هذه الرسالة.</p>
+                    </div>";
+                    await _email.SendAsync(user.Email, "إعادة تعيين كلمة المرور — منصة الاستراتيجية", html);
+                    _log.LogInformation("Password reset email sent to {Email}", user.Email);
+                }
+                catch (Exception ex)
+                {
+                    _log.LogError(ex, "Failed to generate / send reset email for {Input}", input);
+                }
+            }
+        }
+
+        return RedirectToAction(nameof(ForgotPasswordConfirmation));
+    }
+
+    [HttpGet]
+    public IActionResult ForgotPasswordConfirmation() => View();
+
+    [HttpGet]
+    public async Task<IActionResult> ResetPassword(string u, string t)
+    {
+        if (string.IsNullOrWhiteSpace(u) || string.IsNullOrWhiteSpace(t))
+            return RedirectToAction(nameof(Login));
+
+        var user = await _userManager.FindByNameAsync(u);
+        if (user == null || ProtectedAdminUserNames.Contains(user.UserName ?? ""))
+        {
+            TempData["Error"] = "رابط غير صالح.";
+            return RedirectToAction(nameof(Login));
+        }
+
+        return View(new ResetPasswordViewModel { UserName = u, Token = t });
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    [EnableRateLimiting("login")]
+    public async Task<IActionResult> ResetPassword(ResetPasswordViewModel m)
+    {
+        if (m == null || string.IsNullOrWhiteSpace(m.UserName) || string.IsNullOrWhiteSpace(m.Token))
+            return RedirectToAction(nameof(Login));
+
+        var user = await _userManager.FindByNameAsync(m.UserName);
+        if (user == null || ProtectedAdminUserNames.Contains(user.UserName ?? ""))
+        {
+            ModelState.AddModelError("", "رابط غير صالح.");
+            return View(m);
+        }
+
+        if (m.NewPassword != m.ConfirmPassword)
+        {
+            ModelState.AddModelError("", "كلمتا المرور غير متطابقتين.");
+            return View(m);
+        }
+
+        string decodedToken;
+        try { decodedToken = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(m.Token)); }
+        catch { ModelState.AddModelError("", "رابط غير صالح أو منتهي الصلاحية."); return View(m); }
+
+        var res = await _userManager.ResetPasswordAsync(user, decodedToken, m.NewPassword ?? "");
+        if (!res.Succeeded)
+        {
+            foreach (var e in res.Errors) ModelState.AddModelError("", e.Description);
+            return View(m);
+        }
+
+        TempData["Success"] = "تمت إعادة تعيين كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.";
+        _log.LogInformation("Password reset succeeded for {User}", user.UserName);
+        return RedirectToAction(nameof(Login));
+    }
 
     // Phase 20 — self-service profile: view identity fields, edit display name, change password.
     [Authorize]
@@ -155,6 +347,23 @@ public class ProfileViewModel
     public string? JourneyScopeKey { get; set; }
     public DateTime? LastLoginAt { get; set; }
     public string? CurrentPassword { get; set; }
+    public string? NewPassword { get; set; }
+    public string? ConfirmPassword { get; set; }
+}
+
+// Phase 20.27 — first-time password setup
+public class SetPasswordViewModel
+{
+    public string UserName { get; set; } = "";
+    public string? NewPassword { get; set; }
+    public string? ConfirmPassword { get; set; }
+}
+
+// Phase 20.27 — password reset via email
+public class ResetPasswordViewModel
+{
+    public string UserName { get; set; } = "";
+    public string Token { get; set; } = "";
     public string? NewPassword { get; set; }
     public string? ConfirmPassword { get; set; }
 }

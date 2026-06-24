@@ -122,24 +122,57 @@ public class AdminLiveController : Controller
             if (noneRows.Count > 0) groups.Add(new LiveSectorGroup { Sector = "بدون قطاع", Rows = noneRows });
         }
 
-        // KPI strip — counted against the visible department set, not just listed rows.
-        var completed = rows.Count(r => r.CompletedAt != null);
-        var inProgress = rows.Count(r => r.CompletedAt == null && r.CurrentStage > 1);
-        var notStarted = allDepts.Count - rows.Where(r => r.CompletedAt != null || r.CurrentStage > 1)
-                                               .Select(r => r.DeptCode).Distinct().Count();
+        // Phase 20.26 — KPI strip now honors the active filters (sector + dept).
+        // Previously KPIs were always counted against the full scope (allDepts), so
+        // selecting a single department did not update the cards. The denominator is
+        // now the set of departments matching the current filter selection.
+        var deptsInScope = allDepts.AsEnumerable();
+        if (!string.IsNullOrEmpty(dept) && dept != "All")
+            deptsInScope = deptsInScope.Where(d => d.DeptCode == dept);
+        if (sector != "All")
+            deptsInScope = deptsInScope.Where(d => (d.ParentSector ?? "بدون قطاع") == sector);
+        var filteredDepts = deptsInScope.ToList();
+        var filteredDeptCodes = filteredDepts.Select(d => d.DeptCode).ToHashSet();
+
+        // "rows" already reflects the sector filter (line 108-109). For the dept filter
+        // we already applied it earlier in the EF query (sessionsQ).
+        var kpiRows = rows.Where(r => filteredDeptCodes.Contains(r.DeptCode)).ToList();
+        var completed = kpiRows.Count(r => r.CompletedAt != null);
+        var inProgress = kpiRows.Count(r => r.CompletedAt == null && r.CurrentStage > 1);
+        var activeDeptCount = kpiRows.Where(r => r.CompletedAt != null || r.CurrentStage > 1)
+                                     .Select(r => r.DeptCode).Distinct().Count();
+        var notStarted = filteredDepts.Count - activeDeptCount;
 
         var kpis = new LiveKpis
         {
-            TotalDepartments = allDepts.Count,
+            TotalDepartments = filteredDepts.Count,
             SessionsCompleted = completed,
             SessionsInProgress = inProgress,
             NotStarted = Math.Max(0, notStarted),
-            OverallPercent = allDepts.Count == 0 ? 0
-                : (int)Math.Round(100.0 * completed / allDepts.Count),
+            OverallPercent = filteredDepts.Count == 0 ? 0
+                : (int)Math.Round(100.0 * completed / filteredDepts.Count),
         };
 
-        var sectorFilterOptions = sectorOrder.ToList();
-        if (isGlobal) sectorFilterOptions.Add("بدون قطاع");
+        // Phase 20.26 — sector filter is limited to the user's actual scope.
+        // Admin / GLOBAL / TEST sees all three sectors + "بدون قطاع".
+        // A VP only sees their own sector (and a single-sector dropdown is hidden
+        // by the view because there is nothing to choose).
+        List<string> sectorFilterOptions;
+        if (isGlobal)
+        {
+            sectorFilterOptions = sectorOrder.ToList();
+            sectorFilterOptions.Add("بدون قطاع");
+        }
+        else
+        {
+            // Resolve VP's own sector via the visible departments.
+            var visibleSectors = allDepts
+                .Select(d => d.ParentSector)
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct()
+                .ToList()!;
+            sectorFilterOptions = visibleSectors!;
+        }
 
         return new LiveDashboardViewModel
         {

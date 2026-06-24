@@ -24,6 +24,17 @@
         <h2>تسجيل الدخول</h2>
         <p class="muted">للحضور: لا حاجة لتسجيل الدخول، استخدم رمز الجلسة من المُيسّر.</p>
 
+        @if (TempData["Success"] != null)
+        {
+            <div class="alert" style="background:#eaf5d8;border:1px solid #5F9600;color:#3a5e00;padding:10px;border-radius:6px;margin-bottom:12px;">
+                @TempData["Success"]
+            </div>
+        }
+        @if (TempData["Error"] != null)
+        {
+            <div class="alert alert--error">@TempData["Error"]</div>
+        }
+
         @if (!ViewData.ModelState.IsValid)
         {
             <div class="alert alert--error">
@@ -49,5 +60,10 @@
             </div>
             <button type="submit" class="btn btn--primary btn--block">دخول</button>
         </form>
+
+        @* Phase 20.27 — self-service password recovery link. *@
+        <div style="margin-top:14px;text-align:center;">
+            <a href="/Account/ForgotPassword" class="muted small">نسيت كلمة المرور؟</a>
+        </div>
     </div>
 </div>
