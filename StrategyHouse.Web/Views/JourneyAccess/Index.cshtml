@@ -1,0 +1,74 @@
+@{
+    Layout = "_JourneyLayout";
+    ViewData["Title"] = "دخول الرحلة بالبريد الإلكتروني";
+    var email = ViewBag.Email as string;
+}
+
+@*
+    Phase 20.29 — Email-only access to the journey.
+    User asked: "instead everyone is entered by the department code like
+    GAC202 they entered by their emails without passwords and anything else."
+    Single email field, Arabic RTL, mirrors the kiosk style of /Journey.
+*@
+
+<style>
+    .kiosk-stage {
+        min-height: calc(100vh - 220px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 12px;
+    }
+    .kiosk-stage .kiosk-shell {
+        width: 100%;
+        max-width: 560px;
+        margin: 0 auto;
+    }
+    .kiosk-stage .kiosk-shell .text-center { text-align: center; }
+    .kiosk-stage .gac-card { text-align: right; }
+    .kiosk-stage .alt-link {
+        display: block;
+        margin-top: 14px;
+        text-align: center;
+        color: var(--gac-primary);
+        font-size: 0.9rem;
+    }
+    @@media (max-height: 640px) {
+        .kiosk-stage { min-height: auto; padding: 18px 12px; }
+    }
+</style>
+
+<div class="kiosk-stage">
+    <div class="kiosk-shell">
+        <div class="text-center mb-4">
+            <div style="font-weight:800;color:var(--gac-primary);font-size:clamp(1.1rem, 3vw, 1.6rem);text-align:center;">الهيئة العامة للمنافسة</div>
+            <h1 class="mt-2">رحلة استراتيجية الهيئة</h1>
+            <p class="text-muted">أدخل بريدك الإلكتروني المسجّل لدى الإدارة للدخول إلى رحلتك مباشرة — لا حاجة لرمز ولا كلمة مرور.</p>
+        </div>
+
+        @if (TempData["Error"] != null)
+        {
+            <div class="alert alert-danger">@TempData["Error"]</div>
+        }
+
+        <div class="gac-card">
+            <form method="post" asp-controller="JourneyAccess" asp-action="Submit">
+                @Html.AntiForgeryToken()
+                <label class="form-label fw-bold">البريد الإلكتروني</label>
+                <input type="email"
+                       name="email"
+                       value="@email"
+                       class="form-control form-control-lg text-center"
+                       style="direction:ltr;font-weight:600;"
+                       placeholder="name@@gac.gov.sa"
+                       autocomplete="email"
+                       required />
+                <button type="submit" class="btn btn-lg gac-btn-primary text-white w-100 mt-3 text-center d-flex justify-content-center align-items-center" style="text-align:center;">
+                    ادخل إلى الرحلة
+                </button>
+            </form>
+
+            <a class="alt-link" href="/Journey">أو ادخل برمز الإدارة (GACxxx)</a>
+        </div>
+    </div>
+</div>

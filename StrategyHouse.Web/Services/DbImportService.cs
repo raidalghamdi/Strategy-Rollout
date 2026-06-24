@@ -285,6 +285,24 @@ public class DbImportService
                 result.TotalUpdates += upd;
                 result.TotalDeletes += del;
                 _log.LogInformation("DB import: table {Table} +{Ins} ~{Upd} -{Del}", table, ins, upd, del);
+
+                // Phase 20.29 — normalize DepartmentRoster emails after any import.
+                // Users typically only fill the visible "Email" column in Excel; we
+                // derive "EmailNormalized" (lower-cased, trimmed) so that the
+                // /Journey/Access lookup (which queries EmailNormalized) keeps
+                // working without forcing the admin to maintain a second column.
+                if (string.Equals(table, "DepartmentRoster", StringComparison.OrdinalIgnoreCase))
+                {
+                    using var normCmd = conn.CreateCommand();
+                    normCmd.Transaction = tx;
+                    normCmd.CommandText =
+                        "UPDATE DepartmentRoster " +
+                        "SET EmailNormalized = CASE " +
+                        "   WHEN Email IS NULL OR TRIM(Email) = '' THEN NULL " +
+                        "   ELSE LOWER(TRIM(Email)) END;";
+                    var normRows = await normCmd.ExecuteNonQueryAsync();
+                    _log.LogInformation("DB import: normalized {Rows} DepartmentRoster emails", normRows);
+                }
             }
 
             await tx.CommitAsync();

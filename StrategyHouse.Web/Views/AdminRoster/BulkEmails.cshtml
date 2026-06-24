@@ -1,0 +1,115 @@
+@model StrategyHouse.Web.Controllers.BulkEmailsVm
+@{ ViewData["Title"] = "إضافة وتحديث الأعضاء بالجملة"; }
+
+@*
+    Phase 20.29 — Bulk add / update roster emails.
+    User instruction: "Continue doing it and make sure there is a feature
+    to add bulk at once."
+
+    Two paths to bulk add:
+      1. Excel import via /Admin/DbImport (sheet name: DepartmentRoster)
+      2. This page — paste lines like:
+            email,deptcode
+            email,deptcode,namear
+            email,deptcode,namear,role
+*@
+
+<div class="d-flex justify-content-between align-items-center mb-3" style="flex-wrap:wrap;gap:.5rem;">
+    <div>
+        <h1 style="margin:0;">إضافة وتحديث الأعضاء بالجملة</h1>
+        <p class="muted" style="margin:.25rem 0 0;">أضف عشرات الأعضاء بإيميلاتهم دفعة واحدة.</p>
+    </div>
+    <div>
+        <a href="/Admin/Roster" class="btn btn-outline-secondary">← العودة للقائمة</a>
+    </div>
+</div>
+
+@if (Model.DryRun)
+{
+    <div class="alert alert-warning">
+        <strong>وضع المعاينة:</strong> لم يتم حفظ أي تغييرات.
+        @Model.InsertedCount إضافة محتملة و @Model.UpdatedCount تحديث محتمل.
+    </div>
+}
+
+@if (Model.Errors.Count > 0)
+{
+    <div class="alert alert-danger">
+        <strong>أخطاء — لم يُحفظ شيء:</strong>
+        <ul style="margin:.5rem 0 0;">
+            @foreach (var e in Model.Errors) { <li>@e</li> }
+        </ul>
+    </div>
+}
+
+@if (Model.Warnings.Count > 0)
+{
+    <div class="alert alert-warning">
+        <strong>تنبيهات:</strong>
+        <ul style="margin:.5rem 0 0;">
+            @foreach (var w in Model.Warnings) { <li>@w</li> }
+        </ul>
+    </div>
+}
+
+<div class="alert alert-info" style="font-size:.9rem;">
+    <strong>صيغة المدخلات</strong> — سطر لكل عضو، الفاصل فاصلة (,) أو Tab، الأسطر التي تبدأ بـ <code>#</code> تُعد تعليقات:
+    <pre style="background:#f8f9fa;border:1px solid #ddd;padding:.6rem;margin:.5rem 0 0;border-radius:4px;direction:ltr;text-align:left;">
+# email, deptcode  (يحدّث أو يضيف باستخدام جزء البريد كاسم)
+ahmad@@gac.gov.sa, DEPT-02
+
+# email, deptcode, namear  (يطابق بالاسم العربي ويحدّث/يضيف)
+sarah@@gac.gov.sa, DEPT-02, سارة الأحمد
+
+# email, deptcode, namear, role  (مع تحديد الدور)
+omar@@gac.gov.sa, DEPT-03, عمر الفهد, مدير إدارة
+</pre>
+    البريد الإلكتروني فريد على مستوى المنصة كلها — لا يمكن استخدام نفس البريد لعضوين.
+</div>
+
+<form method="post" asp-action="BulkEmailsSubmit">
+    @Html.AntiForgeryToken()
+
+    <div class="mb-3">
+        <label class="form-label fw-bold">رموز الإدارات المتاحة</label>
+        <div class="muted" style="font-size:.85rem;line-height:1.8;">
+            @foreach (var d in Model.Departments)
+            {
+                <span style="display:inline-block;margin-left:.5rem;background:#f0f0f0;padding:.15rem .5rem;border-radius:4px;">
+                    <code>@d.Code</code> — @d.NameAr
+                </span>
+            }
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label fw-bold">المدخلات</label>
+        <textarea name="payload"
+                  class="form-control"
+                  rows="14"
+                  style="direction:ltr;text-align:left;font-family:monospace;font-size:.9rem;"
+                  placeholder="ahmad@@gac.gov.sa, DEPT-02
+sarah@@gac.gov.sa, DEPT-02, سارة الأحمد
+omar@@gac.gov.sa, DEPT-03, عمر الفهد, مدير إدارة">@Model.Payload</textarea>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" name="dryRun" value="true" class="btn btn-outline-primary">
+            معاينة فقط (بدون حفظ)
+        </button>
+        <button type="submit" name="dryRun" value="false" class="btn gac-btn-primary text-white">
+            تنفيذ وحفظ
+        </button>
+    </div>
+</form>
+
+<hr style="margin:2rem 0;" />
+
+<h2 style="font-size:1.2rem;">طريقة بديلة: استيراد من Excel</h2>
+<p class="muted">
+    يمكنك أيضاً تنزيل قاعدة البيانات من
+    <a href="/Admin/DbExport">/Admin/DbExport</a>،
+    تعديل ورقة <code>DepartmentRoster</code> (مع تعبئة عمود <code>Email</code>)،
+    ثم رفعها عبر <a href="/Admin/DbImport">/Admin/DbImport</a>.
+    يتم تجاهل الأعمدة المساعدة <code>EmailNormalized</code> تلقائياً ويُعاد حسابها.
+</p>

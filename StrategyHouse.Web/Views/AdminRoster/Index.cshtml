@@ -1,0 +1,94 @@
+@model StrategyHouse.Web.Controllers.RosterIndexVm
+@{ ViewData["Title"] = "أعضاء الإدارات وبريدهم الإلكتروني"; }
+
+@*
+    Phase 20.29 — Admin Roster overview.
+    Shows every roster member, their dept, and whether they have an email
+    set (which means they can sign in to /Journey/Access without a code).
+*@
+
+<div class="d-flex justify-content-between align-items-center mb-3" style="flex-wrap:wrap;gap:.5rem;">
+    <div>
+        <h1 style="margin:0;">أعضاء الإدارات وبريدهم الإلكتروني</h1>
+        <p class="muted" style="margin:.25rem 0 0;">
+            مجموع الأعضاء: <strong>@Model.TotalCount</strong> ·
+            من لديهم بريد للدخول: <strong>@Model.WithEmailCount</strong>
+        </p>
+    </div>
+    <div style="display:flex;gap:.5rem;">
+        <a href="/Admin/Roster/BulkEmails" class="btn gac-btn-primary text-white">إضافة/تحديث بالجملة</a>
+        <a href="/Admin" class="btn btn-outline-secondary">← العودة للوحة</a>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+
+<div class="alert alert-info" style="font-size:.9rem;">
+    <strong>كيف يدخل العضو إلى الرحلة؟</strong>
+    عند إضافة بريد إلكتروني لعضو هنا، يستطيع الدخول مباشرة من
+    <a href="/Journey/Access" target="_blank">/Journey/Access</a>
+    بكتابة بريده فقط — بدون رمز ولا كلمة مرور. البريد فريد على مستوى المنصة كلها.
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped" style="background:#fff;">
+        <thead>
+            <tr>
+                <th>الإدارة</th>
+                <th>الاسم</th>
+                <th>الدور</th>
+                <th>البريد الإلكتروني</th>
+                <th>الحالة</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var m in Model.Members)
+            {
+                <tr>
+                    <td><code>@m.DeptCode</code></td>
+                    <td>@m.NameAr</td>
+                    <td>@m.Role</td>
+                    <td style="direction:ltr;text-align:left;">
+                        @if (!string.IsNullOrWhiteSpace(m.Email))
+                        {
+                            <span style="font-weight:600;">@m.Email</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </td>
+                    <td>
+                        @if (m.IsActive)
+                        {
+                            <span class="badge bg-success">نشط</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">معطّل</span>
+                        }
+                    </td>
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(m.Email))
+                        {
+                            <form method="post" asp-action="ClearEmail" style="display:inline;"
+                                  onsubmit="return confirm('هل تريد حذف بريد هذا العضو؟ سيمنعه ذلك من الدخول بالبريد.');">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="memberId" value="@m.MemberId" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger">حذف البريد</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

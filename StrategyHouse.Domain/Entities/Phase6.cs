@@ -19,6 +19,12 @@ public class DepartmentRoster
     public bool IsDefaultAttending { get; set; } = true;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    // Phase 20.29 — email-only access to the journey. Optional; when set, lets the
+    // member sign in to the journey by typing their email (no password / no code).
+    // Stored normalized (lower-cased + trimmed) for case-insensitive lookup.
+    [MaxLength(320)] public string? Email { get; set; }
+    [MaxLength(320)] public string? EmailNormalized { get; set; }
 }
 
 // Every chatbot question/answer, persisted for analytics.

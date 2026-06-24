@@ -190,6 +190,13 @@ public class ApplicationDbContext : IdentityDbContext<AppUser, IdentityRole<int>
 
         // Phase 6
         b.Entity<DepartmentRoster>().HasIndex(r => new { r.DeptCode, r.IsActive });
+        // Phase 20.29 — unique normalized email for journey email-only access.
+        // Filtered: only enforced when EmailNormalized is non-null (members without an
+        // email keep the legacy code+pick flow).
+        b.Entity<DepartmentRoster>()
+            .HasIndex(r => r.EmailNormalized)
+            .IsUnique()
+            .HasFilter("[EmailNormalized] IS NOT NULL");
         b.Entity<ChatbotConversation>().HasIndex(c => c.AskedAt);
 
         // Phase 18 — index the redesigned-journey capture tables by session for fast reads.
