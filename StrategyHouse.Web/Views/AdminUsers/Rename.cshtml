@@ -1,0 +1,45 @@
+@model StrategyHouse.Web.Controllers.RenameUserModel
+@{ ViewData["Title"] = "إعادة تسمية مستخدم"; }
+
+<h1 class="mb-3">إعادة تسمية مستخدم</h1>
+
+<div class="alert alert-warning">
+    <strong>تنبيه:</strong> تغيير اسم المستخدم سيُنهي جميع جلساته النشطة وعليه إعادة تسجيل الدخول بالاسم الجديد.
+    سجل التدقيق (Audit Log) يُحفظ بالاسم الجديد بعد التغيير.
+</div>
+
+<div class="card" style="background:#fff; padding:1.25rem; max-width:640px;">
+    <form method="post" action="/Admin/Users/Rename/@Model.Id">
+        @Html.AntiForgeryToken()
+
+        <div asp-validation-summary="All" class="text-danger small mb-2"></div>
+
+        <div class="mb-3">
+            <label class="form-label">الاسم الحالي</label>
+            <input type="text" class="form-control" value="@Model.OldUserName" disabled />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">البريد الحالي</label>
+            <input type="text" class="form-control" value="@Model.OldEmail" disabled />
+        </div>
+
+        <hr />
+
+        <div class="mb-3">
+            <label class="form-label">الاسم الجديد <span class="text-danger">*</span></label>
+            <input type="text" name="NewUserName" class="form-control" value="@Model.NewUserName" required autocomplete="off" />
+            <div class="form-text">يمكن أن يكون اسم مستخدم بسيط (vp.juridical) أو بريد كامل (vp.juridical@gac.gov.sa).</div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">البريد الجديد</label>
+            <input type="email" name="NewEmail" class="form-control" value="@Model.NewEmail" autocomplete="off" />
+            <div class="form-text">إذا تُرك فارغاً وكان الاسم الجديد بريداً، سيُستخدم الاسم نفسه؛ وإلا سيُضاف @@gac.gov.sa تلقائياً.</div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn--primary">حفظ الاسم الجديد</button>
+            <a href="/Admin/Users" class="btn btn--secondary">إلغاء</a>
+        </div>
+    </form>
+</div>

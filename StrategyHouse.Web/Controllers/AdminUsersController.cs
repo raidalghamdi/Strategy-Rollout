@@ -17,6 +17,15 @@ public class AdminUsersController : Controller
     private readonly UserManager<AppUser> _users;
     private readonly AuditLogService _audit;
 
+    // Phase 20.28 — protected admin accounts cannot be renamed, edited, disabled,
+    // or have their password reset from this UI. SeedData re-asserts these accounts
+    // on every startup so they are always recoverable.
+    private static readonly HashSet<string> ProtectedAdminUserNames =
+        new(StringComparer.OrdinalIgnoreCase) { "admin@gac.gov.sa", "admin", "gac.admin" };
+
+    private static bool IsProtected(AppUser u) =>
+        u.UserName != null && ProtectedAdminUserNames.Contains(u.UserName);
+
     public AdminUsersController(UserManager<AppUser> users, AuditLogService audit)
     {
         _users = users;
@@ -43,6 +52,7 @@ public class AdminUsersController : Controller
             IsActive = u.IsActive,
             CreatedAt = u.CreatedAt,
             LastLoginAt = u.LastLoginAt,
+            IsProtected = IsProtected(u),
         }).ToList());
     }
 
@@ -100,6 +110,11 @@ public class AdminUsersController : Controller
     {
         var u = await _users.FindByIdAsync(id.ToString());
         if (u == null) return NotFound();
+        if (IsProtected(u))
+        {
+            TempData["Error"] = "حساب الأدمن المحمي لا يمكن تعديله من الواجهة.";
+            return RedirectToAction(nameof(Index));
+        }
 
         var oldRole = u.AppRole;
         u.FullNameAr = m.FullNameAr ?? "";
@@ -128,6 +143,11 @@ public class AdminUsersController : Controller
     {
         var u = await _users.FindByIdAsync(id.ToString());
         if (u == null) return NotFound();
+        if (IsProtected(u))
+        {
+            TempData["Error"] = "حساب الأدمن المحمي لا يمكن إعادة تعيين كلمة مروره من الواجهة.";
+            return RedirectToAction(nameof(Index));
+        }
         ViewBag.UserName = u.UserName;
         return View(new ResetPasswordModel { Id = id });
     }
@@ -137,6 +157,11 @@ public class AdminUsersController : Controller
     {
         var u = await _users.FindByIdAsync(id.ToString());
         if (u == null) return NotFound();
+        if (IsProtected(u))
+        {
+            TempData["Error"] = "حساب الأدمن المحمي لا يمكن إعادة تعيين كلمة مروره من الواجهة.";
+            return RedirectToAction(nameof(Index));
+        }
         if (string.IsNullOrWhiteSpace(m.NewPassword) || m.NewPassword != m.ConfirmPassword)
         {
             ViewBag.UserName = u.UserName;
@@ -161,9 +186,93 @@ public class AdminUsersController : Controller
     {
         var u = await _users.FindByIdAsync(id.ToString());
         if (u == null) return NotFound();
+        if (IsProtected(u))
+        {
+            TempData["Error"] = "حساب الأدمن المحمي لا يمكن تعطيله.";
+            return RedirectToAction(nameof(Index));
+        }
         u.IsActive = false;
         await _users.UpdateAsync(u);
         await _audit.LogAsync(User.Identity?.Name ?? "system", "USER_DEACTIVATE", "User", u.UserName, null);
+        return RedirectToAction(nameof(Index));
+    }
+
+    // Phase 20.28 — rename a user. Changes UserName + Email and refreshes
+    // SecurityStamp so existing sessions are invalidated. Blocked for protected admins.
+    [HttpGet("Rename/{id:int}")]
+    public async Task<IActionResult> Rename(int id)
+    {
+        var u = await _users.FindByIdAsync(id.ToString());
+        if (u == null) return NotFound();
+        if (IsProtected(u))
+        {
+            TempData["Error"] = "حساب الأدمن المحمي لا يمكن إعادة تسميته.";
+            return RedirectToAction(nameof(Index));
+        }
+        return View(new RenameUserModel
+        {
+            Id = id,
+            OldUserName = u.UserName ?? "",
+            OldEmail = u.Email ?? "",
+            NewUserName = u.UserName ?? "",
+            NewEmail = u.Email ?? "",
+        });
+    }
+
+    [HttpPost("Rename/{id:int}"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> Rename(int id, RenameUserModel m)
+    {
+        var u = await _users.FindByIdAsync(id.ToString());
+        if (u == null) return NotFound();
+        if (IsProtected(u))
+        {
+            TempData["Error"] = "حساب الأدمن المحمي لا يمكن إعادة تسميته.";
+            return RedirectToAction(nameof(Index));
+        }
+        var newName = (m.NewUserName ?? "").Trim();
+        m.OldUserName = u.UserName ?? "";
+        m.OldEmail = u.Email ?? "";
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            ModelState.AddModelError("", "اسم المستخدم الجديد مطلوب.");
+            return View(m);
+        }
+        if (ProtectedAdminUserNames.Contains(newName))
+        {
+            ModelState.AddModelError("", "لا يمكن استخدام اسم مستخدم محجوز للأدمن.");
+            return View(m);
+        }
+        var existing = await _users.FindByNameAsync(newName);
+        if (existing != null && existing.Id != u.Id)
+        {
+            ModelState.AddModelError("", "اسم المستخدم مستخدم مسبقاً.");
+            return View(m);
+        }
+
+        var oldName = u.UserName ?? "";
+        var oldEmail = u.Email ?? "";
+        var newEmail = string.IsNullOrWhiteSpace(m.NewEmail)
+            ? (newName.Contains('@') ? newName : $"{newName}@gac.gov.sa")
+            : m.NewEmail.Trim();
+
+        var rn = await _users.SetUserNameAsync(u, newName);
+        if (!rn.Succeeded)
+        {
+            ModelState.AddModelError("", string.Join(" / ", rn.Errors.Select(e => e.Description)));
+            return View(m);
+        }
+        var re = await _users.SetEmailAsync(u, newEmail);
+        if (!re.Succeeded)
+        {
+            ModelState.AddModelError("", string.Join(" / ", re.Errors.Select(e => e.Description)));
+            return View(m);
+        }
+        await _users.UpdateSecurityStampAsync(u);
+
+        await _audit.LogAsync(User.Identity?.Name ?? "system", "USER_RENAME", "User", newName,
+            new { OldUserName = oldName, NewUserName = newName, OldEmail = oldEmail, NewEmail = newEmail });
+
+        TempData["Success"] = $"تم تغيير اسم المستخدم من {oldName} إلى {newName}.";
         return RedirectToAction(nameof(Index));
     }
 }
@@ -178,6 +287,16 @@ public class UserRow
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
+    public bool IsProtected { get; set; }
+}
+
+public class RenameUserModel
+{
+    public int Id { get; set; }
+    public string OldUserName { get; set; } = "";
+    public string OldEmail { get; set; } = "";
+    public string NewUserName { get; set; } = "";
+    public string NewEmail { get; set; } = "";
 }
 
 public class UserEditModel
