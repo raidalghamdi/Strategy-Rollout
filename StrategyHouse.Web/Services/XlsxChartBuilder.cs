@@ -105,10 +105,11 @@ internal static class XlsxChartBuilder
         {
             drawingsPart = existing;
             wsDrawing = drawingsPart.WorksheetDrawing ??= new Xdr.WorksheetDrawing();
-            // Ensure the relationship is declared on the worksheet root.
+            // Ensure the relationship is declared on the worksheet root, in the
+            // schema-correct position.
             if (wsPart.Worksheet.Elements<Drawing>().FirstOrDefault() == null)
             {
-                wsPart.Worksheet.Append(new Drawing { Id = wsPart.GetIdOfPart(drawingsPart) });
+                InsertDrawing(wsPart, new Drawing { Id = wsPart.GetIdOfPart(drawingsPart) });
             }
             return;
         }
@@ -117,8 +118,46 @@ internal static class XlsxChartBuilder
         wsDrawing = new Xdr.WorksheetDrawing();
         drawingsPart.WorksheetDrawing = wsDrawing;
 
-        // Tell the worksheet about its drawing part.
-        wsPart.Worksheet.Append(new Drawing { Id = wsPart.GetIdOfPart(drawingsPart) });
+        // Tell the worksheet about its drawing part, in the schema-correct position.
+        InsertDrawing(wsPart, new Drawing { Id = wsPart.GetIdOfPart(drawingsPart) });
+    }
+
+    // OOXML CT_Worksheet schema requires this element order:
+    //   sheetData ... mergeCells ... printOptions, pageMargins, pageSetup,
+    //   headerFooter, rowBreaks, colBreaks, customProperties, cellWatches,
+    //   ignoredErrors, smartTags, drawing, drawingHF, picture, oleObjects,
+    //   controls, webPublishItems, tableParts, extLst.
+    //
+    // ClosedXML emits an empty <tableParts count="0"/> as the LAST element on
+    // every worksheet. If we blindly Append a <drawing>, it lands AFTER
+    // tableParts and Excel rejects the file as corrupt ("Replaced Part:
+    // /xl/worksheets/sheetN.xml part with XML error"). We must insert
+    // drawing BEFORE tableParts (and before any later siblings).
+    private static void InsertDrawing(WorksheetPart wsPart, Drawing drawing)
+    {
+        var ws = wsPart.Worksheet;
+        // Find the first element that must come AFTER <drawing>.
+        var firstAfter = ws.ChildElements
+            .OfType<OpenXmlElement>()
+            .FirstOrDefault(e =>
+                e is DrawingHeaderFooter ||
+                e is LegacyDrawing ||
+                e is LegacyDrawingHeaderFooter ||
+                e is DocumentFormat.OpenXml.Spreadsheet.Picture ||
+                e is OleObjects ||
+                e is Controls ||
+                e is WebPublishItems ||
+                e is TableParts ||
+                e is WorksheetExtensionList);
+
+        if (firstAfter != null)
+        {
+            ws.InsertBefore(drawing, firstAfter);
+        }
+        else
+        {
+            ws.Append(drawing);
+        }
     }
 
     private static void AppendChart(
