@@ -96,6 +96,13 @@ public class JourneyAccessController : Controller
             "Journey email-access: member {MemberId} ({Name}) dept={Dept} → session {SessionId}",
             member.MemberId, member.NameAr, member.DeptCode, session.Id);
 
-        return Redirect($"/Journey/Run?sessionId={session.Id}");
+        // Phase 20.30 — the journey Run action is routed as a path segment:
+        //   [HttpGet("Journey/Run/{sessionId:guid}")]
+        // The earlier query-string URL (/Journey/Run?sessionId=...) didn't match
+        // any route on production (Railway), so the browser fell through to a
+        // static-file fallback that prompted to download a file named "Run".
+        // RedirectToAction emits the correct path-segment URL and proper
+        // 302 + Location headers.
+        return RedirectToAction("Run", "Journey", new { sessionId = session.Id });
     }
 }
