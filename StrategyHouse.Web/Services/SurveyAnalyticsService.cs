@@ -30,13 +30,16 @@ public class SurveyAnalyticsService
 
     public record ChoiceResult(string ChoiceText, int Count, double Percent);
 
-    public record OpenTextCategoryTally(string Category, int Count, double Percent);
+    // Phase 20.33 (Comment 11) — Percent = % of categorized; PercentOfAll = % of all respondents
+    public record OpenTextCategoryTally(string Category, int Count, double Percent, double PercentOfAll = 0);
 
+    // Phase 20.33 (Comment 12) — BlankCount separates empty answers from answered-but-uncategorized
     public record OpenTextResults(
         int TotalResponses,
         List<OpenTextCategoryTally> Categories,
         int UncategorizedCount,
-        List<OpenTextVerbatim> RecentVerbatim);
+        List<OpenTextVerbatim> RecentVerbatim,
+        int BlankCount = 0);
 
     public record OpenTextVerbatim(Guid ResponseId, string Text, string? Category, DateTime SubmittedAt);
 
@@ -93,8 +96,14 @@ public class SurveyAnalyticsService
             var sorted = nums.OrderBy(n => n).ToList();
             median = total % 2 == 1 ? sorted[total / 2] : (sorted[total / 2 - 1] + sorted[total / 2]) / 2.0;
         }
+        // Phase 20.33 (Comment 10) — use AwayFromZero so 48/58=82.758… rounds to 82.8 not 83.8
         double pctHigh = total > 0 ? 100.0 * nums.Count(n => n >= 4) / total : 0;
-        return new LikertResults(Math.Round(mean, 2), median, dist, Math.Round(pctHigh, 1), total);
+        return new LikertResults(
+            Math.Round(mean, 2, MidpointRounding.AwayFromZero),
+            median,
+            dist,
+            Math.Round(pctHigh, 1, MidpointRounding.AwayFromZero),
+            total);
     }
 
     // ---------- Multiple choice ----------
@@ -133,25 +142,35 @@ public class SurveyAnalyticsService
             .Where(a => a.SurveyQuestionId == questionId)
             .ToDictionaryAsync(a => a.SurveyResponseId, a => a.Category);
 
-        var withText = answers
-            .Where(a => a.Answers.TryGetValue(key, out var v) && !string.IsNullOrWhiteSpace(v))
+        // Phase 20.33 (Comment 12) — split blank (no answer) from answered-but-uncategorized
+        // allAnswering = respondents who attempted this question at all (key present in JSON)
+        var allAnswering = answers
+            .Where(a => a.Answers.ContainsKey(key))
             .Select(a => (a.ResponseId, a.SubmittedAt, Text: a.Answers[key],
                 Category: assignments.TryGetValue(a.ResponseId, out var c) ? c : null))
             .ToList();
 
+        int blankCount = allAnswering.Count(a => string.IsNullOrWhiteSpace(a.Text));
+        var withText = allAnswering.Where(a => !string.IsNullOrWhiteSpace(a.Text)).ToList();
+
         int total = withText.Count;
         int uncategorized = withText.Count(x => string.IsNullOrEmpty(x.Category));
+        // Phase 20.33 (Comment 11) — denominator for % is categorized count (not all responses)
+        int categorizedCount = total - uncategorized;
 
         var cats = withText.Where(x => !string.IsNullOrEmpty(x.Category))
             .GroupBy(x => x.Category!)
             .Select(g => new OpenTextCategoryTally(g.Key, g.Count(),
-                total > 0 ? Math.Round(100.0 * g.Count() / total, 1) : 0))
+                // Percent of CATEGORIZED responses (primary display)
+                categorizedCount > 0 ? Math.Round(100.0 * g.Count() / categorizedCount, 1, MidpointRounding.AwayFromZero) : 0,
+                // Percent of ALL responses (secondary display)
+                total > 0 ? Math.Round(100.0 * g.Count() / total, 1, MidpointRounding.AwayFromZero) : 0))
             .OrderByDescending(c => c.Count).ToList();
 
         var recent = withText.Take(10)
             .Select(x => new OpenTextVerbatim(x.ResponseId, x.Text, x.Category, x.SubmittedAt)).ToList();
 
-        return new OpenTextResults(total, cats, uncategorized, recent);
+        return new OpenTextResults(total, cats, uncategorized, recent, blankCount);
     }
 
     // All text answers for the categorisation page (not just recent 10).

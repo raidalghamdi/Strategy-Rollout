@@ -80,10 +80,36 @@
         }
         else if (c.Type == QuestionType.OpenText && c.OpenText != null)
         {
-            <p class="fw-bold text-success">إجمالي: @c.OpenText.TotalResponses · غير مصنّف: @c.OpenText.UncategorizedCount</p>
+            @* Phase 20.33 (Comment 11) — dual-denominator summary + categories table *@
+            <p class="fw-bold text-success">
+                إجمالي: @c.OpenText.TotalResponses ·
+                مصنّف: @(c.OpenText.TotalResponses - c.OpenText.UncategorizedCount - c.OpenText.BlankCount) ·
+                غير مصنّف: @c.OpenText.UncategorizedCount
+                @if (c.OpenText.BlankCount > 0) { <span> · فارغ: @c.OpenText.BlankCount</span> }
+            </p>
             @if (c.OpenText.Categories.Any())
             {
-                <div class="chart-wrap" style="height:200px;"><canvas id="rep-@c.Order"></canvas></div>
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <div class="chart-wrap" style="height:200px;"><canvas id="rep-@c.Order"></canvas></div>
+                    </div>
+                    <div class="col-md-7">
+                        <table class="table table-sm">
+                            <thead><tr><th>الفئة</th><th>ع</th><th title="من المصنّفين">% مصنّف</th><th title="من جميع المجيبين">% الكل</th></tr></thead>
+                            <tbody>
+                                @foreach (var cat in c.OpenText.Categories)
+                                {
+                                    <tr>
+                                        <td>@cat.Category</td>
+                                        <td>@cat.Count</td>
+                                        <td>@cat.Percent.ToString("0.#")%</td>
+                                        <td class="text-muted">@cat.PercentOfAll.ToString("0.#")%</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             }
         }
 
@@ -105,6 +131,7 @@
 }
 
 @section Scripts {
+@* Phase 20.33 (Comment 7) — Chart.js with fallback CDN *@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 (function () {
@@ -159,7 +186,17 @@
 })();
 </script>
 <script>
-(function () {
+(function() {
+    if (typeof Chart === 'undefined') {
+        var s = document.createElement('script');
+        s.src = 'https://unpkg.com/chart.js@4.4.1/dist/chart.umd.min.js';
+        s.onload = function() { if (typeof window._initFinalCharts === 'function') window._initFinalCharts(); };
+        document.head.appendChild(s);
+    }
+})();
+</script>
+<script>
+window._initFinalCharts = function () {
     if (typeof Chart === 'undefined') return;
     var cards = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
         Model.Cards.Select(c => new {
@@ -181,6 +218,7 @@
             new Chart(el, { type: 'doughnut', data: { labels: c.cats.map(x => x.label), datasets: [{ data: c.cats.map(x => x.count), backgroundColor: palette }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
         }
     });
-})();
+};
+window._initFinalCharts();
 </script>
 }

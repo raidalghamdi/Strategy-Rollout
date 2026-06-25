@@ -28,7 +28,8 @@ public class SurveyAnalyticsViewModel
     public List<QuestionCard> Cards { get; set; } = new();
 }
 
-public record OpenTextQuestionLink(Guid QuestionId, int Order, string QuestionAr, int Total, int Uncategorized);
+// Phase 20.33 (Comment 12) — added BlankCount for blank vs uncategorized transparency
+public record OpenTextQuestionLink(Guid QuestionId, int Order, string QuestionAr, int Total, int Uncategorized, int BlankCount = 0);
 
 public class CategorizeViewModel
 {

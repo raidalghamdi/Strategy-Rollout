@@ -27,6 +27,11 @@ public class ExecutiveReportViewModel
     public ExecLeadershipRisks LeadershipRisks { get; set; } = new();
     public ExecLeadershipMaturity LeadershipMaturity { get; set; } = new();
     public List<string> LeadershipRecommendations { get; set; } = new();
+
+    // Phase 20.33 (Comment 4) — three-level detail
+    public List<ExecIndividualRow> IndividualRows { get; set; } = new();
+    public List<ExecDepartmentRowV2> DepartmentRowsV2 { get; set; } = new();
+    public List<ExecSectorRow> SectorRows { get; set; } = new();
 }
 
 public class ExecOverview
@@ -114,6 +119,38 @@ public class ExecNameCount
 {
     public string Name { get; set; } = "";
     public int Count { get; set; }
+}
+
+// Phase 20.33 (Comment 4) — individual employee row in executive report
+public class ExecIndividualRow
+{
+    public string Email { get; set; } = "";
+    public string FullNameAr { get; set; } = "";
+    public string DeptCode { get; set; } = "";
+    public string DeptName { get; set; } = "";
+    public string SectorName { get; set; } = "";
+    public double? QuizScore { get; set; }  // 0..5 or null
+    public double? CompletionMinutes { get; set; }
+    public bool Completed { get; set; }
+    public DateTime? CompletedAt { get; set; }
+}
+
+// Phase 20.33 (Comment 4) — sector-level aggregate row
+public class ExecSectorRow
+{
+    public string SectorName { get; set; } = "";
+    public int SessionsCount { get; set; }
+    public int AttendeesCount { get; set; }
+    public double CompletionRate { get; set; }  // 0..100
+    public double AvgCompletionMinutes { get; set; }
+    public List<string> DeptNames { get; set; } = new();
+}
+
+// Phase 20.33 (Comment 4) — extended department row with avg completion time
+public class ExecDepartmentRowV2 : ExecDepartmentRow
+{
+    public string SectorName { get; set; } = "";
+    public double AvgCompletionMinutes { get; set; }
 }
 
 // Phase 16 — distribution of the "team value" each department chose in stage 3.

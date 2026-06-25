@@ -147,7 +147,8 @@ public class OpenTextAutoCategorizer
     /// normalised — must match output of Normalize().
     /// Order in the list = priority (most specific first).
     /// </summary>
-    private static List<(string Category, string[] Keywords)>? GetRules(int order)
+    // Phase 20.33 (Comment 12) — made public so Analytics view can display keyword rules
+    public static List<(string Category, string[] Keywords)>? GetRules(int order)
     {
         return order switch
         {

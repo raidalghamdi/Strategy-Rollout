@@ -16,16 +16,17 @@
 </div>
 <p class="muted">المستخدمون لا يُحذفون نهائياً — التعطيل يحافظ على سجل التدقيق. حسابات الأدمن المحمية لا يمكن تعديلها أو إعادة تسميتها من هذه الواجهة.</p>
 
+@* Phase 20.33 (Comment 6) — Mobile responsive: hide low-priority columns on small screens *@
 <div class="table-responsive">
     <table class="table table-hover align-middle" style="background:#fff;">
         <thead>
             <tr>
                 <th>اسم المستخدم</th>
-                <th>الاسم</th>
+                <th class="d-none d-md-table-cell">الاسم</th>
                 <th>الدور</th>
-                <th>نطاق الرحلة</th>
+                <th class="d-none d-lg-table-cell">نطاق الرحلة</th>
                 <th>الحالة</th>
-                <th>آخر دخول</th>
+                <th class="d-none d-md-table-cell">آخر دخول</th>
                 <th></th>
             </tr>
         </thead>
@@ -34,17 +35,19 @@
         {
             <tr>
                 <td>
-                    @u.UserName
+                    <div>@u.UserName</div>
+                    @* On mobile, show name under username *@
+                    <div class="d-md-none small text-muted">@u.FullNameAr</div>
                     @if (u.IsProtected)
                     {
                         <span class="badge bg-warning text-dark ms-1" title="حساب أدمن محمي — لا يمكن تعديله أو حذفه">محمي</span>
                     }
                 </td>
-                <td>@u.FullNameAr</td>
+                <td class="d-none d-md-table-cell">@u.FullNameAr</td>
                 <td>@u.AppRole</td>
-                <td><span class="small">@(u.JourneyScopeKey ?? "—")</span></td>
+                <td class="d-none d-lg-table-cell"><span class="small">@(u.JourneyScopeKey ?? "—")</span></td>
                 <td>@(u.IsActive ? Html.Raw("<span class='badge bg-success'>نشط</span>") : Html.Raw("<span class='badge bg-secondary'>معطّل</span>"))</td>
-                <td><span class="small">@(u.LastLoginAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—")</span></td>
+                <td class="d-none d-md-table-cell"><span class="small">@(u.LastLoginAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—")</span></td>
                 <td class="text-nowrap">
                     @if (u.IsProtected)
                     {
@@ -52,16 +55,18 @@
                     }
                     else
                     {
-                        <a href="/Admin/Users/Edit/@u.Id" class="btn btn-sm btn--secondary">تعديل</a>
-                        <a href="/Admin/Users/Rename/@u.Id" class="btn btn-sm btn--secondary">إعادة تسمية</a>
-                        <a href="/Admin/Users/ResetPassword/@u.Id" class="btn btn-sm btn--secondary">كلمة المرور</a>
-                        @if (u.IsActive)
-                        {
-                            <form method="post" action="/Admin/Users/Delete/@u.Id" style="display:inline;" onsubmit="return confirm('تعطيل هذا المستخدم؟');">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn--danger">تعطيل</button>
-                            </form>
-                        }
+                        <div class="d-flex flex-wrap gap-1">
+                            <a href="/Admin/Users/Edit/@u.Id" class="btn btn-sm btn--secondary">تعديل</a>
+                            <a href="/Admin/Users/Rename/@u.Id" class="btn btn-sm btn--secondary d-none d-md-inline-flex">إعادة تسمية</a>
+                            <a href="/Admin/Users/ResetPassword/@u.Id" class="btn btn-sm btn--secondary">كلمة المرور</a>
+                            @if (u.IsActive)
+                            {
+                                <form method="post" action="/Admin/Users/Delete/@u.Id" style="display:inline;" onsubmit="return confirm('تعطيل هذا المستخدم؟');">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn--danger">تعطيل</button>
+                                </form>
+                            }
+                        </div>
                     }
                 </td>
             </tr>

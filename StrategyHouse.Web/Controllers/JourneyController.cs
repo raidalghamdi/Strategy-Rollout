@@ -1230,12 +1230,11 @@ public class JourneyController : Controller
     {
         var session = await LoadSessionAsync(sessionId);
         if (session == null) return NotFound();
-        if (session.CompletedAt == null)
-        {
-            var tracked = await _db.StrategySessions.FindAsync(sessionId);
-            tracked!.CompletedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
-        }
+        // Phase 20.33 — CompletedAt is now set when the quiz is submitted
+        // (see QuizController.Submit). This page is the final landing screen
+        // after sign + (optional) quiz; it no longer mutates the session, so
+        // sessions that reach here without taking the quiz remain accurately
+        // marked as incomplete.
         ViewBag.Dept = await _db.Departments.FindAsync(session.DeptCode);
         ViewBag.Map = await _db.DepartmentStrategyMaps.FirstOrDefaultAsync(m => m.SessionId == sessionId);
         return View(session);

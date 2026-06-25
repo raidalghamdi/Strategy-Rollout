@@ -18,6 +18,9 @@ public interface IJourneyScopeService
     Task<List<string>> GetVisibleDeptCodesAsync(ClaimsPrincipal user);
     Task<string?> GetSectorKeyAsync(ClaimsPrincipal user);
     Task<bool> IsGlobalAsync(ClaimsPrincipal user);
+    // Phase 20.33 (Comment 5) — variant for AppUser entity (avoids re-loading from Claims)
+    Task<List<string>> GetScopeFilteredDeptCodesAsync(AppUser user);
+    bool IsGlobalRole(ClaimsPrincipal user);
 }
 
 public class JourneyScopeService : IJourneyScopeService
@@ -48,9 +51,35 @@ public class JourneyScopeService : IJourneyScopeService
 
     public async Task<bool> IsGlobalAsync(ClaimsPrincipal user)
     {
-        if (user.IsInRole("Admin")) return true;
+        if (user.IsInRole("Admin") || user.IsInRole("CX")) return true;
         var key = await GetSectorKeyAsync(user);
         return key is "GLOBAL" or "TEST";
+    }
+
+    // Phase 20.33 (Comment 5) — synchronous role check (no DB round-trip needed)
+    public bool IsGlobalRole(ClaimsPrincipal user)
+        => user.IsInRole("Admin") || user.IsInRole("CX") || user.IsInRole("gac.admin");
+
+    // Phase 20.33 (Comment 5) — scope filter given a loaded AppUser (used by report services)
+    public async Task<List<string>> GetScopeFilteredDeptCodesAsync(AppUser user)
+    {
+        // Admin and CX see everything
+        if (user.AppRole == Domain.Enums.UserRole.Admin ||
+            user.AppRole == Domain.Enums.UserRole.CX)
+            return await _db.Departments.OrderBy(d => d.DeptCode).Select(d => d.DeptCode).ToListAsync();
+
+        var key = user.JourneyScopeKey;
+        if (string.IsNullOrEmpty(key) || key is "GLOBAL" or "TEST")
+            return await _db.Departments.OrderBy(d => d.DeptCode).Select(d => d.DeptCode).ToListAsync();
+
+        if (SectorByKey.TryGetValue(key, out var sector))
+            return await _db.Departments
+                .Where(d => d.ParentSector == sector)
+                .OrderBy(d => d.DeptCode)
+                .Select(d => d.DeptCode)
+                .ToListAsync();
+
+        return new List<string>();
     }
 
     public async Task<List<string>> GetVisibleDeptCodesAsync(ClaimsPrincipal user)

@@ -13,7 +13,8 @@ namespace StrategyHouse.Web.Controllers;
 // Phase 12 — admin surface for the official 8-question survey: per-question analytics
 // with the spec's measurement metrics, open-text categorisation, reseed, and the final
 // report (HTML + branded PDF). Operates on the single seeded official survey.
-[Authorize(Roles = "Admin,Facilitator")]
+// Phase 20.33 (Comment 8) — CX role: read + upload + export, but not reseed.
+[Authorize(Roles = "Admin,Facilitator,CX")]
 [Route("Admin/Survey")]
 public class AdminSurveyController : Controller
 {
@@ -58,6 +59,7 @@ public class AdminSurveyController : Controller
     }
 
     [HttpPost("Reseed")]
+    [Authorize(Roles = "Admin,Facilitator")] // Phase 20.33 — CX cannot reseed
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Reseed()
     {
@@ -79,7 +81,8 @@ public class AdminSurveyController : Controller
         foreach (var q in qs)
         {
             var r = await _analytics.GetOpenTextResultsAsync(q.Id);
-            items.Add(new OpenTextQuestionLink(q.Id, q.Order, q.QuestionAr, r.TotalResponses, r.UncategorizedCount));
+            // Phase 20.33 (Comment 12) — pass BlankCount to index
+            items.Add(new OpenTextQuestionLink(q.Id, q.Order, q.QuestionAr, r.TotalResponses, r.UncategorizedCount, r.BlankCount));
         }
         return View(items);
     }
@@ -312,13 +315,25 @@ public class AdminSurveyController : Controller
         if (model.Takeaways.Count < 3 && q8 != null && q8.Total > 0)
             model.Takeaways.Add($"القدرة على المساهمة: متوسط {q8.Mean:0.##} / 5 ({q8.PctHigh:0.#}% بقدرة عالية).");
 
-        // Overall insights.
-        var officialValues = new[] { "الشفافية", "التعاون", "التميز", "العدالة", "الابتكار" };
+        // Phase 20.33 (Comment 9) — Overall insights: single source of truth from Q3 MCQ + Q5 categorized.
+        // Q3 = MCQ "أبرز نقطة قوة" (choices: الشفافية، التعاون، التميز، العدالة، الابتكار)
+        // Q5 = OpenText "أهم القيم" (categorized free-text responses)
+        // Both are read live from SurveyAnalyticsService — no hardcoded labels.
         var q3 = analytics.Cards.FirstOrDefault(c => c.Order == 3)?.Choices;
         if (q3 != null && q3.Any(c => c.Count > 0))
         {
-            var top = q3.First();
-            model.Insights.Add($"التوافق مع القيم الرسمية: القيمة الأبرز لدى الموظفين هي \"{top.ChoiceText}\" — وجميع الخيارات ضمن القيم الرسمية المعتمدة ({string.Join("، ", officialValues)}).");
+            var ranked = q3.Where(c => c.Count > 0).OrderByDescending(c => c.Count).ToList();
+            var top = ranked.First();
+            model.Insights.Add($"سؤال 3 — أبرز نقطة قوة: \"{top.ChoiceText}\" بنسبة {top.Percent:0.#}% ({top.Count} إجابة). "
+                + $"توزيع كامل: {string.Join(" و ", ranked.Take(5).Select(c => $"{c.ChoiceText}: {c.Percent:0.#}%"))}.");
+        }
+        var q5card = analytics.Cards.FirstOrDefault(c => c.Order == 5);
+        if (q5card?.OpenText != null && q5card.OpenText.TotalResponses > 0)
+        {
+            var topCat = q5card.OpenText.Categories.FirstOrDefault();
+            if (topCat != null)
+                model.Insights.Add($"سؤال 5 — أبرز قيمة مذكورة (إجابات حرة مصنّفة): \"{topCat.Category}\" ({topCat.Count} إجابة، {topCat.Percent:0.#}% من إجمالي {q5card.OpenText.TotalResponses}). "
+                    + (q5card.OpenText.UncategorizedCount > 0 ? $"غير مصنّف: {q5card.OpenText.UncategorizedCount}" : "كل الإجابات مصنّفة."));
         }
         if (q1 != null && q8 != null && q1.Total > 0 && q8.Total > 0)
         {

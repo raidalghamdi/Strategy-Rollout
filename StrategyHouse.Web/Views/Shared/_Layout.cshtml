@@ -86,36 +86,46 @@
                 }
                 else
                 {
-                    <a class="@activeIf("Home")" href="/">الرئيسية</a>
+                    @* Phase 20.33 (Comment 8) — CX role has limited nav *@
+                    var _isCX = User.IsInRole("CX");
 
-                    <div class="group-title">المراقبة</div>
-                    <a class="@activeIf("Admin")" href="/Admin/LiveDashboard">اللوحة الحية</a>
-                    <a class="@activeIf("Admin")" href="/Admin">لوحة المعلومات</a>
+                    @if (!_isCX)
+                    {
+                        <a class="@activeIf("Home")" href="/">الرئيسية</a>
 
-                    <div class="group-title">الرحلة الاستراتيجية</div>
-                    <a class="@activeIf("Journey")" href="/Journey">الرحلة</a>
+                        <div class="group-title">المراقبة</div>
+                        <a class="@activeIf("Admin")" href="/Admin/LiveDashboard">اللوحة الحية</a>
+                        <a class="@activeIf("Admin")" href="/Admin">لوحة المعلومات</a>
 
-                    <div class="group-title">الاختبار</div>
-                    <a class="@activeIf("AdminQuiz")" href="/Admin/Quiz">إدارة الاختبار</a>
+                        <div class="group-title">الرحلة الاستراتيجية</div>
+                        <a class="@activeIf("Journey")" href="/Journey">الرحلة</a>
+
+                        <div class="group-title">الاختبار</div>
+                        <a class="@activeIf("AdminQuiz")" href="/Admin/Quiz">إدارة الاختبار</a>
+                    }
 
                     <div class="group-title">الاستبيان</div>
-                    <a class="@activeIf("AdminSurveys")" href="/Admin/Surveys">الاستبيان</a>
+                    <a class="@activeIf("AdminSurveys")" href="/Admin/Surveys">رفع نتائج الاستبيان</a>
                     <a class="@activeIf("AdminSurvey")" href="/Admin/Survey/Analytics">تحليلات الاستبيان الرسمي</a>
+                    <a class="@activeIf("AdminSurvey")" href="/Admin/Survey/FinalReport">التقرير النهائي للاستبيان</a>
 
                     <div class="group-title">التقارير</div>
                     <a class="@activeIf("AdminExecutiveReport")" href="/Admin/ExecutiveReport">التقرير التنفيذي</a>
 
-                    <div class="group-title">الإعدادات</div>
-                    <a class="@activeIf("AdminCodes")" href="/Admin/Codes">رموز الدخول</a>
-                    <a class="@activeIf("Admin")" href="/Admin/Content">تحرير النصوص</a>
-
-                    @if (User.IsInRole("Admin"))
+                    @if (!_isCX)
                     {
-                        <div class="group-title">الإدارة المتقدمة</div>
-                        <a class="@activeIf("AdminUsers")" href="/Admin/Users">إدارة المستخدمين</a>
-                        <a class="@activeIf("AdminJourneyReset")" href="/Admin/JourneyReset">إعادة تشغيل رحلة إدارة</a>
-                        <a class="@activeIf("AdminTestResults")" href="/Admin/TestResults">حذف نتائج الاختبار</a>
-                        <a class="@activeIf("AdminAuditLog")" href="/Admin/AuditLog">سجل التدقيق</a>
+                        <div class="group-title">الإعدادات</div>
+                        <a class="@activeIf("AdminCodes")" href="/Admin/Codes">رموز الدخول</a>
+                        <a class="@activeIf("Admin")" href="/Admin/Content">تحرير النصوص</a>
+
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <div class="group-title">الإدارة المتقدمة</div>
+                            <a class="@activeIf("AdminUsers")" href="/Admin/Users">إدارة المستخدمين</a>
+                            <a class="@activeIf("AdminJourneyReset")" href="/Admin/JourneyReset">إعادة تشغيل رحلة إدارة</a>
+                            <a class="@activeIf("AdminTestResults")" href="/Admin/TestResults">حذف نتائج الاختبار</a>
+                            <a class="@activeIf("AdminAuditLog")" href="/Admin/AuditLog">سجل التدقيق</a>
+                        }
                     }
                 }
             </nav>

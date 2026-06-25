@@ -12,7 +12,8 @@ using StrategyHouse.Web.Services;
 namespace StrategyHouse.Web.Controllers;
 
 // Phase 2 — leadership analytics. No schema changes; all aggregation off existing tables.
-[Authorize(Roles = "Admin,Facilitator")]
+// Phase 20.33 (Comment 8) — CX role can upload survey files and view survey insights
+[Authorize(Roles = "Admin,Facilitator,CX")]
 [Route("Admin/Insights")]
 public class AdminInsightsController : Controller
 {
@@ -287,6 +288,7 @@ public class AdminInsightsController : Controller
 
     // POST /Admin/Insights/Survey/Reset — password-gated: delete data + revert survey URL.
     [HttpPost("Survey/Reset")]
+    [Authorize(Roles = "Admin,Facilitator")] // Phase 20.33 — CX cannot reset
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SurveyReset(string password)
     {

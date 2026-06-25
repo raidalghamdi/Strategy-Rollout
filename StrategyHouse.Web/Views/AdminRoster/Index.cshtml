@@ -47,10 +47,11 @@
     <table class="table table-striped" style="background:#fff;">
         <thead>
             <tr>
+                @* Phase 20.33 (Comment 6) — hide low-priority cols on mobile *@
                 <th>الإدارة</th>
                 <th>الاسم</th>
-                <th>الدور</th>
-                <th>البريد الإلكتروني</th>
+                <th class="d-none d-md-table-cell">الدور</th>
+                <th class="d-none d-md-table-cell">البريد الإلكتروني</th>
                 <th>الحالة</th>
                 <th></th>
             </tr>
@@ -71,8 +72,8 @@
                         }
                     </td>
                     <td>@m.NameAr</td>
-                    <td>@m.Role</td>
-                    <td style="direction:ltr;text-align:left;">
+                    <td class="d-none d-md-table-cell">@m.Role</td>
+                    <td class="d-none d-md-table-cell" style="direction:ltr;text-align:left;">
                         @if (!string.IsNullOrWhiteSpace(m.Email))
                         {
                             <span style="font-weight:600;">@m.Email</span>

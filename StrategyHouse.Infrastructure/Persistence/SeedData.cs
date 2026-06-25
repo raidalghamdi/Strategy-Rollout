@@ -48,7 +48,7 @@ public static class SeedData
         UserManager<AppUser> userManager,
         RoleManager<IdentityRole<int>> roleManager)
     {
-        foreach (var role in new[] { "Admin", "Facilitator", "Viewer" })
+        foreach (var role in new[] { "Admin", "Facilitator", "Viewer", "CX" })
         {
             if (!await roleManager.RoleExistsAsync(role))
                 await roleManager.CreateAsync(new IdentityRole<int>(role));
@@ -119,6 +119,36 @@ public static class SeedData
             // Ensure the Admin role assignment exists even on legacy DBs.
             if (!await userManager.IsInRoleAsync(adminUser, "Admin"))
                 await userManager.AddToRoleAsync(adminUser, "Admin");
+        }
+
+        // Phase 20.33 (Comment 8) — seed default CX user (idempotent)
+        var cxUser = await userManager.FindByEmailAsync("cx@gac.gov.sa");
+        if (cxUser == null)
+        {
+            cxUser = new AppUser
+            {
+                UserName = "cx@gac.gov.sa",
+                Email = "cx@gac.gov.sa",
+                EmailConfirmed = true,
+                FullNameAr = "مستخدم CX",
+                AppRole = UserRole.CX,
+                IsActive = true,
+            };
+            var createCx = await userManager.CreateAsync(cxUser, "CX@2026Strong");
+            if (createCx.Succeeded)
+            {
+                await userManager.AddToRoleAsync(cxUser, "CX");
+                Console.WriteLine("[SeedData] CX user cx@gac.gov.sa created.");
+            }
+            else
+            {
+                Console.WriteLine($"[SeedData] Failed to create CX user: {string.Join("; ", createCx.Errors.Select(e => e.Description))}");
+            }
+        }
+        else
+        {
+            if (!await userManager.IsInRoleAsync(cxUser, "CX"))
+                await userManager.AddToRoleAsync(cxUser, "CX");
         }
     }
 

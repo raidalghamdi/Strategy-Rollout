@@ -122,6 +122,100 @@
 </div>
 }
 
+@* Phase 20.33 (Comment 4) — Three-level detail: Individual / Department (v2) / Sector *@
+@if (Model.Sections.Has(ExecReportSections.Departments))
+{
+<div class="card mb-3">
+    <h2 class="h5">تفصيل القطاعات</h2>
+    @if (Model.SectorRows.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle table-sm" style="background:#fff;">
+                <thead class="table-dark">
+                    <tr><th>القطاع</th><th>الجلسات</th><th>الحضور</th><th>نسبة الإكمال</th><th>متوسط الوقت (د)</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Model.SectorRows)
+                    {
+                        <tr>
+                            <td><strong>@(string.IsNullOrEmpty(s.SectorName) ? "إدارات مستقلة" : s.SectorName)</strong></td>
+                            <td>@s.SessionsCount</td>
+                            <td>@s.AttendeesCount</td>
+                            <td>@s.CompletionRate.ToString("0.#")%</td>
+                            <td>@(s.AvgCompletionMinutes > 0 ? s.AvgCompletionMinutes.ToString("0.#") : "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else { <p class="muted">لا توجد بيانات قطاعات.</p> }
+</div>
+
+<div class="card mb-3">
+    <h2 class="h5">تفصيل الإدارات (موسع)</h2>
+    @if (Model.DepartmentRowsV2.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle table-sm" style="background:#fff;">
+                <thead>
+                    <tr><th>الإدارة</th><th>القطاع</th><th>الجلسات</th><th>الحضور</th><th>نسبة الإكمال</th><th>متوسط الوقت (د)</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in Model.DepartmentRowsV2)
+                    {
+                        <tr>
+                            <td><strong>@d.DeptName</strong></td>
+                            <td class="d-none d-md-table-cell">@(string.IsNullOrEmpty(d.SectorName) ? "—" : d.SectorName)</td>
+                            <td>@d.SessionsCount</td>
+                            <td>@d.AttendeesCount</td>
+                            <td>@d.CompletionRate.ToString("0.#")%</td>
+                            <td>@(d.AvgCompletionMinutes > 0 ? d.AvgCompletionMinutes.ToString("0.#") : "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else { <p class="muted">لا توجد بيانات إدارات.</p> }
+</div>
+
+<div class="card mb-3">
+    <h2 class="h5">مستوى الموظفين (من سجل الحضور)</h2>
+    @if (Model.IndividualRows.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-sm align-middle" style="background:#fff;">
+                <thead>
+                    <tr>
+                        <th>الاسم</th>
+                        <th class="d-none d-md-table-cell">البريد الإلكتروني</th>
+                        <th>الإدارة</th>
+                        <th class="d-none d-md-table-cell">القطاع</th>
+                        <th>مكتمل?</th>
+                        <th class="d-none d-md-table-cell">وقت الإكمال (د)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var emp in Model.IndividualRows)
+                    {
+                        <tr>
+                            <td>@emp.FullNameAr</td>
+                            <td class="d-none d-md-table-cell"><span class="small">@(string.IsNullOrEmpty(emp.Email) ? "—" : emp.Email)</span></td>
+                            <td><span class="small">@emp.DeptName</span></td>
+                            <td class="d-none d-md-table-cell"><span class="small">@(string.IsNullOrEmpty(emp.SectorName) ? "—" : emp.SectorName)</span></td>
+                            <td>@(emp.Completed ? Html.Raw("<span class='badge bg-success'>مكتمل</span>") : Html.Raw("<span class='badge bg-secondary'>لم يكتمل</span>"))</td>
+                            <td class="d-none d-md-table-cell">@(emp.CompletionMinutes.HasValue ? emp.CompletionMinutes.Value.ToString("0.#") : "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else { <p class="muted">لا يوجد أعضاء في سجل الحضور بعد.</p> }
+</div>
+}
+
 @if (Model.Sections.Has(ExecReportSections.Quiz) || Model.Sections.Has(ExecReportSections.Survey))
 {
 <div class="grid-2 mb-3">
@@ -382,7 +476,19 @@
 }
 
 @section Scripts {
+@* Phase 20.33 (Comment 7) — load Chart.js with fallback mirror CDN to fix blank chart areas *@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+// Fallback: if CDN failed to load Chart.js, try unpkg mirror
+(function() {
+    if (typeof Chart === 'undefined') {
+        var s = document.createElement('script');
+        s.src = 'https://unpkg.com/chart.js@4.4.1/dist/chart.umd.min.js';
+        s.onload = function() { if (typeof window._initCharts === 'function') window._initCharts(); };
+        document.head.appendChild(s);
+    }
+})();
+</script>
 <script>
 (function () {
     var openBtn = document.getElementById('btn-email-report');
@@ -437,7 +543,8 @@
 })();
 </script>
 <script>
-(function () {
+// Phase 20.33 (Comment 7) — named init so fallback CDN can call it
+window._initCharts = function() {
     if (typeof Chart === 'undefined') return;
 
     var deptLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DepartmentBreakdown.Select(d => d.DeptName)));
@@ -460,7 +567,9 @@
     if (elClarity) {
         new Chart(elClarity, { type: 'bar', data: { labels: ['1', '2', '3', '4', '5'], datasets: [{ label: 'التكرار', data: clarityDist, backgroundColor: '#299ECE' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } } });
     }
-})();
+};
+// Call immediately if Chart.js is already loaded
+window._initCharts();
 </script>
 <script>
 (function () {

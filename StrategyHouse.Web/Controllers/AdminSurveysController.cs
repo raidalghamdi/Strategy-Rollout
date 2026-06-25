@@ -10,7 +10,8 @@ using StrategyHouse.Web.Services;
 namespace StrategyHouse.Web.Controllers;
 
 // Phase 4 — admin authoring & reporting for programme surveys.
-[Authorize(Roles = "Admin,Facilitator")]
+// Phase 20.33 (Comment 8) — CX role gets Import access.
+[Authorize(Roles = "Admin,Facilitator,CX")]
 [Route("Admin/Surveys")]
 public class AdminSurveysController : Controller
 {
@@ -61,6 +62,7 @@ public class AdminSurveysController : Controller
     }
 
     [HttpPost("Create")]
+    [Authorize(Roles = "Admin,Facilitator")] // Phase 20.33 — CX cannot create surveys
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(string titleAr, string? descriptionAr)
     {

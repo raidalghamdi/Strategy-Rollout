@@ -31,7 +31,12 @@ else
                 <div class="card h-100">
                     <h2 class="h6">السؤال @q.Order</h2>
                     <p>@q.QuestionAr</p>
-                    <p class="muted small">إجمالي الإجابات: @q.Total · غير مصنّف: @q.Uncategorized</p>
+                    @* Phase 20.33 (Comment 12) — show blank vs uncategorized *@
+                    <p class="muted small">
+                        إجمالي: @q.Total ·
+                        غير مصنّف: @q.Uncategorized
+                        @if (q.BlankCount > 0) { <span> · فارغ: @q.BlankCount</span> }
+                    </p>
                     <a href="/Admin/Survey/Categorize/@q.QuestionId" class="btn btn--primary btn-sm">فتح التصنيف</a>
                 </div>
             </div>

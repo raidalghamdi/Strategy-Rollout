@@ -70,5 +70,7 @@ public enum UserRole
 {
     Admin = 1,
     Facilitator = 2,
-    Viewer = 3
+    Viewer = 3,
+    // Phase 20.33 (Comment 8) — CX role: survey + executive report access, no DB import/export
+    CX = 4
 }

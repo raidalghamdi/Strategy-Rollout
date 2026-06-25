@@ -80,6 +80,9 @@ public class ExecutiveReportService
 
         vm.MapsCount = await _db.DepartmentStrategyMaps.CountAsync();
 
+        // Phase 20.33 (Comment 4) — build the three-level detail tables
+        await BuildThreeLevelDetailAsync(vm, sessions, deptNames);
+
         // ----- Phase 14 leadership analytics (depend on the above) -----
         await BuildLeadershipAlignmentAsync(vm);
         BuildLeadershipCulture(vm, sessions, deptNames);
@@ -483,6 +486,100 @@ public class ExecutiveReportService
 
         // Cap at 8 per the spec.
         if (recs.Count > 8) vm.LeadershipRecommendations = recs.Take(8).ToList();
+    }
+
+    // ----- Phase 20.33 (Comment 4) — three-level detail -----
+
+    private async Task BuildThreeLevelDetailAsync(
+        ExecutiveReportViewModel vm,
+        List<Domain.Entities.StrategySession> sessions,
+        Dictionary<string, string> deptNames)
+    {
+        // Load departments with their sector
+        var depts = await _db.Departments.AsNoTracking().ToListAsync();
+        var deptSector = depts.ToDictionary(d => d.DeptCode, d => d.ParentSector ?? "");
+
+        // --- Individual level: roster members with session info ---
+        var roster = await _db.DepartmentRoster.AsNoTracking().Where(r => r.IsActive).ToListAsync();
+
+        // Build a map: deptCode → list of completed sessions (for avg time)
+        var sessionsByDept = sessions
+            .GroupBy(s => s.DeptCode)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        foreach (var member in roster.OrderBy(r => r.DeptCode).ThenBy(r => r.NameAr))
+        {
+            var deptSessions = sessionsByDept.TryGetValue(member.DeptCode, out var ss) ? ss : new();
+            var completed = deptSessions.Where(s => s.CompletedAt != null).ToList();
+            double? avgTime = completed.Count > 0
+                ? completed.Average(s => (s.CompletedAt!.Value - s.StartedAt).TotalMinutes)
+                : null;
+
+            vm.IndividualRows.Add(new Models.ExecIndividualRow
+            {
+                Email = member.Email ?? "",
+                FullNameAr = member.NameAr,
+                DeptCode = member.DeptCode,
+                DeptName = deptNames.TryGetValue(member.DeptCode, out var dn) ? dn : member.DeptCode,
+                SectorName = deptSector.TryGetValue(member.DeptCode, out var sec) ? sec : "",
+                Completed = deptSessions.Any(s => s.CompletedAt != null),
+                CompletedAt = completed.OrderByDescending(s => s.CompletedAt).FirstOrDefault()?.CompletedAt,
+                CompletionMinutes = avgTime.HasValue ? Math.Round(avgTime.Value, 1) : null,
+            });
+        }
+
+        // --- Department level (V2 with sector + avg time) ---
+        vm.DepartmentRowsV2 = sessions
+            .GroupBy(s => s.DeptCode)
+            .Select(g =>
+            {
+                var completed = g.Where(s => s.CompletedAt != null).ToList();
+                double avgMin = completed.Count > 0
+                    ? Math.Round(completed.Average(s => (s.CompletedAt!.Value - s.StartedAt).TotalMinutes), 1)
+                    : 0;
+                return new Models.ExecDepartmentRowV2
+                {
+                    DeptCode = g.Key,
+                    DeptName = deptNames.TryGetValue(g.Key, out var n) ? n : g.Key,
+                    SectorName = deptSector.TryGetValue(g.Key, out var sec) ? sec : "",
+                    SessionsCount = g.Count(),
+                    AttendeesCount = g.Sum(s => s.AttendeeCount ?? 0),
+                    CompletionRate = g.Any() ? Math.Round(100.0 * g.Count(s => s.CompletedAt != null) / g.Count(), 1) : 0,
+                    AvgCompletionMinutes = avgMin,
+                };
+            })
+            .OrderByDescending(r => r.AttendeesCount).ThenBy(r => r.DeptName)
+            .ToList();
+
+        // --- Sector level ---
+        var sectorRows = new Dictionary<string, Models.ExecSectorRow>();
+        foreach (var row in vm.DepartmentRowsV2)
+        {
+            var sector = string.IsNullOrEmpty(row.SectorName) ? "إدارات مستقلة" : row.SectorName;
+            if (!sectorRows.TryGetValue(sector, out var sr))
+            {
+                sr = new Models.ExecSectorRow { SectorName = sector };
+                sectorRows[sector] = sr;
+            }
+            sr.SessionsCount += row.SessionsCount;
+            sr.AttendeesCount += row.AttendeesCount;
+            sr.DeptNames.Add(row.DeptName);
+        }
+        // Compute completion rate and avg time at sector level from raw sessions
+        foreach (var (sectorName, sr) in sectorRows)
+        {
+            var deptCodes = depts
+                .Where(d => (string.IsNullOrEmpty(d.ParentSector) ? "إدارات مستقلة" : d.ParentSector) == sectorName)
+                .Select(d => d.DeptCode).ToHashSet();
+            var sectorSessions = sessions.Where(s => deptCodes.Contains(s.DeptCode)).ToList();
+            if (sectorSessions.Count > 0)
+                sr.CompletionRate = Math.Round(100.0 * sectorSessions.Count(s => s.CompletedAt != null) / sectorSessions.Count, 1);
+            var sectorCompleted = sectorSessions.Where(s => s.CompletedAt != null).ToList();
+            sr.AvgCompletionMinutes = sectorCompleted.Count > 0
+                ? Math.Round(sectorCompleted.Average(s => (s.CompletedAt!.Value - s.StartedAt).TotalMinutes), 1)
+                : 0;
+        }
+        vm.SectorRows = sectorRows.Values.OrderByDescending(r => r.AttendeesCount).ThenBy(r => r.SectorName).ToList();
     }
 
     // ----- small text utilities -----

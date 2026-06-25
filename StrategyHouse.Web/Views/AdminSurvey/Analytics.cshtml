@@ -1,4 +1,5 @@
 @using StrategyHouse.Domain.Enums
+@using StrategyHouse.Web.Services
 @model StrategyHouse.Web.Models.SurveyAnalyticsViewModel
 @{
     ViewData["Title"] = "تحليلات الاستبيان الرسمي";
@@ -80,12 +81,33 @@
         }
         else if (c.Type == QuestionType.OpenText && c.OpenText != null)
         {
-            <p class="muted small">إجمالي: @c.OpenText.TotalResponses · غير مصنّف: @c.OpenText.UncategorizedCount</p>
+            @* Phase 20.33 (Comment 11) — dual-denominator summary line *@
+            <p class="muted small">
+                إجمالي: @c.OpenText.TotalResponses ·
+                مصنّف: @(c.OpenText.TotalResponses - c.OpenText.UncategorizedCount - c.OpenText.BlankCount) ·
+                غير مصنّف: @c.OpenText.UncategorizedCount
+                @if (c.OpenText.BlankCount > 0) { <span> · فارغ: @c.OpenText.BlankCount</span> }
+            </p>
             <div class="row g-3">
                 <div class="col-md-5">
                     @if (c.OpenText.Categories.Any())
                     {
                         <div class="chart-wrap" style="height:220px;"><canvas id="chart-@c.Order"></canvas></div>
+                        @* Phase 20.33 (Comment 11) — categories table with dual % *@
+                        <table class="table table-sm mt-2">
+                            <thead><tr><th>الفئة</th><th>العدد</th><th title="من المصنّفين">% مصنّف</th><th title="من جميع المجيبين">% الكل</th></tr></thead>
+                            <tbody>
+                                @foreach (var cat in c.OpenText.Categories)
+                                {
+                                    <tr>
+                                        <td>@cat.Category</td>
+                                        <td>@cat.Count</td>
+                                        <td>@cat.Percent.ToString("0.#")%</td>
+                                        <td class="text-muted">@cat.PercentOfAll.ToString("0.#")%</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
                     }
                     else { <p class="muted small">لا توجد فئات مصنّفة بعد.</p> }
                 </div>
@@ -103,6 +125,27 @@
                     </ul>
                 </div>
             </div>
+            @* Phase 20.33 (Comment 12) — keyword rules accordion *@
+            @if (OpenTextAutoCategorizer.GetRules(c.Order) is { } rules12)
+            {
+                <details class="mt-2">
+                    <summary class="muted small" style="cursor:pointer;">قواعد التصنيف التلقائي (السؤال @c.Order)</summary>
+                    <div class="table-responsive mt-1">
+                        <table class="table table-sm" style="font-size:0.78rem;">
+                            <thead><tr><th>الفئة</th><th>الكلمات المفتاحية</th></tr></thead>
+                            <tbody>
+                                @foreach (var (cat, kws) in rules12)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@cat</td>
+                                        <td class="muted">@string.Join("، ", kws)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+            }
             <a href="/Admin/Survey/Categorize/@c.QuestionId" class="btn btn--primary btn-sm mt-2">تصنيف الإجابات</a>
         }
     </div>
@@ -131,9 +174,20 @@
 </div>
 
 @section Scripts {
+@* Phase 20.33 (Comment 7) — Chart.js with fallback CDN *@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-(function () {
+(function() {
+    if (typeof Chart === 'undefined') {
+        var s = document.createElement('script');
+        s.src = 'https://unpkg.com/chart.js@4.4.1/dist/chart.umd.min.js';
+        s.onload = function() { if (typeof window._initSurveyCharts === 'function') window._initSurveyCharts(); };
+        document.head.appendChild(s);
+    }
+})();
+</script>
+<script>
+window._initSurveyCharts = function () {
     if (typeof Chart === 'undefined') return;
     var cards = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
         Model.Cards.Select(c => new {
@@ -167,6 +221,7 @@
             });
         }
     });
-})();
+};
+window._initSurveyCharts();
 </script>
 }

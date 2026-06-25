@@ -9,7 +9,8 @@ namespace StrategyHouse.Web.Controllers;
 
 // Phase 13 — the comprehensive executive report: HTML dashboard plus branded PDF, CSV,
 // PowerPoint and Excel exports (Phase 13.1), with optional email delivery.
-[Authorize(Roles = "Admin,Facilitator")]
+// Phase 20.33 (Comment 8) — CX role gets full executive report access
+[Authorize(Roles = "Admin,Facilitator,CX")]
 [Route("Admin")]
 public class AdminExecutiveReportController : Controller
 {

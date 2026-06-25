@@ -216,6 +216,28 @@ public class QuizController : Controller
             AnswersJson = JsonSerializer.Serialize(detail),
         };
         _db.QuizAttempts.Add(attempt);
+
+        // Phase 20.33 — mark the strategy session as complete the moment the
+        // quiz is submitted (one quiz attempt per session). Previously CompletedAt
+        // was only set after the map-sign + Complete page redirect, which left
+        // many sessions stuck at CompletedAt=NULL when facilitators closed the
+        // tab right after signing. Tying completion to quiz submission also
+        // makes the executive report's "avg completion time" reflect the actual
+        // learner experience end-to-end.
+        if (dto.SessionId.HasValue)
+        {
+            var session = await _db.StrategySessions.FindAsync(dto.SessionId.Value);
+            if (session != null && session.CompletedAt == null)
+            {
+                session.CompletedAt = DateTime.UtcNow;
+                session.LastActivityAt = DateTime.UtcNow;
+                if (string.Equals(session.Status, "InProgress", StringComparison.OrdinalIgnoreCase))
+                {
+                    session.Status = "Completed";
+                }
+            }
+        }
+
         await _db.SaveChangesAsync();
 
         return Json(new { ok = true, score, total = dto.Answers.Count, detail });
