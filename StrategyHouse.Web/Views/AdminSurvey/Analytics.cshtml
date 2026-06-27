@@ -175,19 +175,28 @@
 
 @section Scripts {
 @* Phase 20.33 (Comment 7) — Chart.js with fallback CDN *@
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/lib/chartjs/chart.umd.min.js" onload="if(typeof window._initSurveyCharts==='function')window._initSurveyCharts();"></script>
 <script>
-(function() {
-    if (typeof Chart === 'undefined') {
-        var s = document.createElement('script');
-        s.src = 'https://unpkg.com/chart.js@4.4.1/dist/chart.umd.min.js';
-        s.onload = function() { if (typeof window._initSurveyCharts === 'function') window._initSurveyCharts(); };
-        document.head.appendChild(s);
+// Phase 20.34 (Comment C) — robust chart init: ensures init runs even if script load order varies.
+(function () {
+    function tryInit() {
+        if (typeof Chart !== 'undefined' && typeof window._initSurveyCharts === 'function') {
+            window._initSurveyCharts();
+            return true;
+        }
+        return false;
+    }
+    if (!tryInit()) {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', tryInit);
+        }
+        setTimeout(tryInit, 500);
     }
 })();
 </script>
 <script>
 window._initSurveyCharts = function () {
+    if (window._initSurveyChartsDone) return; window._initSurveyChartsDone = true;
     if (typeof Chart === 'undefined') return;
     var cards = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
         Model.Cards.Select(c => new {

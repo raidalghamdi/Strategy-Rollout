@@ -122,97 +122,141 @@
 </div>
 }
 
-@* Phase 20.33 (Comment 4) — Three-level detail: Individual / Department (v2) / Sector *@
+@* Phase 20.34 (Comment A) — Totals-first hierarchy: Overall → Sector → Department → Individual
+   Individual names hidden by default behind a toggle. *@
 @if (Model.Sections.Has(ExecReportSections.Departments))
 {
 <div class="card mb-3">
-    <h2 class="h5">تفصيل القطاعات</h2>
-    @if (Model.SectorRows.Any())
-    {
-        <div class="table-responsive">
-            <table class="table table-hover align-middle table-sm" style="background:#fff;">
-                <thead class="table-dark">
-                    <tr><th>القطاع</th><th>الجلسات</th><th>الحضور</th><th>نسبة الإكمال</th><th>متوسط الوقت (د)</th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var s in Model.SectorRows)
-                    {
-                        <tr>
-                            <td><strong>@(string.IsNullOrEmpty(s.SectorName) ? "إدارات مستقلة" : s.SectorName)</strong></td>
-                            <td>@s.SessionsCount</td>
-                            <td>@s.AttendeesCount</td>
-                            <td>@s.CompletionRate.ToString("0.#")%</td>
-                            <td>@(s.AvgCompletionMinutes > 0 ? s.AvgCompletionMinutes.ToString("0.#") : "—")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
-    else { <p class="muted">لا توجد بيانات قطاعات.</p> }
-</div>
+    <h2 class="h5 mb-1">الإجماليات حسب المستوى</h2>
+    <p class="muted small mb-3">تعرض الأرقام الإجمالية على مستوى المنظمة، ثم القطاعات، ثم الإدارات. الأسماء الفردية مخفية افتراضياً ويمكن إظهارها بزر الإظهار في الأسفل.</p>
 
-<div class="card mb-3">
-    <h2 class="h5">تفصيل الإدارات (موسع)</h2>
-    @if (Model.DepartmentRowsV2.Any())
-    {
-        <div class="table-responsive">
-            <table class="table table-hover align-middle table-sm" style="background:#fff;">
-                <thead>
-                    <tr><th>الإدارة</th><th>القطاع</th><th>الجلسات</th><th>الحضور</th><th>نسبة الإكمال</th><th>متوسط الوقت (د)</th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var d in Model.DepartmentRowsV2)
-                    {
-                        <tr>
-                            <td><strong>@d.DeptName</strong></td>
-                            <td class="d-none d-md-table-cell">@(string.IsNullOrEmpty(d.SectorName) ? "—" : d.SectorName)</td>
-                            <td>@d.SessionsCount</td>
-                            <td>@d.AttendeesCount</td>
-                            <td>@d.CompletionRate.ToString("0.#")%</td>
-                            <td>@(d.AvgCompletionMinutes > 0 ? d.AvgCompletionMinutes.ToString("0.#") : "—")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
-    else { <p class="muted">لا توجد بيانات إدارات.</p> }
-</div>
-
-<div class="card mb-3">
-    <h2 class="h5">مستوى الموظفين (من سجل الحضور)</h2>
-    @if (Model.IndividualRows.Any())
-    {
+    @* Level 1 — Overall (organization-wide) *@
+    <div class="mb-3">
+        <h3 class="h6 mb-2">إجمالي المنظمة</h3>
         <div class="table-responsive">
             <table class="table table-sm align-middle" style="background:#fff;">
-                <thead>
-                    <tr>
-                        <th>الاسم</th>
-                        <th class="d-none d-md-table-cell">البريد الإلكتروني</th>
-                        <th>الإدارة</th>
-                        <th class="d-none d-md-table-cell">القطاع</th>
-                        <th>مكتمل?</th>
-                        <th class="d-none d-md-table-cell">وقت الإكمال (د)</th>
-                    </tr>
+                <thead class="table-light">
+                    <tr><th>الجلسات</th><th>الحضور</th><th>نسبة الإكمال</th><th>متوسط الوقت (د)</th></tr>
                 </thead>
                 <tbody>
-                    @foreach (var emp in Model.IndividualRows)
-                    {
-                        <tr>
-                            <td>@emp.FullNameAr</td>
-                            <td class="d-none d-md-table-cell"><span class="small">@(string.IsNullOrEmpty(emp.Email) ? "—" : emp.Email)</span></td>
-                            <td><span class="small">@emp.DeptName</span></td>
-                            <td class="d-none d-md-table-cell"><span class="small">@(string.IsNullOrEmpty(emp.SectorName) ? "—" : emp.SectorName)</span></td>
-                            <td>@(emp.Completed ? Html.Raw("<span class='badge bg-success'>مكتمل</span>") : Html.Raw("<span class='badge bg-secondary'>لم يكتمل</span>"))</td>
-                            <td class="d-none d-md-table-cell">@(emp.CompletionMinutes.HasValue ? emp.CompletionMinutes.Value.ToString("0.#") : "—")</td>
-                        </tr>
+                    @{
+                        var totSessions = Model.SectorRows.Sum(s => s.SessionsCount);
+                        var totAttendees = Model.SectorRows.Sum(s => s.AttendeesCount);
+                        var totCompletion = Model.Overview.CompletionPercentage;
+                        var totAvgMin = Model.Overview.AvgCompletionMinutes;
                     }
+                    <tr class="fw-bold" style="background:#FFF8E1;">
+                        <td>@totSessions</td>
+                        <td>@totAttendees</td>
+                        <td>@totCompletion.ToString("0.#")%</td>
+                        <td>@(totAvgMin > 0 ? totAvgMin.ToString("0.#") : "—")</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
+    </div>
+
+    @* Level 2 — Sectors (collapsible) *@
+    <details class="mb-3" open>
+        <summary class="h6 mb-2" style="cursor:pointer;">حسب القطاع (@Model.SectorRows.Count)</summary>
+        @if (Model.SectorRows.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle table-sm" style="background:#fff;">
+                    <thead class="table-dark">
+                        <tr><th>القطاع</th><th>الجلسات</th><th>الحضور</th><th>نسبة الإكمال</th><th>متوسط الوقت (د)</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model.SectorRows)
+                        {
+                            <tr>
+                                <td><strong>@(string.IsNullOrEmpty(s.SectorName) ? "إدارات مستقلة" : s.SectorName)</strong></td>
+                                <td>@s.SessionsCount</td>
+                                <td>@s.AttendeesCount</td>
+                                <td>@s.CompletionRate.ToString("0.#")%</td>
+                                <td>@(s.AvgCompletionMinutes > 0 ? s.AvgCompletionMinutes.ToString("0.#") : "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else { <p class="muted">لا توجد بيانات قطاعات.</p> }
+    </details>
+
+    @* Level 3 — Departments (collapsible) *@
+    <details class="mb-3">
+        <summary class="h6 mb-2" style="cursor:pointer;">حسب الإدارة (@Model.DepartmentRowsV2.Count)</summary>
+        @if (Model.DepartmentRowsV2.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle table-sm" style="background:#fff;">
+                    <thead>
+                        <tr><th>الإدارة</th><th>القطاع</th><th>الجلسات</th><th>الحضور</th><th>نسبة الإكمال</th><th>متوسط الوقت (د)</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var d in Model.DepartmentRowsV2)
+                        {
+                            <tr>
+                                <td><strong>@d.DeptName</strong></td>
+                                <td class="d-none d-md-table-cell">@(string.IsNullOrEmpty(d.SectorName) ? "—" : d.SectorName)</td>
+                                <td>@d.SessionsCount</td>
+                                <td>@d.AttendeesCount</td>
+                                <td>@d.CompletionRate.ToString("0.#")%</td>
+                                <td>@(d.AvgCompletionMinutes > 0 ? d.AvgCompletionMinutes.ToString("0.#") : "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else { <p class="muted">لا توجد بيانات إدارات.</p> }
+    </details>
+
+    @* Level 4 — Individuals (HIDDEN BY DEFAULT — toggle button) *@
+    @if (Model.IndividualRows.Any())
+    {
+        <div class="mt-3 mb-2">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="toggle-individuals"
+                    data-show-label="إظهار أسماء الموظفين (@Model.IndividualRows.Count)"
+                    data-hide-label="إخفاء أسماء الموظفين"
+                    onclick="(function(){var el=document.getElementById('individuals-section');var btn=document.getElementById('toggle-individuals');if(el.style.display==='none'){el.style.display='block';btn.textContent=btn.getAttribute('data-hide-label');}else{el.style.display='none';btn.textContent=btn.getAttribute('data-show-label');}})();">
+                إظهار أسماء الموظفين (@Model.IndividualRows.Count)
+            </button>
+            <span class="muted small ms-2">مخفية افتراضياً للحفاظ على الخصوصية والتركيز على الأرقام الإجمالية</span>
+        </div>
+        <div id="individuals-section" style="display:none;">
+            <h3 class="h6 mb-2">مستوى الموظفين (من سجل الحضور)</h3>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle" style="background:#fff;">
+                    <thead class="table-light">
+                        <tr>
+                            <th>الاسم</th>
+                            <th class="d-none d-md-table-cell">البريد الإلكتروني</th>
+                            <th>الإدارة</th>
+                            <th class="d-none d-md-table-cell">القطاع</th>
+                            <th>مكتمل؟</th>
+                            <th class="d-none d-md-table-cell">وقت الإكمال (د)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var emp in Model.IndividualRows)
+                        {
+                            <tr>
+                                <td>@emp.FullNameAr</td>
+                                <td class="d-none d-md-table-cell"><span class="small">@(string.IsNullOrEmpty(emp.Email) ? "—" : emp.Email)</span></td>
+                                <td><span class="small">@emp.DeptName</span></td>
+                                <td class="d-none d-md-table-cell"><span class="small">@(string.IsNullOrEmpty(emp.SectorName) ? "—" : emp.SectorName)</span></td>
+                                <td>@(emp.Completed ? Html.Raw("<span class='badge bg-success'>مكتمل</span>") : Html.Raw("<span class='badge bg-secondary'>لم يكتمل</span>"))</td>
+                                <td class="d-none d-md-table-cell">@(emp.CompletionMinutes.HasValue ? emp.CompletionMinutes.Value.ToString("0.#") : "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
     }
-    else { <p class="muted">لا يوجد أعضاء في سجل الحضور بعد.</p> }
+    else { <p class="muted small mt-2">لا يوجد أعضاء في سجل الحضور بعد.</p> }
 </div>
 }
 
@@ -477,15 +521,24 @@
 
 @section Scripts {
 @* Phase 20.33 (Comment 7) — load Chart.js with fallback mirror CDN to fix blank chart areas *@
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/lib/chartjs/chart.umd.min.js" onload="if(typeof window._initCharts==='function')window._initCharts();"></script>
 <script>
-// Fallback: if CDN failed to load Chart.js, try unpkg mirror
-(function() {
-    if (typeof Chart === 'undefined') {
-        var s = document.createElement('script');
-        s.src = 'https://unpkg.com/chart.js@4.4.1/dist/chart.umd.min.js';
-        s.onload = function() { if (typeof window._initCharts === 'function') window._initCharts(); };
-        document.head.appendChild(s);
+// Phase 20.34 (Comment C) — robust chart init: run when Chart.js is ready.
+// Chart.js is bundled locally (/lib/chartjs/) so this works offline / on intranet.
+(function () {
+    function tryInit() {
+        if (typeof Chart !== 'undefined' && typeof window._initCharts === 'function') {
+            window._initCharts();
+            return true;
+        }
+        return false;
+    }
+    if (!tryInit()) {
+        // Retry on DOMContentLoaded and once more 500ms later (covers script ordering edge cases)
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', tryInit);
+        }
+        setTimeout(tryInit, 500);
     }
 })();
 </script>
@@ -546,6 +599,8 @@
 // Phase 20.33 (Comment 7) — named init so fallback CDN can call it
 window._initCharts = function() {
     if (typeof Chart === 'undefined') return;
+    if (window._initChartsDone) return; // guard: prevent re-init double-draw
+    window._initChartsDone = true;
 
     var deptLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DepartmentBreakdown.Select(d => d.DeptName)));
     var deptAttendees = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DepartmentBreakdown.Select(d => d.AttendeesCount)));

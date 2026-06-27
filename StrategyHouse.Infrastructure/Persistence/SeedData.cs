@@ -150,6 +150,55 @@ public static class SeedData
             if (!await userManager.IsInRoleAsync(cxUser, "CX"))
                 await userManager.AddToRoleAsync(cxUser, "CX");
         }
+
+        // Phase 20.34 (Comment B) — seed a JOURNEY TEST user (idempotent). This account
+        // is intended for manual end-to-end testing of the employee journey flow.
+        // Email:    journey.test@gac.gov.sa
+        // Password: Journey@2026Strong
+        // Scope:    TEST (→ SEC_ALL synthetic dept, walks the unified all-sectors journey)
+        // Role:     Facilitator (حتى تظهر له روابط الرحلة دون أدوات إدارية)
+        var journeyTester = await userManager.FindByEmailAsync("journey.test@gac.gov.sa");
+        if (journeyTester == null)
+        {
+            journeyTester = new AppUser
+            {
+                UserName = "journey.test@gac.gov.sa",
+                Email = "journey.test@gac.gov.sa",
+                EmailConfirmed = true,
+                FullNameAr = "حساب تجربة الرحلة",
+                AppRole = UserRole.Facilitator,
+                JourneyScopeKey = "TEST",
+                IsActive = true,
+            };
+            var createTester = await userManager.CreateAsync(journeyTester, "Journey@2026Strong");
+            if (createTester.Succeeded)
+            {
+                await userManager.AddToRoleAsync(journeyTester, "Facilitator");
+                Console.WriteLine("[SeedData] Journey test user journey.test@gac.gov.sa created (password: Journey@2026Strong).");
+            }
+            else
+            {
+                Console.WriteLine($"[SeedData] Failed to create journey test user: {string.Join("; ", createTester.Errors.Select(e => e.Description))}");
+            }
+        }
+        else
+        {
+            // Ensure scope + role stay correct on existing installs.
+            bool dirty = false;
+            if (journeyTester.JourneyScopeKey != "TEST")
+            {
+                journeyTester.JourneyScopeKey = "TEST";
+                dirty = true;
+            }
+            if (journeyTester.AppRole != UserRole.Facilitator)
+            {
+                journeyTester.AppRole = UserRole.Facilitator;
+                dirty = true;
+            }
+            if (dirty) await userManager.UpdateAsync(journeyTester);
+            if (!await userManager.IsInRoleAsync(journeyTester, "Facilitator"))
+                await userManager.AddToRoleAsync(journeyTester, "Facilitator");
+        }
     }
 
     // Phase 20 — canonical 20-department list (DEPT-01..DEPT-20) with the three real
