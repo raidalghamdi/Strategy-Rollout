@@ -10,29 +10,91 @@
         _ => "<span class='badge' style='background:#9aa6b2'>لم تبدأ</span>"
     };
     var k = Model.Kpis;
+
+    // Phase 20.36 — sectors first then "الإدارات الأخرى" section, dedupe rows by DeptCode.
+    var sectorOrder = new[] { "قطاع الدعم المؤسسي", "قطاع الشؤون الاقتصادية", "قطاع الشؤون القانونية" };
+    var sectorGroups = Model.Groups
+        .Where(g => sectorOrder.Contains(g.Sector))
+        .OrderBy(g => Array.IndexOf(sectorOrder, g.Sector))
+        .ToList();
+    // Anything not in the three sectors becomes "الإدارات الأخرى" (only visible to GAC.ADMIN).
+    var otherGroups = Model.Groups
+        .Where(g => !sectorOrder.Contains(g.Sector))
+        .ToList();
 }
 <div class="live-kpis" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:0 0 16px;">
-    <div class="card" style="text-align:center;"><div class="muted small">إجمالي الإدارات</div><div style="font-size:1.6rem;font-weight:800;">@k.TotalDepartments</div></div>
-    <div class="card" style="text-align:center;"><div class="muted small">مكتملة</div><div style="font-size:1.6rem;font-weight:800;color:#5F9600;">@k.SessionsCompleted</div></div>
-    <div class="card" style="text-align:center;"><div class="muted small">قيد التنفيذ</div><div style="font-size:1.6rem;font-weight:800;color:#FAC126;">@k.SessionsInProgress</div></div>
-    <div class="card" style="text-align:center;"><div class="muted small">لم تبدأ</div><div style="font-size:1.6rem;font-weight:800;color:#9aa6b2;">@k.NotStarted</div></div>
-    <div class="card" style="text-align:center;"><div class="muted small">نسبة الإنجاز</div><div style="font-size:1.6rem;font-weight:800;">@k.OverallPercent%</div></div>
+    <div class="card" style="text-align:center;"><div class="muted small">إجمالي الإدارات التنفيذية</div><div style="font-size:1.6rem;font-weight:800;">@k.TotalDepartments</div></div>
+    <div class="card" style="text-align:center;"><div class="muted small">عدد الرحلات المكتملة</div><div style="font-size:1.6rem;font-weight:800;color:#5F9600;">@k.CompletedJourneys</div></div>
+    <div class="card" style="text-align:center;"><div class="muted small">عدد الاختبارات المنجزة</div><div style="font-size:1.6rem;font-weight:800;color:#FAC126;">@k.QuizzesDone</div></div>
+    <div class="card" style="text-align:center;"><div class="muted small">عدد المشاركين في الاستبيان</div><div style="font-size:1.6rem;font-weight:800;color:#28334A;">@k.SurveyParticipants</div></div>
+    <div class="card" style="text-align:center;"><div class="muted small">إجمالي الحضور</div><div style="font-size:1.6rem;font-weight:800;color:#1f497d;">@k.TotalAttendees</div></div>
 </div>
 
+@* Phase 20.36 #3 — replaced the map with a per-department attendee table. *@
+@if (Model.DeptAttendance.Any())
+{
+    <div class="card" style="padding:14px;margin-bottom:18px;">
+        <h3 style="margin:0 0 10px;">الحضور لكل إدارة تنفيذية</h3>
+        <div class="table-responsive">
+            <table class="table align-middle" style="background:#fff;">
+                <thead>
+                    <tr>
+                        <th>القطاع</th>
+                        <th>الإدارة التنفيذية</th>
+                        <th class="text-end" style="width:140px;">عدد الحضور</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{
+                        var bySector = Model.DeptAttendance
+                            .GroupBy(d => d.Sector)
+                            .OrderBy(g => Array.IndexOf(sectorOrder, g.Key) == -1
+                                ? sectorOrder.Length + 1 : Array.IndexOf(sectorOrder, g.Key))
+                            .ToList();
+                    }
+                    @foreach (var sg in bySector)
+                    {
+                        @* Phase 20.36 — hide "الإدارات الأخرى" from VPs (only GAC.ADMIN sees it). *@
+                        if (sg.Key == "الإدارات الأخرى" && !Model.IsGlobal) { continue; }
+                        var rowsInSector = sg.OrderByDescending(r => r.Attendees).ThenBy(r => r.DeptCode).ToList();
+                        var first = true;
+                        foreach (var d in rowsInSector)
+                        {
+                            <tr>
+                                @if (first)
+                                {
+                                    <td rowspan="@rowsInSector.Count" style="vertical-align:middle;font-weight:700;background:#f5f7fb;">
+                                        @sg.Key
+                                    </td>
+                                    first = false;
+                                }
+                                <td>@d.DeptName <span class="muted small">@d.DeptCode</span></td>
+                                <td class="text-end"><strong>@d.Attendees</strong></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@* Sessions table (sectors first, then "الإدارات الأخرى") *@
 @if (!Model.Groups.Any())
 {
     <p class="muted">لا توجد جلسات مطابقة ضمن نطاقك.</p>
 }
 else
 {
-    foreach (var g in Model.Groups)
+    @* Render sector groups in fixed order first. *@
+    foreach (var g in sectorGroups)
     {
         <h3 style="margin-top:1.2rem;">@g.Sector <span class="muted small">(@g.Rows.Count)</span></h3>
         <div class="table-responsive">
             <table class="table table-hover align-middle table-responsive-stack" style="background:#fff;">
                 <thead>
                     <tr>
-                        <th>الإدارة</th>
+                        <th>الإدارة التنفيذية</th>
                         <th>الحالة</th>
                         <th style="min-width:170px;">المرحلة</th>
                         <th>الأعضاء</th>
@@ -41,10 +103,65 @@ else
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var r in g.Rows)
+                    @{
+                        // Phase 20.36 — dedupe by DeptCode (keep latest session per dept).
+                        var deduped = g.Rows
+                            .GroupBy(r => r.DeptCode)
+                            .Select(grp => grp.OrderByDescending(x => x.LastActivityAt ?? x.StartedAt).First())
+                            .OrderBy(r => r.DeptCode)
+                            .ToList();
+                    }
+                    @foreach (var r in deduped)
                     {
                         <tr style="cursor:pointer;" onclick="location.href='/Admin/SessionDetail/@r.Id'">
-                            <td data-label="الإدارة"><strong>@r.DeptName</strong> <span class="muted small">@r.DeptCode</span></td>
+                            <td data-label="الإدارة التنفيذية"><strong>@r.DeptName</strong> <span class="muted small">@r.DeptCode</span></td>
+                            <td data-label="الحالة">@Html.Raw(Badge(r.StatusKey))</td>
+                            <td data-label="المرحلة">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div style="flex:1;background:#e7edf5;border-radius:6px;height:10px;overflow:hidden;min-width:80px;">
+                                        <div style="width:@r.ProgressPercent%;background:@Color(r.StatusKey);height:100%;"></div>
+                                    </div>
+                                    <span class="small">@r.CurrentStage/5 — @StageName(r.CurrentStage)</span>
+                                </div>
+                            </td>
+                            <td data-label="الأعضاء">@r.Members</td>
+                            <td data-label="الخريطة">@(r.MapSigned ? Html.Raw("<span class='badge bg-success'>معتمدة</span>") : Html.Raw("<span class='badge bg-secondary'>—</span>"))</td>
+                            <td data-label="آخر نشاط"><span class="small">@((r.LastActivityAt ?? r.StartedAt).ToLocalTime().ToString("MM-dd HH:mm"))</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @* "الإدارات الأخرى" appears only for GAC.ADMIN — VPs never see this section. *@
+    if (Model.IsGlobal && otherGroups.Any())
+    {
+        var combinedRows = otherGroups
+            .SelectMany(g => g.Rows)
+            .GroupBy(r => r.DeptCode)
+            .Select(grp => grp.OrderByDescending(x => x.LastActivityAt ?? x.StartedAt).First())
+            .OrderBy(r => r.DeptCode)
+            .ToList();
+
+        <h3 style="margin-top:1.2rem;">الإدارات الأخرى <span class="muted small">(@combinedRows.Count)</span></h3>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle table-responsive-stack" style="background:#fff;">
+                <thead>
+                    <tr>
+                        <th>الإدارة التنفيذية</th>
+                        <th>الحالة</th>
+                        <th style="min-width:170px;">المرحلة</th>
+                        <th>الأعضاء</th>
+                        <th>الخريطة</th>
+                        <th>آخر نشاط</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in combinedRows)
+                    {
+                        <tr style="cursor:pointer;" onclick="location.href='/Admin/SessionDetail/@r.Id'">
+                            <td data-label="الإدارة التنفيذية"><strong>@r.DeptName</strong> <span class="muted small">@r.DeptCode</span></td>
                             <td data-label="الحالة">@Html.Raw(Badge(r.StatusKey))</td>
                             <td data-label="المرحلة">
                                 <div class="d-flex align-items-center gap-2">

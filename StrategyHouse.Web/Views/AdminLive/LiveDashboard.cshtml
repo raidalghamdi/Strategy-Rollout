@@ -9,10 +9,16 @@
         <button type="button" class="btn btn-sm btn--secondary" id="liveRefresh">تحديث الآن</button>
         <button type="button" class="btn btn-sm btn--secondary" id="liveCsv">تصدير CSV</button>
         <button type="button" class="btn btn-sm btn--secondary" id="livePdf">طباعة / PDF</button>
+        @if (Model.IsGlobal)
+        {
+            <a href="/Admin/Survey/FinalReport.pdf" target="_blank" class="btn btn-sm btn--primary">
+                تقرير الاستبيان PDF
+            </a>
+        }
         <span id="liveDot" style="width:10px;height:10px;border-radius:50%;background:#5F9600;display:inline-block;"></span>
     </div>
 </div>
-<p class="muted">جلسات الإدارات ضمن نطاقك، مجمّعة حسب القطاع. تتحدّث تلقائياً كل ٥ دقائق.</p>
+<p class="muted">جلسات الإدارات التنفيذية ضمن نطاقك، مجمّعة حسب القطاع. تتحدّث تلقائياً كل ٥ دقائق.</p>
 
 <div class="mb-3 d-flex gap-2 flex-wrap align-items-end">
     <div>
@@ -45,10 +51,39 @@
         <input type="hidden" id="fSector" value="All" />
     }
     <div>
-        <label class="muted small d-block">الإدارة</label>
+        <label class="muted small d-block">الإدارة التنفيذية</label>
         <select id="fDept" class="form-select form-select-sm">
-            <option value="All" selected="@(Model.Dept == "All")">كل إدارات النطاق</option>
-            @foreach (var (code, nm) in Model.DeptOptions)
+            <option value="All" selected="@(Model.Dept == "All")">كل الإدارات التنفيذية</option>
+            @{
+                var sectorDeptCodes = new HashSet<string>(
+                    Model.DeptAttendance.Where(d => d.Sector != "الإدارات الأخرى").Select(d => d.DeptCode));
+                var otherDeptCodes = new HashSet<string>(
+                    Model.DeptAttendance.Where(d => d.Sector == "الإدارات الأخرى").Select(d => d.DeptCode));
+                var sectorDepts = Model.DeptOptions.Where(o => sectorDeptCodes.Contains(o.Code)).ToList();
+                var otherDepts  = Model.DeptOptions.Where(o => otherDeptCodes.Contains(o.Code)).ToList();
+                var unknownDepts = Model.DeptOptions
+                    .Where(o => !sectorDeptCodes.Contains(o.Code) && !otherDeptCodes.Contains(o.Code)).ToList();
+            }
+            @if (sectorDepts.Any())
+            {
+                <optgroup label="القطاعات">
+                    @foreach (var (code, nm) in sectorDepts)
+                    {
+                        <option value="@code" selected="@(Model.Dept == code)">@nm</option>
+                    }
+                </optgroup>
+            }
+            @* Phase 20.36 #4 — "الإدارات الأخرى" group shown only to GAC.ADMIN *@
+            @if (Model.IsGlobal && otherDepts.Any())
+            {
+                <optgroup label="الإدارات الأخرى">
+                    @foreach (var (code, nm) in otherDepts)
+                    {
+                        <option value="@code" selected="@(Model.Dept == code)">@nm</option>
+                    }
+                </optgroup>
+            }
+            @foreach (var (code, nm) in unknownDepts)
             {
                 <option value="@code" selected="@(Model.Dept == code)">@nm</option>
             }
@@ -71,7 +106,7 @@
     var fDept = document.getElementById('fDept');
 
     function qs() {
-        return 'status=' + encodeURIComponent(fStatus.value) +
+        return 'status=' + encodeURIComponent(fStatus ? fStatus.value : 'All') +
                '&sector=' + encodeURIComponent(fSector.value) +
                '&dept=' + encodeURIComponent(fDept.value);
     }
@@ -88,7 +123,7 @@
             else { dot.style.background = '#c0392b'; }
         } catch (e) { dot.style.background = '#c0392b'; }
     }
-    [fStatus, fSector, fDept].forEach(function (el) { el.addEventListener('change', refresh); });
+    [fStatus, fSector, fDept].forEach(function (el) { if (el) el.addEventListener('change', refresh); });
     document.getElementById('liveRefresh').addEventListener('click', refresh);
 
     // CSV export of the currently rendered table(s).

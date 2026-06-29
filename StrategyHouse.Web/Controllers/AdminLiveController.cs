@@ -136,21 +136,76 @@ public class AdminLiveController : Controller
 
         // "rows" already reflects the sector filter (line 108-109). For the dept filter
         // we already applied it earlier in the EF query (sessionsQ).
+        // Phase 20.36 — cards rewritten: total attendees, completed journeys (pre-quiz finished),
+        // quizzes done, and survey participants (linked via DepartmentRoster.EmailNormalized).
         var kpiRows = rows.Where(r => filteredDeptCodes.Contains(r.DeptCode)).ToList();
-        var completed = kpiRows.Count(r => r.CompletedAt != null);
-        var inProgress = kpiRows.Count(r => r.CompletedAt == null && r.CurrentStage > 1);
-        var activeDeptCount = kpiRows.Where(r => r.CompletedAt != null || r.CurrentStage > 1)
-                                     .Select(r => r.DeptCode).Distinct().Count();
-        var notStarted = filteredDepts.Count - activeDeptCount;
+        var completedJourneys = kpiRows.Count(r => r.CompletedAt != null);
+        var kpiSessionIds = kpiRows.Select(r => r.Id).ToList();
+
+        var totalAttendees = await _db.SessionMembers
+            .Where(m => kpiSessionIds.Contains(m.SessionId))
+            .CountAsync();
+
+        var quizzesDone = await _db.QuizAttempts
+            .Where(q => q.DeptCode != null && filteredDeptCodes.Contains(q.DeptCode))
+            .CountAsync();
+
+        // Survey participants — join SurveyResponses to DepartmentRoster via EmailNormalized
+        var responses = await _db.SurveyResponses
+            .Select(r => new { r.Id, r.DeptCode, r.RespondentName })
+            .ToListAsync();
+        var rosterEntries = await _db.DepartmentRoster
+            .Where(m => m.IsActive && m.EmailNormalized != null)
+            .Select(m => new { m.EmailNormalized, m.DeptCode })
+            .ToListAsync();
+        var emailToDept = rosterEntries
+            .Where(m => !string.IsNullOrEmpty(m.EmailNormalized))
+            .GroupBy(m => m.EmailNormalized!)
+            .ToDictionary(g => g.Key, g => g.First().DeptCode);
+
+        int surveyParticipants = 0;
+        foreach (var r in responses)
+        {
+            if (!string.IsNullOrEmpty(r.DeptCode) && filteredDeptCodes.Contains(r.DeptCode))
+            {
+                surveyParticipants++;
+                continue;
+            }
+            var email = (r.RespondentName ?? string.Empty).Trim().ToLowerInvariant();
+            if (!string.IsNullOrEmpty(email) && emailToDept.TryGetValue(email, out var dc)
+                && filteredDeptCodes.Contains(dc))
+            {
+                surveyParticipants++;
+            }
+        }
+
+        // Per-department attendee breakdown (replaces the map)
+        var attendeesByDept = (await _db.SessionMembers
+            .Where(m => kpiSessionIds.Contains(m.SessionId))
+            .Join(_db.StrategySessions, m => m.SessionId, s => s.Id, (m, s) => new { s.DeptCode })
+            .ToListAsync())
+            .GroupBy(x => x.DeptCode)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var deptAttendance = filteredDepts
+            .Select(d => new DeptAttendeeRow
+            {
+                DeptCode = d.DeptCode,
+                DeptName = d.NameAr ?? d.DeptCode,
+                Sector = string.IsNullOrEmpty(d.ParentSector) ? "الإدارات الأخرى" : d.ParentSector,
+                Attendees = attendeesByDept.TryGetValue(d.DeptCode, out var c) ? c : 0,
+            })
+            .OrderByDescending(x => x.Attendees)
+            .ThenBy(x => x.DeptCode)
+            .ToList();
 
         var kpis = new LiveKpis
         {
             TotalDepartments = filteredDepts.Count,
-            SessionsCompleted = completed,
-            SessionsInProgress = inProgress,
-            NotStarted = Math.Max(0, notStarted),
-            OverallPercent = filteredDepts.Count == 0 ? 0
-                : (int)Math.Round(100.0 * completed / filteredDepts.Count),
+            TotalAttendees = totalAttendees,
+            CompletedJourneys = completedJourneys,
+            QuizzesDone = quizzesDone,
+            SurveyParticipants = surveyParticipants,
         };
 
         // Phase 20.26 — sector filter is limited to the user's actual scope.
@@ -182,6 +237,7 @@ public class AdminLiveController : Controller
             IsGlobal = isGlobal,
             Kpis = kpis,
             Groups = groups,
+            DeptAttendance = deptAttendance,
             DeptOptions = allDepts.Select(d => (d.DeptCode, d.NameAr ?? d.DeptCode)).ToList(),
             SectorOptions = sectorFilterOptions,
         };
@@ -256,11 +312,20 @@ public class LiveSectorGroup
 
 public class LiveKpis
 {
+    // Phase 20.36 — relabelled cards.
     public int TotalDepartments { get; set; }
-    public int SessionsCompleted { get; set; }
-    public int SessionsInProgress { get; set; }
-    public int NotStarted { get; set; }
-    public int OverallPercent { get; set; }
+    public int TotalAttendees { get; set; }       // replaces نسبة الإنجاز
+    public int CompletedJourneys { get; set; }    // replaces مكتملة
+    public int QuizzesDone { get; set; }          // replaces قيد التنفيذ
+    public int SurveyParticipants { get; set; }   // replaces لم تبدأ
+}
+
+public class DeptAttendeeRow
+{
+    public string DeptCode { get; set; } = "";
+    public string DeptName { get; set; } = "";
+    public string Sector { get; set; } = "";
+    public int Attendees { get; set; }
 }
 
 public class LiveDashboardViewModel
@@ -271,6 +336,7 @@ public class LiveDashboardViewModel
     public bool IsGlobal { get; set; }
     public LiveKpis Kpis { get; set; } = new();
     public List<LiveSectorGroup> Groups { get; set; } = new();
+    public List<DeptAttendeeRow> DeptAttendance { get; set; } = new();
     public List<(string Code, string Name)> DeptOptions { get; set; } = new();
     public List<string> SectorOptions { get; set; } = new();
 }
