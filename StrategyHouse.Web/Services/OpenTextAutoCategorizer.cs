@@ -1,4 +1,7 @@
 // Phase 20.21 — Auto-categorisation for open-text survey answers.
+// Phase 20.35 — keyword rules now come from the DB (SurveyQuestionCategories.KeywordsJson)
+//                so analysts can edit them at /Admin/Survey/CategoryManager. The hard-coded
+//                dictionaries below remain only as the seed/fallback when DB rows are empty.
 //
 // Implements the official "آلية قياس نتائج استبيان الموظفين البَعدي" rule sheet:
 //   Q4 (التحديات)   → تنظيمية / تشريعية / موارد بشرية / أنظمة وتقنية / ثقافة مؤسسية
@@ -12,6 +15,7 @@
 // review it in /Admin/Survey/Categorize.
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using StrategyHouse.Domain.Entities;
 using StrategyHouse.Domain.Enums;
@@ -34,23 +38,58 @@ public class OpenTextAutoCategorizer
     /// </summary>
     public string? Classify(int questionOrder, string answer)
     {
+        // Backward-compatible signature — falls back to the hard-coded rules table.
+        // Prefer ClassifyWithRules() with DB-loaded rules wherever possible.
         if (string.IsNullOrWhiteSpace(answer)) return null;
-        var norm = Normalize(answer);
         var rules = GetRules(questionOrder);
         if (rules == null) return null;
+        return ClassifyWithRules(answer, rules);
+    }
 
+    /// <summary>
+    /// Phase 20.35 — stateless classifier that accepts an explicit rule set (e.g., loaded from
+    /// the DB). First match wins, in priority order; null if no keyword hits. Empty keyword
+    /// arrays are skipped silently.
+    /// </summary>
+    public string? ClassifyWithRules(string answer, IReadOnlyList<(string Category, string[] Keywords)> rules)
+    {
+        if (string.IsNullOrWhiteSpace(answer) || rules == null || rules.Count == 0) return null;
+        var norm = Normalize(answer);
         foreach (var (category, keywords) in rules)
         {
+            if (keywords == null || keywords.Length == 0) continue;
             foreach (var kw in keywords)
             {
-                // Normalise keyword at runtime so dictionary entries can be written
-                // naturally (with hamza, ta-marbouta, etc.) and still match.
                 var nkw = Normalize(kw);
                 if (string.IsNullOrEmpty(nkw)) continue;
                 if (norm.Contains(nkw)) return category;
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// Phase 20.35 — build a priority-ordered rule list from a question's DB categories.
+    /// Inactive categories are excluded. Categories with zero keywords are excluded so admin
+    /// rules don't get diluted by empty buckets. Returns an empty list when there is nothing
+    /// usable in the DB; callers should fall back to GetRules() when this happens.
+    /// </summary>
+    public static List<(string Category, string[] Keywords)> BuildRulesFromCategories(
+        IEnumerable<SurveyQuestionCategory> categories)
+    {
+        var list = new List<(string, string[])>();
+        foreach (var c in categories.Where(c => c.IsActive).OrderBy(c => c.Order))
+        {
+            string[] kws;
+            try
+            {
+                kws = JsonSerializer.Deserialize<string[]>(c.KeywordsJson ?? "[]") ?? Array.Empty<string>();
+            }
+            catch { kws = Array.Empty<string>(); }
+            if (kws.Length == 0) continue;
+            list.Add((c.Name, kws));
+        }
+        return list;
     }
 
     /// <summary>
@@ -61,14 +100,15 @@ public class OpenTextAutoCategorizer
     public async Task<(int AutoTagged, int Skipped, int Total)> CategorizeActiveSurveyAsync(CancellationToken ct = default)
     {
         var survey = await _db.Surveys
-            .Include(s => s.Questions)
             .FirstOrDefaultAsync(s => s.TitleAr == Phase12SurveySeeder.SurveyTitle, ct);
         if (survey == null) return (0, 0, 0);
 
-        var openQs = survey.Questions
-            .Where(q => q.QuestionType == QuestionType.OpenText)
+        // Phase 20.35 — load open-text questions with categories (for KeywordsJson rules).
+        var openQs = await _db.SurveyQuestions
+            .Include(q => q.Categories)
+            .Where(q => q.SurveyId == survey.Id && q.QuestionType == QuestionType.OpenText)
             .OrderBy(q => q.Order)
-            .ToList();
+            .ToListAsync(ct);
         if (openQs.Count == 0) return (0, 0, 0);
 
         var responses = await _db.SurveyResponses
@@ -82,6 +122,19 @@ public class OpenTextAutoCategorizer
             .Select(a => (a.SurveyResponseId, a.SurveyQuestionId))
             .ToHashSet();
 
+        // Phase 20.35 — pre-build per-question rule sets from DB, with hard-coded fallback.
+        var perQuestionRules = new Dictionary<Guid, List<(string Category, string[] Keywords)>>();
+        foreach (var q in openQs)
+        {
+            var dbRules = BuildRulesFromCategories(q.Categories);
+            if (dbRules.Count == 0)
+            {
+                var hard = GetRules(q.Order);
+                if (hard != null) dbRules = hard;
+            }
+            perQuestionRules[q.Id] = dbRules;
+        }
+
         int auto = 0, skipped = 0, total = 0;
         foreach (var resp in responses)
         {
@@ -92,7 +145,7 @@ public class OpenTextAutoCategorizer
                 if (string.IsNullOrWhiteSpace(val)) continue;
                 total++;
                 if (existingKey.Contains((resp.Id, q.Id))) { skipped++; continue; }
-                var cat = Classify(q.Order, val);
+                var cat = ClassifyWithRules(val, perQuestionRules[q.Id]);
                 if (cat == null) continue;
                 _db.OpenTextCategoryAssignments.Add(new OpenTextCategoryAssignment
                 {

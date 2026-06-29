@@ -1,0 +1,97 @@
+@model List<StrategyHouse.Web.Controllers.AdminCategoryManagerController.IndexRow>
+@{
+    ViewData["Title"] = "إدارة فئات الأسئلة المفتوحة";
+    var surveyTitle = ViewData["SurveyTitle"] as string ?? "";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <h1 class="mb-0">إدارة فئات الأسئلة المفتوحة</h1>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="/Admin/Survey/Categorize" class="btn btn--secondary btn-sm">⟶ تصنيف يدوي</a>
+        <a href="/Admin/Survey/FinalReport" class="btn btn--secondary btn-sm">⟶ التقرير النهائي</a>
+        <a href="/Admin/Survey/Analytics" class="btn btn--secondary btn-sm">⟶ التحليلات</a>
+    </div>
+</div>
+<p class="muted">@surveyTitle</p>
+
+@if (TempData["CatMsg"] is string msg && !string.IsNullOrEmpty(msg))
+{
+    <div class="alert alert-info">@msg</div>
+}
+
+<form method="post" action="/Admin/Survey/Categorize/AutoAll" class="mb-3 d-inline">
+    @Html.AntiForgeryToken()
+    <button type="submit" class="btn btn-sm" style="background:#194F90;color:#fff;font-weight:700;border-radius:999px;">
+        إعادة تشغيل التصنيف التلقائي للجميع
+    </button>
+</form>
+
+<div class="card mb-3">
+    <h2 class="h5">الأسئلة المفتوحة</h2>
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>السؤال</th>
+                <th title="إجمالي الإجابات">إجمالي</th>
+                <th title="إجابات نصية لم تُصنَّف">غير مصنّف</th>
+                <th title="إجابات فارغة">فارغ</th>
+                <th title="عدد الفئات النشطة">فئات نشطة</th>
+                <th title="عدد الفئات المعطّلة">معطّلة</th>
+                <th>الحالة في التقرير</th>
+                <th>إجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in Model)
+            {
+                <tr>
+                    <td>@r.Order</td>
+                    <td>@r.QuestionAr</td>
+                    <td>@r.Total</td>
+                    <td>
+                        @if (r.Uncategorized > 0)
+                        {
+                            <span class="badge bg-warning text-dark">@r.Uncategorized</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-success">0</span>
+                        }
+                    </td>
+                    <td><span class="text-muted">@r.BlankCount</span></td>
+                    <td>@r.ActiveCategories</td>
+                    <td><span class="text-muted">@r.InactiveCategories</span></td>
+                    <td>
+                        @if (r.ReadyForReport)
+                        {
+                            <span class="badge bg-success">جاهز</span>
+                            @if (r.ReadyForReportAt.HasValue) { <small class="text-muted d-block">@r.ReadyForReportAt.Value.ToString("yyyy-MM-dd HH:mm")</small> }
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">بانتظار المراجعة</span>
+                        }
+                    </td>
+                    <td>
+                        <a href="/Admin/Survey/CategoryManager/Edit/@r.QuestionId" class="btn btn-sm btn--secondary">إدارة</a>
+                    </td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="9" class="text-center text-muted">لا توجد أسئلة مفتوحة في الاستبيان النشط.</td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="card mb-3">
+    <h2 class="h6">كيف تعمل هذه الخدمة؟</h2>
+    <ul class="small text-muted">
+        <li>كل سؤال مفتوح يملك قائمة فئات قابلة للتعديل (إضافة/تعديل/تعطيل) — تُحفظ في قاعدة البيانات.</li>
+        <li>كل فئة تحتوي قائمة كلمات مفتاحية تُستخدم في التصنيف التلقائي — قابلة للتعديل أيضًا.</li>
+        <li>بعد المراجعة، اضغط <strong>"جاهز للنشر"</strong> ليظهر السؤال في التقرير النهائي.</li>
+        <li>الأسئلة بحالة <strong>"بانتظار المراجعة"</strong> تظهر في التقرير بشريط تنبيه ولا تُحتسب نتائجها التفصيلية.</li>
+    </ul>
+</div>

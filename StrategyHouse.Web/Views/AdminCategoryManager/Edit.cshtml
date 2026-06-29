@@ -1,0 +1,228 @@
+@model StrategyHouse.Web.Controllers.AdminCategoryManagerController.EditViewModel
+@{
+    ViewData["Title"] = $"إدارة فئات السؤال {Model.QuestionOrder}";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <h1 class="mb-0">السؤال @Model.QuestionOrder — إدارة الفئات</h1>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="/Admin/Survey/CategoryManager" class="btn btn--secondary btn-sm">⟶ كل الأسئلة المفتوحة</a>
+        <a href="/Admin/Survey/Categorize/@Model.QuestionId" class="btn btn--secondary btn-sm">⟶ التصنيف اليدوي</a>
+    </div>
+</div>
+<p class="muted">@Model.QuestionAr</p>
+
+@if (TempData["CatMsg"] is string msg && !string.IsNullOrEmpty(msg))
+{
+    <div class="alert alert-info">@msg</div>
+}
+
+@Html.AntiForgeryToken()
+
+<div class="card mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <h2 class="h6 mb-1">حالة هذا السؤال في التقرير النهائي</h2>
+            @if (Model.ReadyForReport)
+            {
+                <span class="badge bg-success">جاهز للنشر</span>
+                @if (Model.ReadyForReportAt.HasValue) { <small class="text-muted ms-2">منذ @Model.ReadyForReportAt.Value.ToString("yyyy-MM-dd HH:mm")</small> }
+            }
+            else
+            {
+                <span class="badge bg-secondary">بانتظار المراجعة قبل النشر</span>
+            }
+        </div>
+        <div class="d-flex gap-2">
+            @if (!Model.ReadyForReport)
+            {
+                <form method="post" action="/Admin/Survey/CategoryManager/MarkReady/@Model.QuestionId">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-sm" style="background:#009845;color:#fff;font-weight:700;border-radius:999px;">
+                        وضع علامة "جاهز للنشر"
+                    </button>
+                </form>
+            }
+            else
+            {
+                <form method="post" action="/Admin/Survey/CategoryManager/Unmark/@Model.QuestionId">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-sm btn--secondary">إلغاء الجاهزية</button>
+                </form>
+            }
+            <form method="post" action="/Admin/Survey/CategoryManager/Rerun/@Model.QuestionId">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-sm" style="background:#194F90;color:#fff;font-weight:700;border-radius:999px;">
+                    إعادة تشغيل التصنيف التلقائي
+                </button>
+            </form>
+        </div>
+    </div>
+    <div class="grid-3 mt-3">
+        <div class="card"><h3>@Model.TotalAnswers</h3><p class="muted small">إجمالي الإجابات</p></div>
+        <div class="card"><h3>@Model.CategorizedAnswers</h3><p class="muted small">مصنّفة</p></div>
+        <div class="card"><h3>@Model.Uncategorized.Count</h3><p class="muted small">غير مصنّفة (نصية)</p></div>
+    </div>
+    @if (Model.BlankAnswers > 0)
+    {
+        <p class="muted small mt-2">إجابات فارغة (مستبعدة من التصنيف): @Model.BlankAnswers</p>
+    }
+</div>
+
+<div class="card mb-3">
+    <h2 class="h5">الفئات</h2>
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th style="width:40px;">#</th>
+                <th>الاسم</th>
+                <th>الوصف</th>
+                <th>الكلمات المفتاحية</th>
+                <th>مرتبطة بإجابات</th>
+                <th>نوع</th>
+                <th>الحالة</th>
+                <th>إجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in Model.Categories)
+            {
+                <tr class="@(c.IsActive ? "" : "table-secondary")">
+                    <td>@c.Order</td>
+                    <td><strong>@c.Name</strong></td>
+                    <td><span class="text-muted small">@(c.DescriptionAr ?? "—")</span></td>
+                    <td>
+                        @if (c.Keywords.Any())
+                        {
+                            <details>
+                                <summary class="small">@c.Keywords.Count كلمة</summary>
+                                <div class="small text-muted">@string.Join("، ", c.Keywords)</div>
+                            </details>
+                        }
+                        else
+                        {
+                            <span class="text-muted small">لا توجد</span>
+                        }
+                    </td>
+                    <td><span class="badge bg-light text-dark">@c.AssignedCount</span></td>
+                    <td>
+                        @if (c.IsBuiltin) { <span class="badge bg-info text-dark">أساسي</span> } else { <span class="badge bg-light text-dark">مخصّص</span> }
+                    </td>
+                    <td>
+                        @if (c.IsActive) { <span class="badge bg-success">نشط</span> } else { <span class="badge bg-secondary">معطّل</span> }
+                    </td>
+                    <td class="d-flex flex-wrap gap-1">
+                        <button type="button" class="btn btn-sm btn--secondary" onclick="document.getElementById('edit-cat-@c.Id').classList.toggle('d-none')">تعديل</button>
+                        <form method="post" action="/Admin/Survey/CategoryManager/ToggleActive" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="questionId" value="@Model.QuestionId" />
+                            <input type="hidden" name="categoryId" value="@c.Id" />
+                            <button type="submit" class="btn btn-sm btn--secondary">@(c.IsActive ? "تعطيل" : "تفعيل")</button>
+                        </form>
+                        <form method="post" action="/Admin/Survey/CategoryManager/DeleteCategory" class="d-inline" onsubmit="return confirm('حذف الفئة @c.Name؟ سيتم تعطيلها إذا كانت مرتبطة بإجابات.');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="questionId" value="@Model.QuestionId" />
+                            <input type="hidden" name="categoryId" value="@c.Id" />
+                            <button type="submit" class="btn btn-sm btn-danger">حذف</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr id="edit-cat-@c.Id" class="d-none">
+                    <td colspan="8">
+                        <form method="post" action="/Admin/Survey/CategoryManager/EditCategory" class="row g-2">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="questionId" value="@Model.QuestionId" />
+                            <input type="hidden" name="categoryId" value="@c.Id" />
+                            <div class="col-md-3">
+                                <label class="form-label small">الاسم</label>
+                                <input type="text" name="name" value="@c.Name" class="form-control form-control-sm" required />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">الوصف (اختياري)</label>
+                                <input type="text" name="descriptionAr" value="@c.DescriptionAr" class="form-control form-control-sm" />
+                            </div>
+                            <div class="col-md-1">
+                                <label class="form-label small">الترتيب</label>
+                                <input type="number" name="order" value="@c.Order" class="form-control form-control-sm" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">الكلمات المفتاحية (افصل بفاصلة)</label>
+                                <textarea name="keywords" class="form-control form-control-sm" rows="2">@string.Join("، ", c.Keywords)</textarea>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;">حفظ</button>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+            }
+            @if (!Model.Categories.Any())
+            {
+                <tr><td colspan="8" class="text-center text-muted">لا توجد فئات بعد — أضف الفئة الأولى أدناه.</td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="card mb-3">
+    <h2 class="h6">إضافة فئة جديدة</h2>
+    <form method="post" action="/Admin/Survey/CategoryManager/AddCategory" class="row g-2">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="questionId" value="@Model.QuestionId" />
+        <div class="col-md-3">
+            <label class="form-label small">الاسم</label>
+            <input type="text" name="name" class="form-control form-control-sm" required placeholder="مثال: شفافية" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small">الوصف (اختياري)</label>
+            <input type="text" name="descriptionAr" class="form-control form-control-sm" placeholder="وصف قصير يساعد المراجعين" />
+        </div>
+        <div class="col-md-5">
+            <label class="form-label small">الكلمات المفتاحية (افصل بفاصلة)</label>
+            <input type="text" name="keywords" class="form-control form-control-sm" placeholder="شفافية, إفصاح, وضوح" />
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-sm" style="background:#009845;color:#fff;font-weight:700;border-radius:999px;">إضافة الفئة</button>
+        </div>
+    </form>
+</div>
+
+<div class="card mb-3">
+    <h2 class="h5">إجابات غير مصنّفة (@Model.Uncategorized.Count)</h2>
+    @if (!Model.Uncategorized.Any())
+    {
+        <p class="text-muted small">جميع الإجابات النصية مصنّفة.</p>
+    }
+    else
+    {
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr><th>التاريخ</th><th>الإجابة</th><th style="width:280px;">تعيين فئة</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var a in Model.Uncategorized)
+                {
+                    <tr>
+                        <td class="text-muted small">@a.SubmittedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@a.Text</td>
+                        <td>
+                            <form method="post" action="/Admin/Survey/CategoryManager/AssignAnswer" class="d-flex gap-1">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="questionId" value="@Model.QuestionId" />
+                                <input type="hidden" name="responseId" value="@a.ResponseId" />
+                                <select name="category" class="form-select form-select-sm">
+                                    <option value="">— اختر فئة —</option>
+                                    @foreach (var cat in Model.Categories.Where(x => x.IsActive))
+                                    {
+                                        <option value="@cat.Name">@cat.Name</option>
+                                    }
+                                </select>
+                                <button type="submit" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;">تعيين</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>

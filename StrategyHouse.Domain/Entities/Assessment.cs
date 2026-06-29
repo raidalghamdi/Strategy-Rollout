@@ -73,6 +73,15 @@ public class SurveyQuestion
     [MaxLength(500)] public string? MeasurementMetric { get; set; }
     [Column(TypeName = "longtext")] public string? MeasurementFormula { get; set; }
 
+    // Phase 20.35 — gate that controls whether this question's results show in FinalReport.
+    // Admins must explicitly mark a question ready (after reviewing categorization) before it is
+    // populated into the published final report. Defaults to true to preserve existing behaviour
+    // for non-open-text questions; the auto-categorizer flips it to false for OpenText until a
+    // human signs off.
+    public bool ReadyForReport { get; set; } = true;
+    public DateTime? ReadyForReportAt { get; set; }
+    public int? ReadyForReportByUserId { get; set; }
+
     [ForeignKey(nameof(SurveyId))]
     public Survey? Survey { get; set; }
 
@@ -81,6 +90,8 @@ public class SurveyQuestion
 }
 
 // Phase 12 — predefined categories an analyst can tag open-text answers with.
+// Phase 20.35 — categories now carry their own keyword dictionary (JSON array of Arabic terms)
+// so analysts can edit auto-categorisation rules from the admin UI instead of editing source code.
 [Table("SurveyQuestionCategories")]
 public class SurveyQuestionCategory
 {
@@ -88,6 +99,21 @@ public class SurveyQuestionCategory
     public Guid SurveyQuestionId { get; set; }
     [MaxLength(120)] public string Name { get; set; } = "";
     public int Order { get; set; }
+
+    // Phase 20.35 — admin-managed keyword list. Stored as JSON array of strings; an empty list
+    // means the category is matched only by manual assignment. Existing rows back-fill to "[]".
+    [Column(TypeName = "longtext")] public string KeywordsJson { get; set; } = "[]";
+
+    // Active = participates in auto-categorisation and shows in dropdowns. Admins can deactivate
+    // a category without losing its historical assignments.
+    public bool IsActive { get; set; } = true;
+
+    // Builtin = seeded by the platform (e.g., Q4 challenges, Q5 values, Q7 aspirations). Admins
+    // can edit keywords on builtin rows but cannot delete them; non-builtin rows are fully
+    // editable and deletable.
+    public bool IsBuiltin { get; set; } = false;
+
+    [MaxLength(500)] public string? DescriptionAr { get; set; }
 
     [ForeignKey(nameof(SurveyQuestionId))]
     public SurveyQuestion? SurveyQuestion { get; set; }

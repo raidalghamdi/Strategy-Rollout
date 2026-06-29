@@ -243,6 +243,9 @@ using (var scope = app.Services.CreateScope())
     // Phase 12 — replace the survey bank with the 8 official questions (idempotent via hash).
     await Phase12SurveySeeder.SeedAsync(db);
 
+    // Phase 20.35 — seed default keyword rules into SurveyQuestionCategories.KeywordsJson (idempotent; never overwrites admin edits).
+    await CategoryKeywordsSeeder.SeedAsync(db);
+
     // Phase 14 — seed editable home-page CMS keys (idempotent; never overwrites edits).
     await Phase14HomeContentSeeder.SeedAsync(db);
 

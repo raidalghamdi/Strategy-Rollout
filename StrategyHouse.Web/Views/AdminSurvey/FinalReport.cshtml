@@ -1,4 +1,6 @@
 @using StrategyHouse.Domain.Enums
+@using Microsoft.EntityFrameworkCore
+@inject StrategyHouse.Infrastructure.Persistence.ApplicationDbContext _db
 @model StrategyHouse.Web.Models.FinalReportViewModel
 @{
     ViewData["Title"] = "التقرير النهائي للاستبيان";
@@ -9,6 +11,16 @@
         QuestionType.OpenText => "سؤال مفتوح",
         _ => ""
     };
+
+    // Phase 20.35 — read ReadyForReport flag live for the OpenText questions shown below.
+    var readyMap = await _db.SurveyQuestions
+        .Where(q => Model.Cards.Select(c => c.QuestionId).Contains(q.Id))
+        .ToDictionaryAsync(q => q.Id, q => q.ReadyForReport);
+    bool IsReady(Guid qid) => !readyMap.TryGetValue(qid, out var v) || v;
+    var pendingOpenText = Model.Cards
+        .Where(c => c.Type == QuestionType.OpenText && !IsReady(c.QuestionId))
+        .OrderBy(c => c.Order)
+        .ToList();
 }
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -18,10 +30,24 @@
         <a href="/Admin/Survey/FinalReport.pptx" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">تحميل PowerPoint</a>
         <a href="/Admin/Survey/FinalReport.xlsx" class="btn btn-sm" style="background:#FAC126;color:#00192B;font-weight:700;border-radius:999px;">تحميل Excel</a>
         <button type="button" id="btn-email-report" class="btn btn-sm" style="background:#fff;color:#00192B;font-weight:700;border-radius:999px;">إرسال بالبريد</button>
+        <a href="/Admin/Survey/CategoryManager" class="btn btn--secondary btn-sm">⟶ إدارة الفئات</a>
         <a href="/Admin/Survey/Analytics" class="btn btn--secondary btn-sm">⟶ التحليلات</a>
     </div>
 </div>
 <p class="muted">@Model.SurveyTitle</p>
+
+@if (pendingOpenText.Any())
+{
+    <div class="alert alert-warning" role="alert">
+        <strong>تنبيه:</strong> الأسئلة التالية بانتظار المراجعة قبل النشر ولا تظهر بتفاصيلها في هذا التقرير:
+        <ul class="mb-0 mt-1">
+            @foreach (var c in pendingOpenText)
+            {
+                <li>السؤال @c.Order: @c.QuestionAr — <a href="/Admin/Survey/CategoryManager/Edit/@c.QuestionId">راجع الآن</a></li>
+            }
+        </ul>
+    </div>
+}
 
 @Html.AntiForgeryToken()
 
@@ -78,7 +104,7 @@
         {
             <div class="chart-wrap" style="height:200px;"><canvas id="rep-@c.Order"></canvas></div>
         }
-        else if (c.Type == QuestionType.OpenText && c.OpenText != null)
+        else if (c.Type == QuestionType.OpenText && c.OpenText != null && IsReady(c.QuestionId))
         {
             @* Phase 20.33 (Comment 11) — dual-denominator summary + categories table *@
             <p class="fw-bold text-success">
@@ -112,8 +138,16 @@
                 </div>
             }
         }
+        else if (c.Type == QuestionType.OpenText && !IsReady(c.QuestionId))
+        {
+            <div class="alert alert-secondary mb-0">
+                <strong>بانتظار المراجعة قبل النشر.</strong>
+                ستظهر نتائج هذا السؤال بعد مراجعة الفئات ووضع علامة الجاهزية.
+                <a href="/Admin/Survey/CategoryManager/Edit/@c.QuestionId" class="alert-link">افتح إدارة الفئات</a>
+            </div>
+        }
 
-        @if (Model.Interpretations.TryGetValue(c.QuestionId, out var interp))
+        @if (Model.Interpretations.TryGetValue(c.QuestionId, out var interp) && (c.Type != QuestionType.OpenText || IsReady(c.QuestionId)))
         {
             <p class="muted small fst-italic">التفسير: @interp</p>
         }
