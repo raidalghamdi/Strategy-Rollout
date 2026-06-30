@@ -152,33 +152,61 @@ public class AdminLiveController : Controller
             .Where(q => q.DeptCode != null && filteredDeptCodes.Contains(q.DeptCode))
             .CountAsync();
 
-        // Survey participants — join SurveyResponses to DepartmentRoster via EmailNormalized
-        var responses = await _db.SurveyResponses
-            .Select(r => new { r.Id, r.DeptCode, r.RespondentName })
-            .ToListAsync();
-        var rosterEntries = await _db.DepartmentRoster
-            .Where(m => m.IsActive && m.EmailNormalized != null)
-            .Select(m => new { m.EmailNormalized, m.DeptCode })
-            .ToListAsync();
-        var emailToDept = rosterEntries
-            .Where(m => !string.IsNullOrEmpty(m.EmailNormalized))
-            .GroupBy(m => m.EmailNormalized!)
-            .ToDictionary(g => g.Key, g => g.First().DeptCode);
+        // Phase 20.37 — "عدد المشاركين في الاستبيان" must use exactly the same source as the
+        // Survey Analytics page "إجمالي الردود" — i.e. count of SurveyResponses on the active
+        // (most-recent) survey. For admin/GLOBAL we return that total directly. For VPs we
+        // scope the same set: by SurveyResponses.DeptCode first, then by RespondentName
+        // (email) -> DepartmentRoster.DeptCode fallback.
+        var officialSurveyId = await _db.Surveys
+            .Where(s => s.IsActive)
+            .OrderByDescending(s => s.CreatedAt)
+            .Select(s => (Guid?)s.Id)
+            .FirstOrDefaultAsync();
 
-        int surveyParticipants = 0;
-        foreach (var r in responses)
+        int surveyParticipants;
+        if (officialSurveyId == null)
         {
-            if (!string.IsNullOrEmpty(r.DeptCode) && filteredDeptCodes.Contains(r.DeptCode))
+            surveyParticipants = 0;
+        }
+        else if (isGlobal)
+        {
+            // Same calculation as AdminSurveyController.BuildAnalyticsAsync — the value
+            // displayed on "تحليلات الاستبيان الرسمي" / إجمالي الردود.
+            surveyParticipants = await _db.SurveyResponses
+                .CountAsync(r => r.SurveyId == officialSurveyId);
+        }
+        else
+        {
+            // Scoped VP view — still pulling from the same SurveyResponses table.
+            var responses = await _db.SurveyResponses
+                .Where(r => r.SurveyId == officialSurveyId)
+                .Select(r => new { r.Id, r.DeptCode, r.RespondentName })
+                .ToListAsync();
+            var rosterEntries = await _db.DepartmentRoster
+                .Where(m => m.IsActive && m.EmailNormalized != null)
+                .Select(m => new { m.EmailNormalized, m.DeptCode })
+                .ToListAsync();
+            var emailToDept = rosterEntries
+                .Where(m => !string.IsNullOrEmpty(m.EmailNormalized))
+                .GroupBy(m => m.EmailNormalized!)
+                .ToDictionary(g => g.Key, g => g.First().DeptCode);
+
+            int matched = 0;
+            foreach (var r in responses)
             {
-                surveyParticipants++;
-                continue;
+                if (!string.IsNullOrEmpty(r.DeptCode) && filteredDeptCodes.Contains(r.DeptCode))
+                {
+                    matched++;
+                    continue;
+                }
+                var email = (r.RespondentName ?? string.Empty).Trim().ToLowerInvariant();
+                if (!string.IsNullOrEmpty(email) && emailToDept.TryGetValue(email, out var dc)
+                    && filteredDeptCodes.Contains(dc))
+                {
+                    matched++;
+                }
             }
-            var email = (r.RespondentName ?? string.Empty).Trim().ToLowerInvariant();
-            if (!string.IsNullOrEmpty(email) && emailToDept.TryGetValue(email, out var dc)
-                && filteredDeptCodes.Contains(dc))
-            {
-                surveyParticipants++;
-            }
+            surveyParticipants = matched;
         }
 
         // Per-department attendee breakdown (replaces the map) — same source as the
