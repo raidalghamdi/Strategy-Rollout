@@ -50,7 +50,6 @@ else
                         <th>الإدارة التنفيذية</th>
                         <th>الحالة</th>
                         <th style="min-width:170px;">المرحلة</th>
-                        <th>الأعضاء</th>
                         <th>عدد الحضور</th>
                         <th>آخر نشاط</th>
                     </tr>
@@ -77,7 +76,6 @@ else
                                     <span class="small">@r.CurrentStage/5 — @StageName(r.CurrentStage)</span>
                                 </div>
                             </td>
-                            <td data-label="الأعضاء">@r.Members</td>
                             <td data-label="عدد الحضور"><strong>@(r.AttendeeCount ?? 0)</strong></td>
                             <td data-label="آخر نشاط"><span class="small">@((r.LastActivityAt ?? r.StartedAt).ToLocalTime().ToString("MM-dd HH:mm"))</span></td>
                         </tr>
@@ -105,7 +103,6 @@ else
                         <th>الإدارة التنفيذية</th>
                         <th>الحالة</th>
                         <th style="min-width:170px;">المرحلة</th>
-                        <th>الأعضاء</th>
                         <th>عدد الحضور</th>
                         <th>آخر نشاط</th>
                     </tr>
@@ -124,7 +121,6 @@ else
                                     <span class="small">@r.CurrentStage/5 — @StageName(r.CurrentStage)</span>
                                 </div>
                             </td>
-                            <td data-label="الأعضاء">@r.Members</td>
                             <td data-label="عدد الحضور"><strong>@(r.AttendeeCount ?? 0)</strong></td>
                             <td data-label="آخر نشاط"><span class="small">@((r.LastActivityAt ?? r.StartedAt).ToLocalTime().ToString("MM-dd HH:mm"))</span></td>
                         </tr>
