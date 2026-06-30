@@ -30,54 +30,7 @@
     <div class="card" style="text-align:center;"><div class="muted small">إجمالي الحضور</div><div style="font-size:1.6rem;font-weight:800;color:#1f497d;">@k.TotalAttendees</div></div>
 </div>
 
-@* Phase 20.36 #3 — replaced the map with a per-department attendee table. *@
-@if (Model.DeptAttendance.Any())
-{
-    <div class="card" style="padding:14px;margin-bottom:18px;">
-        <h3 style="margin:0 0 10px;">الحضور لكل إدارة تنفيذية</h3>
-        <div class="table-responsive">
-            <table class="table align-middle" style="background:#fff;">
-                <thead>
-                    <tr>
-                        <th>القطاع</th>
-                        <th>الإدارة التنفيذية</th>
-                        <th class="text-end" style="width:140px;">عدد الحضور</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @{
-                        var bySector = Model.DeptAttendance
-                            .GroupBy(d => d.Sector)
-                            .OrderBy(g => Array.IndexOf(sectorOrder, g.Key) == -1
-                                ? sectorOrder.Length + 1 : Array.IndexOf(sectorOrder, g.Key))
-                            .ToList();
-                    }
-                    @foreach (var sg in bySector)
-                    {
-                        @* Phase 20.36 — hide "الإدارات الأخرى" from VPs (only GAC.ADMIN sees it). *@
-                        if (sg.Key == "الإدارات الأخرى" && !Model.IsGlobal) { continue; }
-                        var rowsInSector = sg.OrderByDescending(r => r.Attendees).ThenBy(r => r.DeptCode).ToList();
-                        var first = true;
-                        foreach (var d in rowsInSector)
-                        {
-                            <tr>
-                                @if (first)
-                                {
-                                    <td rowspan="@rowsInSector.Count" style="vertical-align:middle;font-weight:700;background:#f5f7fb;">
-                                        @sg.Key
-                                    </td>
-                                    first = false;
-                                }
-                                <td>@d.DeptName <span class="muted small">@d.DeptCode</span></td>
-                                <td class="text-end"><strong>@d.Attendees</strong></td>
-                            </tr>
-                        }
-                    }
-                </tbody>
-            </table>
-        </div>
-    </div>
-}
+@* Phase 20.37 — "الحضور لكل إدارة تنفيذية" section removed per user request. *@
 
 @* Sessions table (sectors first, then "الإدارات الأخرى") *@
 @if (!Model.Groups.Any())
@@ -98,7 +51,7 @@ else
                         <th>الحالة</th>
                         <th style="min-width:170px;">المرحلة</th>
                         <th>الأعضاء</th>
-                        <th>الخريطة</th>
+                        <th>عدد الحضور</th>
                         <th>آخر نشاط</th>
                     </tr>
                 </thead>
@@ -125,7 +78,7 @@ else
                                 </div>
                             </td>
                             <td data-label="الأعضاء">@r.Members</td>
-                            <td data-label="الخريطة">@(r.MapSigned ? Html.Raw("<span class='badge bg-success'>معتمدة</span>") : Html.Raw("<span class='badge bg-secondary'>—</span>"))</td>
+                            <td data-label="عدد الحضور"><strong>@(r.AttendeeCount ?? 0)</strong></td>
                             <td data-label="آخر نشاط"><span class="small">@((r.LastActivityAt ?? r.StartedAt).ToLocalTime().ToString("MM-dd HH:mm"))</span></td>
                         </tr>
                     }
@@ -153,7 +106,7 @@ else
                         <th>الحالة</th>
                         <th style="min-width:170px;">المرحلة</th>
                         <th>الأعضاء</th>
-                        <th>الخريطة</th>
+                        <th>عدد الحضور</th>
                         <th>آخر نشاط</th>
                     </tr>
                 </thead>
@@ -172,7 +125,7 @@ else
                                 </div>
                             </td>
                             <td data-label="الأعضاء">@r.Members</td>
-                            <td data-label="الخريطة">@(r.MapSigned ? Html.Raw("<span class='badge bg-success'>معتمدة</span>") : Html.Raw("<span class='badge bg-secondary'>—</span>"))</td>
+                            <td data-label="عدد الحضور"><strong>@(r.AttendeeCount ?? 0)</strong></td>
                             <td data-label="آخر نشاط"><span class="small">@((r.LastActivityAt ?? r.StartedAt).ToLocalTime().ToString("MM-dd HH:mm"))</span></td>
                         </tr>
                     }

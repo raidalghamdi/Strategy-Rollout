@@ -101,6 +101,7 @@ public class AdminLiveController : Controller
                 StartedAt = s.StartedAt,
                 LastActivityAt = s.LastActivityAt,
                 Members = memberCounts.TryGetValue(s.Id, out var mc) ? mc : 0,
+                AttendeeCount = s.AttendeeCount,
                 MapSigned = signedSet.Contains(s.Id),
             };
         }).ToList();
@@ -142,9 +143,10 @@ public class AdminLiveController : Controller
         var completedJourneys = kpiRows.Count(r => r.CompletedAt != null);
         var kpiSessionIds = kpiRows.Select(r => r.Id).ToList();
 
-        var totalAttendees = await _db.SessionMembers
-            .Where(m => kpiSessionIds.Contains(m.SessionId))
-            .CountAsync();
+        // Phase 20.37 — align with Executive Report: total attendees comes from
+        // StrategySessions.AttendeeCount (the authoritative source), not SessionMembers
+        // row count, which is only populated when a session is actually opened.
+        var totalAttendees = kpiRows.Sum(r => r.AttendeeCount ?? 0);
 
         var quizzesDone = await _db.QuizAttempts
             .Where(q => q.DeptCode != null && filteredDeptCodes.Contains(q.DeptCode))
@@ -179,13 +181,11 @@ public class AdminLiveController : Controller
             }
         }
 
-        // Per-department attendee breakdown (replaces the map)
-        var attendeesByDept = (await _db.SessionMembers
-            .Where(m => kpiSessionIds.Contains(m.SessionId))
-            .Join(_db.StrategySessions, m => m.SessionId, s => s.Id, (m, s) => new { s.DeptCode })
-            .ToListAsync())
-            .GroupBy(x => x.DeptCode)
-            .ToDictionary(g => g.Key, g => g.Count());
+        // Per-department attendee breakdown (replaces the map) — same source as the
+        // executive report card: sum of StrategySessions.AttendeeCount grouped by DeptCode.
+        var attendeesByDept = kpiRows
+            .GroupBy(r => r.DeptCode)
+            .ToDictionary(g => g.Key, g => g.Sum(r => r.AttendeeCount ?? 0));
 
         var deptAttendance = filteredDepts
             .Select(d => new DeptAttendeeRow
@@ -293,6 +293,7 @@ public class LiveSessionRow
     public DateTime StartedAt { get; set; }
     public DateTime? LastActivityAt { get; set; }
     public int Members { get; set; }
+    public int? AttendeeCount { get; set; }
     public bool MapSigned { get; set; }
 
     // Status bucket for colour coding: green / yellow / gray.
